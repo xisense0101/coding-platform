@@ -74,6 +74,39 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      {/* Exam App Download Section */}
+      <section className="py-8 px-4">
+        <div className="container mx-auto max-w-2xl">
+          <Card className="shadow-lg border-2 border-blue-100 dark:border-blue-900 bg-white dark:bg-gray-900">
+            <CardHeader className="flex flex-row items-center gap-4">
+              <div className="w-14 h-14 bg-blue-50 dark:bg-blue-800 rounded-lg flex items-center justify-center">
+                <Shield className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Exam Application for Desktop <Badge variant="secondary" className="ml-2">Beta</Badge></CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-300">Download the secure exam app for Windows. Always get the latest version.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-2 pb-6 flex flex-col items-center">
+              <Button asChild size="lg" className="text-lg px-8 bg-blue-600 hover:bg-blue-700 text-white shadow-md">
+                <a
+                  href="https://github.com/xisense0101/exam-electron/releases/latest/download/blockscode-Setup-1.0.9.exe"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                >
+                  <span className="flex items-center gap-2">
+                    <ArrowRight className="h-5 w-5" /> Download for Windows
+                  </span>
+                </a>
+              </Button>
+              <div className="mt-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+                <span>Latest version is downloaded automatically. <br />File name: <b>blockscode-Setup.exe</b> <br />Windows only. <br />If you have issues, check <a href="https://github.com/xisense0101/exam-electron/releases" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400">all releases</a>.</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
       {/* Features Section */}
       <section className="py-20 px-4">
