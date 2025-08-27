@@ -90,7 +90,7 @@ export default function HomePage() {
             <CardContent className="pt-2 pb-6 flex flex-col items-center">
               <Button asChild size="lg" className="text-lg px-8 bg-blue-600 hover:bg-blue-700 text-white shadow-md">
                 <a
-                  href="https://github.com/xisense0101/exam-electron/releases/latest/download/blockscode-Setup-1.0.9.exe"
+                  href="https://github.com/xisense0101/exam-electron/releases/download/1.0.9/blockscode-Setup-1.0.9.exe"
                   target="_blank"
                   rel="noopener noreferrer"
                   download
