@@ -1,0 +1,12 @@
+{
+  "name": "coding-platform",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "npm@9.0.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "devDependencies": {
+    "turbo": "^1.13.4"
+  }
+}
