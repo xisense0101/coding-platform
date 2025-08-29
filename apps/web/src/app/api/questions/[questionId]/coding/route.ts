@@ -8,13 +8,16 @@ const updateCodingSchema = z.object({
   boilerplate_code: z.record(z.string()).optional(),
   allowed_languages: z.array(z.string()).optional(),
   test_cases: z.array(z.object({
-    input: z.string().default(""),
-    expected_output: z.string().default(""),
+    input: z.string().default("") ,
+    expected_output: z.string().default("") ,
     is_hidden: z.boolean().default(false),
     weight: z.number().default(1)
   })).default([]),
   time_limit: z.number().optional(),
-  memory_limit: z.number().optional()
+  memory_limit: z.number().optional(),
+  head: z.record(z.string()).optional(),
+  body_template: z.record(z.string()).optional(),
+  tail: z.record(z.string()).optional()
 })
 
 export async function GET(
@@ -137,6 +140,9 @@ export async function PATCH(
           test_cases: validatedData.test_cases || [],
           time_limit: validatedData.time_limit || 30,
           memory_limit: validatedData.memory_limit || 128,
+          head: validatedData.head || {},
+          body_template: validatedData.body_template || {},
+          tail: validatedData.tail || {},
           updated_at: new Date().toISOString()
         })
         .eq('question_id', params.questionId)
@@ -164,7 +170,10 @@ export async function PATCH(
           allowed_languages: validatedData.allowed_languages || ['javascript', 'python'],
           test_cases: validatedData.test_cases || [],
           time_limit: validatedData.time_limit || 30,
-          memory_limit: validatedData.memory_limit || 128
+          memory_limit: validatedData.memory_limit || 128,
+          head: validatedData.head || {},
+          body_template: validatedData.body_template || {},
+          tail: validatedData.tail || {}
         })
         .select()
         .single()

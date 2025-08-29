@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { CodeEditor } from '@/components/editors/CodeEditor'
 import { Badge } from "@/components/ui/badge"
 import { RichTextPreview } from '@/components/editors/RichTextEditor'
 import {
@@ -46,7 +47,36 @@ export default function CodingEditor({ questionId, userId, courseId, coding }: C
   const [isResizing, setIsResizing] = useState(false)
   const [isResizingVertical, setIsResizingVertical] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [code, setCode] = useState((coding.boilerplate_code && coding.boilerplate_code[selectedLanguage]) || "")
+  // For new logic: head, body_template, tail
+  const head = coding.head?.[selectedLanguage] || ''
+  const tail = coding.tail?.[selectedLanguage] || ''
+  const bodyTemplate = coding.body_template?.[selectedLanguage] || (coding.boilerplate_code && coding.boilerplate_code[selectedLanguage]) || ''
+  // Compose the full code: head + body + tail
+  const [body, setBody] = useState(bodyTemplate)
+  // For the editor, show head + body + tail, but only body is editable
+  const [fullCode, setFullCode] = useState(`${head}${body}${tail}`)
+
+  // Helper to get the editable range
+  const getBodyRange = () => {
+    const start = head.length
+    const end = head.length + body.length
+    return { start, end }
+  }
+
+  // When body changes, update fullCode
+  useEffect(() => {
+    setFullCode(`${head}${body}${tail}`)
+  }, [head, body, tail])
+
+  // When fullCode changes (from editor), update body only if edit is in body range
+  const handleEditorChange = (val: string) => {
+    // Extract the body from the edited value
+    const { start, end } = getBodyRange()
+    // If the user edited outside the body, ignore those edits
+    const newBody = val.slice(start, val.length - tail.length)
+    setBody(newBody)
+    setFullCode(`${head}${newBody}${tail}`)
+  }
   const [customInput, setCustomInput] = useState("")
   const [consoleOutput, setConsoleOutput] = useState("")
   const [activeTab, setActiveTab] = useState("test-cases")
@@ -106,17 +136,17 @@ export default function CodingEditor({ questionId, userId, courseId, coding }: C
   }, [isResizing, isResizingVertical])
 
   useEffect(() => {
-    if (coding.boilerplate_code && coding.boilerplate_code[selectedLanguage]) {
-      setCode(coding.boilerplate_code[selectedLanguage])
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLanguage])
+    // Update body and fullCode when language changes
+    const newBody = coding.body_template?.[selectedLanguage] || (coding.boilerplate_code && coding.boilerplate_code[selectedLanguage]) || ''
+    setBody(newBody)
+    setFullCode(`${head}${newBody}${tail}`)
+  }, [selectedLanguage, head, tail])
 
   const runCode = async () => {
     setIsRunning(true)
     setActiveTab("console")
     setConsoleOutput("Running test cases...\n")
-
+    // Use the fullCode for execution
     try {
       const res = await fetch('/api/coding/run', {
         method: 'POST',
@@ -125,12 +155,11 @@ export default function CodingEditor({ questionId, userId, courseId, coding }: C
           questionId,
           userId,
           courseId,
-          code,
+          code: fullCode,
           language: selectedLanguage,
           testCases: coding.test_cases
         })
       })
-
       if (!res.ok) {
         const txt = await res.text()
         setConsoleOutput((prev) => prev + `Error running code: ${res.status} ${txt}\n`)
@@ -149,7 +178,7 @@ export default function CodingEditor({ questionId, userId, courseId, coding }: C
     setIsSubmitting(true)
     setActiveTab("console")
     setConsoleOutput("Submitting solution...\n")
-
+    // Use the fullCode for submission
     try {
       const res = await fetch('/api/coding/submit', {
         method: 'POST',
@@ -158,11 +187,10 @@ export default function CodingEditor({ questionId, userId, courseId, coding }: C
           questionId,
           userId,
           courseId,
-          code,
+          code: fullCode,
           language: selectedLanguage
         })
       })
-
       if (!res.ok) {
         const txt = await res.text()
         setConsoleOutput((prev) => prev + `Submission failed: ${res.status} ${txt}\n`)
@@ -288,27 +316,20 @@ export default function CodingEditor({ questionId, userId, courseId, coding }: C
             </div>
           </div>
 
-          {/* Code Editor */}
+          {/* Single CodeEditor for head+body+tail, only body editable */}
           <div className="flex-1 relative" style={{ height: `${100 - bottomPanelHeight}%` }}>
-            <div className="absolute inset-0 bg-slate-900 text-slate-100 font-mono text-sm">
-              <div className="flex">
-                <div className="w-12 bg-slate-800 text-slate-400 text-right pr-2 py-4 select-none border-r border-slate-700">
-                  {code.split("\n").map((_, i) => (
-                    <div key={i} className="leading-6">
-                      {i + 1}
-                    </div>
-                  ))}
-                </div>
-                <div className="flex-1 p-4">
-                  <div className="text-sky-400 mb-2">#include</div>
-                  <Textarea
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    className="w-full h-full bg-transparent border-none text-slate-100 font-mono resize-none focus:ring-0 focus:outline-none"
-                    style={{ minHeight: "300px" }}
-                  />
-                </div>
-              </div>
+            <div className="absolute inset-0 bg-slate-900 text-slate-100 font-mono text-sm flex flex-col">
+              <CodeEditor
+                value={fullCode}
+                onChange={handleEditorChange}
+                language={selectedLanguage}
+                disabled={isRunning || isSubmitting}
+                height={400}
+                showLanguageSelector={false}
+                showActionButtons={false}
+                theme="dark"
+                className="bg-slate-900"
+              />
             </div>
           </div>
 

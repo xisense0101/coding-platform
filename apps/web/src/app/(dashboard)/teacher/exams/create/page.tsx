@@ -1,6 +1,8 @@
 
 "use client"
+
 import { RichTextPreview } from '@/components/editors/RichTextEditor'
+import { CodeEditor } from '@/components/editors/CodeEditor'
 
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -22,6 +24,9 @@ interface Question {
   options?: string[]
   correctAnswer?: string | number
   code?: string
+  head?: string
+  body_template?: string
+  tail?: string
   testCases?: TestCase[]
   languages?: string[]
   isVisible: boolean
@@ -412,7 +417,9 @@ function CreateExamPageContent() {
                 correctAnswer: question.correctAnswer || 0
               }),
               ...(question.type === 'coding' && {
-                code: question.code || "// Write your code here",
+                head: question.head || "",
+                body_template: question.body_template || question.code || "// Write your code here",
+                tail: question.tail || "",
                 languages: question.languages || ["JavaScript", "Python"],
                 testCases: (question.testCases || []).map(tc => ({
                   id: tc.id,
@@ -598,15 +605,37 @@ function CreateExamPageContent() {
                 </div>
               </div>
 
-              <div>
-                <Label>Code Template</Label>
-                <Textarea
-                  value={question.code || "// Write your code here"}
-                  onChange={(e) => updateQuestion(section.id, question.id, { code: e.target.value })}
-                  placeholder="// Write your code template here"
-                  rows={6}
-                  className="font-mono"
-                />
+              <div className="space-y-2">
+                <Label>Code Problem Setup</Label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label>Head (optional)</Label>
+                    <CodeEditor
+                      value={question.head || ""}
+                      onChange={val => updateQuestion(section.id, question.id, { head: val })}
+                      placeholder="// Setup code (e.g. imports, function signature)"
+                      height={120}
+                    />
+                  </div>
+                  <div>
+                    <Label>Body Template</Label>
+                    <CodeEditor
+                      value={question.body_template || ""}
+                      onChange={val => updateQuestion(section.id, question.id, { body_template: val })}
+                      placeholder="// Main code area for student"
+                      height={120}
+                    />
+                  </div>
+                  <div>
+                    <Label>Tail (optional)</Label>
+                    <CodeEditor
+                      value={question.tail || ""}
+                      onChange={val => updateQuestion(section.id, question.id, { tail: val })}
+                      placeholder="// Code to run after student code (e.g. output checks)"
+                      height={120}
+                    />
+                  </div>
+                </div>
               </div>
 
               <div>

@@ -1,5 +1,5 @@
-"use client"
-
+"use client";
+import React from "react";
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -8,24 +8,102 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RichTextEditor } from '@/components/editors/RichTextEditor'
+import { CodeEditor } from '@/components/editors/CodeEditor'
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { ArrowLeft, Plus, Save, Eye, EyeOff, Code, FileText, Trash2, Settings, Users, Mail } from 'lucide-react'
 
+// Subcomponent for code template row with local editLanguage state
+type CodeTemplateRowProps = {
+  question: Question;
+  sectionId: number;
+  updateQuestion: (sectionId: number, questionId: number, updates: Partial<Question>) => void;
+  programmingLanguages: string[];
+};
+
+function CodeTemplateRow({ question, sectionId, updateQuestion, programmingLanguages }: CodeTemplateRowProps) {
+  const [editLanguage, setEditLanguage] = React.useState((question.languages && question.languages[0])?.toLowerCase() || "javascript");
+  // Ensure head/body_template/tail are objects
+  const headObj = typeof question.head === 'object' && question.head !== null ? question.head : {};
+  const bodyTemplateObj = typeof question.body_template === 'object' && question.body_template !== null ? question.body_template : {};
+  const tailObj = typeof question.tail === 'object' && question.tail !== null ? question.tail : {};
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-2">
+        <Label>Editing Language:</Label>
+        <select
+          value={editLanguage}
+          onChange={e => setEditLanguage(e.target.value)}
+          className="border rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+        >
+          {programmingLanguages.map((lang: string) => (
+            <option key={lang} value={lang.toLowerCase()}>{lang}</option>
+          ))}
+        </select>
+      </div>
+      <div className="flex flex-col gap-4">
+        <div>
+          <Label className="mb-1">Head <span className="text-xs text-gray-400">(optional)</span></Label>
+          <CodeEditor
+            value={headObj[editLanguage] || ""}
+            onChange={val => {
+              updateQuestion(sectionId, question.id, { head: { ...headObj, [editLanguage]: val } })
+            }}
+            language={editLanguage}
+            placeholder="// Setup code (e.g. imports, function signature)"
+            height={100}
+            className="rounded border"
+          />
+        </div>
+        <div>
+          <Label className="mb-1">Body Template</Label>
+          <CodeEditor
+            value={bodyTemplateObj[editLanguage] || ""}
+            onChange={val => {
+              updateQuestion(sectionId, question.id, { body_template: { ...bodyTemplateObj, [editLanguage]: val } })
+            }}
+            language={editLanguage}
+            placeholder="// Main code area for student"
+            height={140}
+            className="rounded border"
+          />
+        </div>
+        <div>
+          <Label className="mb-1">Tail <span className="text-xs text-gray-400">(optional)</span></Label>
+          <CodeEditor
+            value={tailObj[editLanguage] || ""}
+            onChange={val => {
+              updateQuestion(sectionId, question.id, { tail: { ...tailObj, [editLanguage]: val } })
+            }}
+            language={editLanguage}
+            placeholder="// Code to run after student code (e.g. output checks)"
+            height={100}
+            className="rounded border"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 interface Question {
-  id: number
-  type: "mcq" | "coding" | "essay" | "reading"
-  title: string
-  content: string
-  options?: string[]
-  correctAnswer?: string | number
-  code?: string
-  testCases?: TestCase[]
-  languages?: string[]
-  isVisible: boolean
-  points: number
-  hasChanges?: boolean
+  id: number;
+  type: "mcq" | "coding" | "essay" | "reading";
+  title: string;
+  content: string;
+  options?: string[];
+  correctAnswer?: string | number;
+  code?: string;
+  head?: Record<string, string>; // per-language
+  body_template?: Record<string, string>; // per-language
+  tail?: Record<string, string>; // per-language
+  testCases?: TestCase[];
+  languages?: string[];
+  isVisible: boolean;
+  points: number;
+  hasChanges?: boolean;
 }
 
 interface TestCase {
@@ -136,6 +214,10 @@ function CreateCoursePageContent() {
                         isHidden: tc.is_hidden || false,
                         weight: tc.weight || 1
                       }))
+                      // Load head/body_template/tail for each language (default to javascript)
+                      questionDetails.head = typeof codingData.head === 'object' && codingData.head !== null ? codingData.head : {};
+                      questionDetails.body_template = typeof codingData.body_template === 'object' && codingData.body_template !== null ? codingData.body_template : {};
+                      questionDetails.tail = typeof codingData.tail === 'object' && codingData.tail !== null ? codingData.tail : {};
                     } else {
                       // Default coding structure
                       questionDetails.code = "// Write your code here"
@@ -162,7 +244,10 @@ function CreateCoursePageContent() {
                     ...(question.type === 'coding' && {
                       code: "// Write your code here",
                       languages: ["JavaScript", "Python"],
-                      testCases: []
+                      testCases: [],
+                      head: {},
+                      body_template: {},
+                      tail: {},
                     })
                   }
                 }
@@ -230,11 +315,14 @@ function CreateCoursePageContent() {
         ...baseQuestion,
         options: ["", "", "", ""],
         correctAnswer: 0
-      }
+      };
     } else if (type === "coding") {
       newQuestion = {
         ...baseQuestion,
-        code: "// Write your code here",
+        head: {},
+        body_template: {},
+        tail: {},
+        code: "// Write your code here", // legacy
         testCases: [
           {
             id: Date.now(),
@@ -245,9 +333,9 @@ function CreateCoursePageContent() {
           }
         ],
         languages: ["JavaScript", "Python"]
-      }
+      };
     } else {
-      newQuestion = baseQuestion
+      newQuestion = baseQuestion;
     }
 
     setSections(prev => prev.map(section => 
@@ -543,6 +631,16 @@ function CreateCoursePageContent() {
                       weight: tc.weight || 1
                     }))
                     
+                    // Always save all languages from programmingLanguages for head/body_template/tail
+                    const allLangs = programmingLanguages;
+                    const headObj: Record<string, string> = {};
+                    const bodyTemplateObj: Record<string, string> = {};
+                    const tailObj: Record<string, string> = {};
+                    allLangs.forEach(lang => {
+                      headObj[lang.toLowerCase()] = (question.head && typeof question.head === 'object' ? question.head[lang.toLowerCase()] : "") || "";
+                      bodyTemplateObj[lang.toLowerCase()] = (question.body_template && typeof question.body_template === 'object' ? question.body_template[lang.toLowerCase()] : "") || "";
+                      tailObj[lang.toLowerCase()] = (question.tail && typeof question.tail === 'object' ? question.tail[lang.toLowerCase()] : "") || "";
+                    });
                     const codingData = {
                       problem_statement: question.content || "",
                       rich_problem_statement: question.content || "",
@@ -550,8 +648,11 @@ function CreateCoursePageContent() {
                         javascript: question.code || "// Write your code here",
                         python: (question.code || "# Write your code here").replace(/\//g, '#').replace(/function|{|}/g, '').trim()
                       },
-                      allowed_languages: question.languages || ['JavaScript', 'Python'],
-                      test_cases: testCases
+                      allowed_languages: question.languages && question.languages.length > 0 ? question.languages : programmingLanguages,
+                      test_cases: testCases,
+                      head: headObj,
+                      body_template: bodyTemplateObj,
+                      tail: tailObj
                     }
 
                     const codingResponse = await fetch(`/api/questions/${question.id}/coding`, {
@@ -840,16 +941,16 @@ function CreateCoursePageContent() {
                 </div>
               </div>
 
-              <div>
-                <Label>Code Template</Label>
-                <Textarea
-                  value={question.code || "// Write your code here"}
-                  onChange={(e) => updateQuestion(section.id, question.id, { code: e.target.value })}
-                  placeholder="// Write your code template here"
-                  rows={6}
-                  className="font-mono"
+              <div className="space-y-2">
+                <Label>Code Problem Setup</Label>
+                <CodeTemplateRow
+                  question={question}
+                  sectionId={section.id}
+                  updateQuestion={updateQuestion}
+                  programmingLanguages={programmingLanguages}
                 />
               </div>
+
 
               <div>
                 <div className="flex justify-between items-center">

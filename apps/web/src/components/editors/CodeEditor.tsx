@@ -265,92 +265,6 @@ export function CodeEditor({
 
   return (
     <div className={cn("border rounded-lg overflow-hidden", className)}>
-      {/* Header with language selector and actions */}
-      {(showLanguageSelector || showActionButtons) && (
-        <div className="flex items-center justify-between p-3 bg-gray-50 border-b">
-          <div className="flex items-center space-x-3">
-            {showLanguageSelector && (
-              <div className="flex items-center space-x-2">
-                <span className="text-sm font-medium text-gray-700">Language:</span>
-                <Select 
-                  value={language} 
-                  onValueChange={handleLanguageChange}
-                  disabled={disabled}
-                >
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableLanguages.map((lang) => (
-                      <SelectItem key={lang.value} value={lang.value}>
-                        <div className="flex items-center space-x-2">
-                          <span>{lang.icon}</span>
-                          <span>{lang.label}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            
-            <Badge variant="secondary" className="text-xs">
-              {language.toUpperCase()}
-            </Badge>
-          </div>
-
-          {showActionButtons && (
-            <div className="flex items-center space-x-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleCopyCode}
-                disabled={disabled || !value.trim()}
-                className="h-8"
-              >
-                <Copy className="h-3 w-3 mr-1" />
-                Copy
-              </Button>
-              
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleDownloadCode}
-                disabled={disabled || !value.trim()}
-                className="h-8"
-              >
-                <Download className="h-3 w-3 mr-1" />
-                Download
-              </Button>
-
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleReset}
-                disabled={disabled}
-                className="h-8"
-              >
-                <RotateCcw className="h-3 w-3 mr-1" />
-                Reset
-              </Button>
-
-              {onRun && (
-                <Button
-                  size="sm"
-                  onClick={onRun}
-                  disabled={disabled || !value.trim() || isRunning}
-                  className="h-8"
-                >
-                  <Play className={cn("h-3 w-3 mr-1", isRunning && "animate-spin")} />
-                  {isRunning ? 'Running...' : 'Run'}
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Editor */}
       <Editor
         height={height}
         language={language}
@@ -361,7 +275,7 @@ export function CodeEditor({
         options={{
           readOnly: disabled,
           minimap: {
-            enabled: height > 300
+            enabled: false
           },
           fontSize: 14,
           lineHeight: 1.6,
@@ -374,19 +288,6 @@ export function CodeEditor({
           }
         }}
       />
-
-      {/* Footer with keyboard shortcuts */}
-      {showActionButtons && (
-        <div className="px-3 py-2 bg-gray-50 border-t text-xs text-gray-500 flex items-center justify-between">
-          <span>
-            Press <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs">Ctrl/Cmd + R</kbd> to run
-          </span>
-          <span className="flex items-center space-x-1">
-            <Settings className="h-3 w-3" />
-            <span>Monaco Editor</span>
-          </span>
-        </div>
-      )}
     </div>
   )
 }
