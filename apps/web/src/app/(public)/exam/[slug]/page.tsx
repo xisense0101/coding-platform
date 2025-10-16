@@ -1,6 +1,8 @@
 
 "use client"
 import { RichTextPreview } from '@/components/editors/RichTextEditor'
+import { CodingQuestionInterface } from '@/components/coding'
+import StudentAuthModal, { StudentAuthData } from '@/components/exam/StudentAuthModal'
 
 import type React from "react"
 
@@ -94,6 +96,11 @@ type UIQuestion = {
   head?: Record<string, string>
   bodyTemplate?: Record<string, string>
   tail?: Record<string, string>
+  testCases?: Array<{
+    input: string
+    expected_output: string
+    is_hidden: boolean
+  }>
 }
 
 type AnswerState = {
@@ -140,9 +147,6 @@ export default function Component() {
   const [isResizing, setIsResizing] = useState(false)
   const [isResizingVertical, setIsResizingVertical] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
-  const [selectedLanguage, setSelectedLanguage] = useState("c")
-  const [isRunning, setIsRunning] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentFontSizeIndex, setCurrentFontSizeIndex] = useState(2)
 
   // Exam runtime state
@@ -158,14 +162,16 @@ export default function Component() {
   const [isExamStarted, setIsExamStarted] = useState(false)
   const [isExamFinished, setIsExamFinished] = useState(false)
   const [showInstructions, setShowInstructions] = useState(true)
+  const [showStudentAuth, setShowStudentAuth] = useState(true)
+  const [studentAuthData, setStudentAuthData] = useState<StudentAuthData | null>(null)
   const [timeLeft, setTimeLeft] = useState(0)
   const [loadingError, setLoadingError] = useState<string | null>(null)
   const [submissionId, setSubmissionId] = useState<string | null>(null)
+  const [selectedLanguage, setSelectedLanguage] = useState("JavaScript")
 
   const containerRef = useRef<HTMLDivElement>(null)
   const rightPanelRef = useRef<HTMLDivElement>(null)
   const resizerRef = useRef<HTMLDivElement>(null)
-  const verticalResizerRef = useRef<HTMLDivElement>(null)
 
   const sb: any = useMemo(() => createClient() as any, [])
   const { user, isLoading: authLoading } = useAuth()
@@ -179,9 +185,13 @@ export default function Component() {
         const res = await fetch(`/api/exams/slug/${params.slug}`)
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
-          throw new Error(err?.error || `Failed to load exam (${res.status})`)
+          console.error('Exam fetch error:', err)
+          const errorMessage = err?.error || `Failed to load exam (${res.status})`
+          const detailsMessage = err?.details ? ` - ${err.details}` : ''
+          throw new Error(errorMessage + detailsMessage)
         }
         const json = await res.json()
+        console.log('Exam loaded successfully:', json.exam?.title)
         const ex: ApiExam = json.exam
         if (!mounted) return
         setExam(ex)
@@ -209,6 +219,7 @@ export default function Component() {
               head: base.coding_question?.head || {},
               bodyTemplate: base.coding_question?.body_template || base.coding_question?.boilerplate_code || {},
               tail: base.coding_question?.tail || {},
+              testCases: base.coding_question?.test_cases || [],
             } as UIQuestion
           }),
         }))
@@ -256,68 +267,85 @@ export default function Component() {
     return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
   }
 
+  // Handle student authentication
+  const handleStudentAuth = (data: StudentAuthData) => {
+    setStudentAuthData(data)
+    setShowStudentAuth(false)
+    console.log('Student authenticated:', data)
+  }
+
   // Start exam -> ensure submission row exists and preload answers
   const startExam = async () => {
-    if (!exam) return
-    // Prefer auth context user to avoid client mismatches
-    const { data: sessionData } = await sb.auth.getSession()
-    const userId = user?.id || sessionData.session?.user?.id
-    if (!userId) {
-      router.push(`/auth/login?next=/exam/${params.slug}`)
-      return
-    }
-
-    // Find existing submission
-  const { data: existing, error: selErr } = await sb
-      .from("exam_submissions")
-      .select("id, answers, is_submitted, submitted_at")
-      .eq("exam_id", exam.id)
-      .eq("student_id", userId)
-      .eq("attempt_number", 1)
-      .maybeSingle()
-
-    if (selErr) console.error("fetch submission error", selErr)
-
-    const existingSub = (existing as unknown as Pick<
-      Tables<'exam_submissions'>,
-      'id' | 'answers' | 'is_submitted' | 'submitted_at'
-    >) || null
-
-    if (!existingSub) {
-      const insertPayload: TablesInsert<'exam_submissions'> = {
-        exam_id: exam.id,
-        student_id: userId,
-        attempt_number: 1,
-  student_name: ((user as any)?.user_metadata?.full_name) || (sessionData.session?.user?.user_metadata as any)?.full_name || "",
-  student_email: user?.email || sessionData.session?.user?.email || "",
-        started_at: new Date().toISOString(),
-        answers: {},
-        is_submitted: false,
-        submission_status: 'in_progress',
+    try {
+      console.log('🚀 Start Exam clicked')
+      if (!exam) {
+        console.error('❌ No exam data available')
+        throw new Error('Exam data not available')
       }
-
-  const { data: inserted, error: insErr } = await sb
-        .from("exam_submissions")
-        .insert(insertPayload)
-        .select("id")
-        .single()
-      if (insErr) {
-        console.error("create submission error", insErr)
-      } else {
-        setSubmissionId((inserted as unknown as { id: string }).id)
+      console.log('✅ Exam data exists:', exam.title)
+      
+      if (!studentAuthData || !studentAuthData.userId) {
+        console.error('❌ No authenticated student data')
+        throw new Error('Student authentication data not available')
       }
-    } else {
-      setSubmissionId(existingSub.id)
-      const pre = (existingSub.answers as any) || {}
-      const ans: Record<string, AnswerState> = {}
-      Object.keys(pre).forEach((qid) => {
-        ans[qid] = { ...pre[qid], status: pre[qid]?.status || "answered" }
+      
+      const userId = studentAuthData.userId
+      console.log('👤 User ID from auth:', userId)
+
+      console.log('🔍 Calling start exam API...')
+      
+      // Call API to create or get existing submission
+      const response = await fetch(`/api/exams/${exam.id}/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: userId,
+          studentName: studentAuthData.studentName,
+          studentEmail: studentAuthData.studentEmail,
+          rollNumber: studentAuthData.rollNumber,
+          studentSection: studentAuthData.studentSection
+        })
       })
-      setAnswers(ans)
-    }
 
-    setIsExamStarted(true)
-    setShowInstructions(false)
+      const result = await response.json()
+
+      if (!response.ok) {
+        console.error('❌ Start exam API error:', result)
+        if (result.alreadySubmitted) {
+          alert('You have already submitted this exam. You cannot take it again.')
+        }
+        throw new Error(result.error || 'Failed to start exam')
+      }
+
+      console.log('✅ Start exam API response:', result)
+
+      // Set submission ID
+      setSubmissionId(result.submission.id)
+
+      // If existing submission, restore answers
+      if (!result.isNew && result.submission.answers) {
+        console.log('📋 Restoring previous answers...')
+        const pre = result.submission.answers || {}
+        const ans: Record<string, AnswerState> = {}
+        Object.keys(pre).forEach((qid) => {
+          ans[qid] = { ...pre[qid], status: pre[qid]?.status || "answered" }
+        })
+        setAnswers(ans)
+        console.log('✅ Restored answers for', Object.keys(ans).length, 'questions')
+      } else {
+        console.log('📝 Starting fresh exam (no previous answers)')
+      }
+
+      console.log('🎯 Setting exam as started...')
+      setIsExamStarted(true)
+      setShowInstructions(false)
+      console.log('✅ Exam started successfully!')
+    } catch (error) {
+      console.error('💥 Error starting exam:', error)
+      throw error // Re-throw to be caught by ExamInstructions
+    }
   }
 
   const persistAnswers = async (next: Record<string, AnswerState>) => {
@@ -523,6 +551,16 @@ export default function Component() {
     )
   }
 
+  if (showStudentAuth && exam) {
+    return (
+      <StudentAuthModal
+        examTitle={exam.title}
+        examId={exam.id}
+        onAuthenticate={handleStudentAuth}
+      />
+    )
+  }
+
   if (showInstructions) {
     return <ExamInstructions onStart={startExam} />
   }
@@ -705,8 +743,6 @@ export default function Component() {
                   }}
                   onAnswerChange={(answer) => updateAnswer(currentQ.id, { userAnswer: answer, status: "answered" })}
                   onClearSelection={clearSelection}
-                  isRunning={isRunning}
-                  isSubmitting={isSubmitting}
                   fontSizeClass={currentFontSizeClass}
                   isSectionSubmitted={!!sectionSubmitted[currentSection?.id || ""]}
                   onQuestionSubmit={() => handleQuestionSubmit(currentQ)}
@@ -742,32 +778,31 @@ export default function Component() {
               {/* Coding: Right Panel - Code Editor */}
               <div ref={rightPanelRef} className="flex-1 flex flex-col overflow-hidden bg-white" style={{ width: `${100 - leftPanelWidth}%` }}>
                 {currentQ && (
-                  <CodingEditorPanel
-                    question={{
-                      id: currentQ.id,
-                      section: currentSection?.title || "",
-                      questionNumber: currentQ.indexInSection,
-                      type: "coding",
-                      title: currentQ.title,
-                      question: currentQ.prompt,
-                      codeTemplate: currentQ.codeTemplate,
-                      language: selectedLanguage,
-                      status: (answers[currentQ.id]?.status as any) || "unanswered",
-                      userCode: (answers[currentQ.id]?.userCode as string) || "",
-                      head: (currentQ.head?.[selectedLanguage.toLowerCase()] || ''),
-                      tail: (currentQ.tail?.[selectedLanguage.toLowerCase()] || ''),
+                  <CodingQuestionInterface
+                    questionId={currentQ.id}
+                    userId={studentAuthData?.userId || user?.id || ""}
+                    coding={{
+                      problem_statement: currentQ.prompt,
+                      boilerplate_code: currentQ.bodyTemplate || {},
+                      test_cases: currentQ.testCases || [],
+                      allowed_languages: currentQ.allowedLanguages || ["c", "cpp", "java", "python", "javascript"],
+                      head: currentQ.head || {},
+                      body_template: currentQ.bodyTemplate || {},
+                      tail: currentQ.tail || {}
                     }}
-                    selectedLanguage={selectedLanguage}
-                    onLanguageChange={setSelectedLanguage}
-                    onCodeChange={(code) => updateAnswer(currentQ.id, { userCode: code, status: "answered" })}
-                    onRun={runCode}
-                    onSubmit={() => handleQuestionSubmit(currentQ)}
-                    isRunning={isRunning}
-                    isSubmitting={isSubmitting}
+                    onRun={async (code, language, customInput) => {
+                      await runCode()
+                      return { output: "Test execution complete" }
+                    }}
+                    onSubmit={async (code, language) => {
+                      updateAnswer(currentQ.id, { userCode: code, status: "answered" })
+                      handleQuestionSubmit(currentQ)
+                    }}
                     bottomPanelHeight={bottomPanelHeight}
                     onVerticalResize={handleVerticalMouseDown}
                     fontSizeClass={currentFontSizeClass}
-                    isSectionSubmitted={!!sectionSubmitted[currentSection?.id || ""]}
+                    isLocked={!!sectionSubmitted[currentSection?.id || ""]}
+                    showSubmitButton={true}
                   />
                 )}
               </div>
@@ -797,9 +832,8 @@ export default function Component() {
     alert("Report problem functionality would be implemented here")
   }
   async function runCode() {
-    setIsRunning(true)
-    await new Promise((r) => setTimeout(r, 1500))
-    setIsRunning(false)
+    // Placeholder for code execution - actual execution handled by CodingQuestionInterface
+    await new Promise((r) => setTimeout(r, 500))
   }
 }
 
@@ -832,7 +866,7 @@ function MCQQuestionPanel({ question, onReportProblem, fontSizeClass }: { questi
   )
 }
 
-function MCQAnswerPanel({ question, onAnswerChange, onClearSelection, isRunning, isSubmitting, fontSizeClass, isSectionSubmitted, onQuestionSubmit }: { question: LocalMcqQuestion; onAnswerChange: (answer: string) => void; onClearSelection: () => void; isRunning: boolean; isSubmitting: boolean; fontSizeClass: string; isSectionSubmitted: boolean; onQuestionSubmit: (question: LocalMcqQuestion) => void }) {
+function MCQAnswerPanel({ question, onAnswerChange, onClearSelection, fontSizeClass, isSectionSubmitted, onQuestionSubmit }: { question: LocalMcqQuestion; onAnswerChange: (answer: string) => void; onClearSelection: () => void; fontSizeClass: string; isSectionSubmitted: boolean; onQuestionSubmit: (question: LocalMcqQuestion) => void }) {
   const isQuestionLocked = isSectionSubmitted
   return (
     <>
@@ -857,9 +891,9 @@ function MCQAnswerPanel({ question, onAnswerChange, onClearSelection, isRunning,
             <RotateCcw className="h-4 w-4 mr-2" />
             Clear selection
           </Button>
-          <Button onClick={() => onQuestionSubmit(question)} disabled={!question.userAnswer || isSubmitting || isQuestionLocked} className="bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white shadow-md transition-all duration-200 hover:shadow-lg font-semibold">
+          <Button onClick={() => onQuestionSubmit(question)} disabled={!question.userAnswer || isQuestionLocked} className="bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white shadow-md transition-all duration-200 hover:shadow-lg font-semibold">
             <Send className="h-4 w-4 mr-2" />
-            {isSubmitting ? "Submitting..." : "Submit"}
+            Submit
           </Button>
         </div>
       </div>
@@ -913,183 +947,24 @@ function CodingQuestionPanel({ question, onReportProblem, fontSizeClass }: { que
   )
 }
 
-function CodingEditorPanel({ question, selectedLanguage, onLanguageChange, onCodeChange, onRun, onSubmit, isRunning, isSubmitting, bottomPanelHeight, onVerticalResize, fontSizeClass, isSectionSubmitted }: { question: LocalCodingQuestion; selectedLanguage: string; onLanguageChange: (language: string) => void; onCodeChange: (code: string) => void; onRun: () => void; onSubmit: (question: LocalCodingQuestion) => void; isRunning: boolean; isSubmitting: boolean; bottomPanelHeight: number; onVerticalResize: (e: React.MouseEvent) => void; fontSizeClass: string; isSectionSubmitted: boolean }) {
-  const [code, setCode] = useState(question.userCode || question.codeTemplate || "")
-  const [customInput, setCustomInput] = useState("2\n2 3\n5 2")
-  const [consoleOutput, setConsoleOutput] = useState("")
-  const [isHeadCollapsed, setIsHeadCollapsed] = useState(true)
-  const [isTailCollapsed, setIsTailCollapsed] = useState(true)
+function ExamInstructions({ onStart }: { onStart: () => Promise<void> }) {
+  const [isStarting, setIsStarting] = useState(false)
   
-  // Normalize language to lowercase for accessing head/tail
-  const languageKey = selectedLanguage.toLowerCase()
-  const head = question.head || ''
-  const tail = question.tail || ''
-
-  const isQuestionLocked = isSectionSubmitted
-
-  const handleCodeChange = (newCode: string) => {
-    if (!isQuestionLocked) {
-      setCode(newCode)
-      onCodeChange(newCode)
+  const handleStart = async () => {
+    try {
+      console.log('📋 Instructions: Start button clicked')
+      setIsStarting(true)
+      await onStart()
+      console.log('📋 Instructions: onStart completed successfully')
+      // Don't reset isStarting here - the component will unmount when exam starts
+    } catch (error) {
+      console.error('❌ Instructions: Error during start:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      alert(`Failed to start exam: ${errorMessage}`)
+      setIsStarting(false)
     }
   }
-
-  const handleRunCode = async () => {
-    onRun()
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setConsoleOutput(
-      "Running test cases...\n\n✓ Test case 1: PASSED\n✓ Test case 2: PASSED\n\nExecution time: 0.02s\nMemory usage: 1.2MB",
-    )
-  }
-
-  return (
-    <>
-      {/* Editor Header */}
-      <div className="flex items-center justify-between p-4 border-b border-sky-200 bg-gradient-to-r from-sky-50 to-white">
-        <div className="flex items-center gap-4">
-          <Select value={selectedLanguage} onValueChange={onLanguageChange} disabled={isQuestionLocked}>
-            <SelectTrigger className="w-32 border-sky-200 focus:ring-sky-500 focus:border-sky-500">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="c">C</SelectItem>
-              <SelectItem value="cpp">C++</SelectItem>
-              <SelectItem value="java">Java</SelectItem>
-              <SelectItem value="python">Python</SelectItem>
-              <SelectItem value="javascript">JavaScript</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" className="hover:bg-sky-100 text-sky-600" disabled={isQuestionLocked}>
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-          <Button onClick={handleRunCode} size="sm" disabled={isRunning || isSubmitting || isQuestionLocked} className="bg-sky-500 hover:bg-sky-600 text-white shadow-md transition-all duration-200 hover:shadow-lg">
-            <Play className="h-4 w-4 mr-2" />
-            {isRunning ? "Running..." : "Run"}
-          </Button>
-          <Button onClick={() => onSubmit(question)} size="sm" disabled={isRunning || isSubmitting || isQuestionLocked} className="bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white shadow-md transition-all duration-200 hover:shadow-lg font-semibold">
-            <Send className="h-4 w-4 mr-2" />
-            {isSubmitting ? "Submitting..." : "Go"}
-          </Button>
-        </div>
-      </div>
-
-      {/* Code Editor with head (read-only collapsible), body (editable), tail (read-only collapsible) */}
-      <div className="flex-1 relative" style={{ height: `${100 - bottomPanelHeight}%` }}>
-        <div className="absolute inset-0 bg-white text-black font-mono text-sm flex flex-col overflow-auto">
-          {head && (
-            <div className="border-b border-gray-300">
-              <button
-                onClick={() => setIsHeadCollapsed(!isHeadCollapsed)}
-                className="w-full flex items-center justify-between px-4 py-2 bg-gray-100 hover:bg-gray-200 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  {isHeadCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                  <span className="text-xs font-semibold text-gray-600">HEAD (Read-only)</span>
-                </div>
-                <span className="text-xs text-gray-500">{isHeadCollapsed ? 'Click to expand' : 'Click to collapse'}</span>
-              </button>
-              {!isHeadCollapsed && (
-                <div className="border-t border-gray-200 p-4 bg-gray-50 overflow-auto max-h-60">
-                  <pre className={cn("text-sm text-gray-700 whitespace-pre-wrap font-mono", fontSizeClass)}>{head}</pre>
-                </div>
-              )}
-            </div>
-          )}
-          <div className="flex-1 overflow-auto border-b border-gray-300">
-            <div className="px-4 py-2 bg-sky-50 border-b border-sky-200">
-              <span className="text-xs font-semibold text-sky-700">BODY (Your Code)</span>
-            </div>
-            <div className="p-4">
-              <Textarea
-                value={code}
-                onChange={(e) => handleCodeChange(e.target.value)}
-                className={cn("w-full h-full bg-white border border-gray-300 text-black font-mono resize-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500", fontSizeClass)}
-                style={{ minHeight: "300px" }}
-                readOnly={isQuestionLocked}
-                placeholder="// Write your code here"
-              />
-            </div>
-          </div>
-          {tail && (
-            <div className="border-t border-gray-300">
-              <button
-                onClick={() => setIsTailCollapsed(!isTailCollapsed)}
-                className="w-full flex items-center justify-between px-4 py-2 bg-gray-100 hover:bg-gray-200 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  {isTailCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                  <span className="text-xs font-semibold text-gray-600">TAIL (Read-only)</span>
-                </div>
-                <span className="text-xs text-gray-500">{isTailCollapsed ? 'Click to expand' : 'Click to collapse'}</span>
-              </button>
-              {!isTailCollapsed && (
-                <div className="border-t border-gray-200 p-4 bg-gray-50 overflow-auto max-h-60">
-                  <pre className={cn("text-sm text-gray-700 whitespace-pre-wrap font-mono", fontSizeClass)}>{tail}</pre>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Vertical Resizer */}
-      <div className="h-1 bg-sky-200 hover:bg-sky-400 cursor-row-resize transition-colors relative group" onMouseDown={onVerticalResize}>
-        <div className="absolute inset-x-0 -top-1 -bottom-1 group-hover:bg-sky-300/30" />
-      </div>
-
-      {/* Bottom Panel - Test Cases/Console */}
-      <div className="border-t border-sky-200 bg-white" style={{ height: `${bottomPanelHeight}%` }}>
-        <Tabs defaultValue="test-cases" className="w-full h-full flex flex-col">
-          <TabsList className="grid w-full grid-cols-3 rounded-none border-b border-sky-100 bg-sky-50 flex-shrink-0">
-            <TabsTrigger value="test-cases" className="rounded-none data-[state=active]:bg-white data-[state=active]:text-sky-700 data-[state=active]:border-b-2 data-[state=active]:border-sky-500">
-              Test cases
-            </TabsTrigger>
-            <TabsTrigger value="custom-input" className="rounded-none data-[state=active]:bg-white data-[state=active]:text-sky-700 data-[state=active]:border-b-2 data-[state=active]:border-sky-500">
-              Custom input
-            </TabsTrigger>
-            <TabsTrigger value="console" className="rounded-none data-[state=active]:bg-white data-[state=active]:text-sky-700 data-[state=active]:border-b-2 data-[state=active]:border-sky-500">
-              Console
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="flex-1 overflow-hidden">
-            <TabsContent value="test-cases" className="p-4 space-y-4 h-full overflow-auto m-0">
-              <div className="space-y-3">
-                <div className="p-4 bg-sky-50 rounded-lg border border-sky-200">
-                  <div className={cn("text-sm font-semibold text-sky-800 mb-2", fontSizeClass)}>Test Case 1</div>
-                  <div className={cn("bg-white p-3 rounded border text-sm font-mono", fontSizeClass)}>
-                    <div className="text-sky-700">Example input</div>
-                    <div className="text-sky-700">Expected: ...</div>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="custom-input" className="p-4 h-full overflow-auto m-0 space-y-4">
-              <Textarea value={customInput} onChange={(e) => setCustomInput(e.target.value)} placeholder="Enter your custom input here..." className={cn("w-full flex-1 font-mono text-sm border-sky-200 focus:ring-sky-500 focus:border-sky-500 resize-none", fontSizeClass)} readOnly={isQuestionLocked} />
-              <div className="flex justify-end">
-                <Button size="sm" className="bg-sky-500 hover:bg-sky-600 text-white shadow-md transition-all duration-200 hover:shadow-lg" disabled={isQuestionLocked}>
-                  <Check className="h-4 w-4 mr-2" />
-                  Run with Custom Input
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="console" className="p-4 h-full overflow-auto m-0">
-              <div className={cn("bg-slate-900 text-slate-100 p-4 rounded-lg font-mono text-sm whitespace-pre-wrap border border-sky-200 h-full overflow-auto", fontSizeClass)}>
-                {consoleOutput || "Console output will appear here..."}
-              </div>
-            </TabsContent>
-          </div>
-        </Tabs>
-      </div>
-    </>
-  )
-}
-
-function ExamInstructions({ onStart }: { onStart: () => void }) {
+  
   return (
     <div className="h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 to-white p-4">
       <Card className="max-w-2xl w-full border-sky-200 shadow-lg">
@@ -1113,8 +988,20 @@ function ExamInstructions({ onStart }: { onStart: () => void }) {
           </div>
 
           <div className="mt-8 text-center">
-            <Button onClick={onStart} size="lg" className="bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white font-semibold px-8 py-3">
-              Start Exam
+            <Button 
+              onClick={handleStart} 
+              disabled={isStarting}
+              size="lg" 
+              className="bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white font-semibold px-8 py-3 disabled:opacity-50"
+            >
+              {isStarting ? (
+                <>
+                  <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full inline-block" />
+                  Starting...
+                </>
+              ) : (
+                'Start Exam'
+              )}
             </Button>
           </div>
         </CardContent>

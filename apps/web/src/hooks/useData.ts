@@ -139,7 +139,8 @@ export function useTeacherCourses() {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include'
       })
 
       if (response.ok) {
@@ -182,11 +183,15 @@ export function useTeacherStats() {
       setLoading(true)
       
       // Fetch courses count
-      const coursesResponse = await fetch('/api/courses?my_courses=true')
+      const coursesResponse = await fetch('/api/courses?my_courses=true', {
+        credentials: 'include'
+      })
       const coursesData = coursesResponse.ok ? await coursesResponse.json() : { courses: [] }
       
       // Fetch exams count
-      const examsResponse = await fetch('/api/exams?my_exams=true')
+      const examsResponse = await fetch('/api/exams?my_exams=true', {
+        credentials: 'include'
+      })
       const examsData = examsResponse.ok ? await examsResponse.json() : { exams: [] }
       
       const totalCourses = coursesData.courses?.length || 0
@@ -228,7 +233,8 @@ export function useTeacherExams() {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include'
       })
 
       if (response.ok) {

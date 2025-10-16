@@ -25,9 +25,9 @@ const codingQuestionSchema = z.object({
   content: z.string(),
   points: z.number(),
   code: z.string().optional(),
-  head: z.string().optional(),
-  body_template: z.string().optional(),
-  tail: z.string().optional(),
+  head: z.union([z.string(), z.record(z.string())]).optional(),
+  body_template: z.union([z.string(), z.record(z.string())]).optional(),
+  tail: z.union([z.string(), z.record(z.string())]).optional(),
   languages: z.array(z.string()).optional(),
   testCases: z.array(testCaseSchema).optional()
 })
@@ -47,6 +47,10 @@ const examSchema = z.object({
   end_time: z.string(),
   is_published: z.boolean().optional(),
   examUrl: z.string().optional(),
+  test_code: z.string().optional().nullable(),
+  test_code_type: z.enum(['permanent', 'rotating']).optional(),
+  test_code_rotation_minutes: z.number().optional().nullable(),
+  test_code_last_rotated: z.string().optional().nullable(),
   sections: z.array(sectionSchema)
 })
 
@@ -151,6 +155,10 @@ export async function POST(request: NextRequest) {
         end_time: endDateTime.toISOString(),
         duration_minutes: validatedData.duration_minutes,
         is_published: validatedData.is_published || false,
+        test_code: validatedData.test_code || null,
+        test_code_type: validatedData.test_code_type || 'permanent',
+        test_code_rotation_minutes: validatedData.test_code_rotation_minutes || null,
+        test_code_last_rotated: validatedData.test_code_last_rotated || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -251,20 +259,29 @@ export async function POST(request: NextRequest) {
           }, {} as Record<string, string>) || { javascript: question.code || '' }
 
           // Format head, body_template, tail per language
-          const head = question.languages?.reduce((acc, lang) => {
-            acc[lang.toLowerCase()] = question.head || ''
-            return acc
-          }, {} as Record<string, string>) || {}
+          // Handle both string and object formats
+          const head = typeof question.head === 'object' 
+            ? question.head 
+            : (question.languages?.reduce((acc, lang) => {
+                acc[lang.toLowerCase()] = (typeof question.head === 'string' ? question.head : '') || ''
+                return acc
+              }, {} as Record<string, string>) || {})
 
-          const bodyTemplate = question.languages?.reduce((acc, lang) => {
-            acc[lang.toLowerCase()] = question.body_template || question.code || ''
-            return acc
-          }, {} as Record<string, string>) || { javascript: question.body_template || question.code || '' }
+          const bodyTemplate = typeof question.body_template === 'object'
+            ? question.body_template
+            : (question.languages?.reduce((acc, lang) => {
+                const template = typeof question.body_template === 'string' ? question.body_template : ''
+                const code = question.code || ''
+                acc[lang.toLowerCase()] = template || code || ''
+                return acc
+              }, {} as Record<string, string>) || { javascript: (typeof question.body_template === 'string' ? question.body_template : '') || question.code || '' })
 
-          const tail = question.languages?.reduce((acc, lang) => {
-            acc[lang.toLowerCase()] = question.tail || ''
-            return acc
-          }, {} as Record<string, string>) || {}
+          const tail = typeof question.tail === 'object'
+            ? question.tail
+            : (question.languages?.reduce((acc, lang) => {
+                acc[lang.toLowerCase()] = (typeof question.tail === 'string' ? question.tail : '') || ''
+                return acc
+              }, {} as Record<string, string>) || {})
 
           const { error: codingError } = await supabase
             .from('coding_questions')
@@ -392,6 +409,10 @@ export async function GET(request: NextRequest) {
         is_published,
         submission_count,
         average_score,
+        test_code,
+        test_code_type,
+        test_code_rotation_minutes,
+        test_code_last_rotated,
         created_at,
         updated_at,
         teacher:users!exams_teacher_id_fkey(full_name),

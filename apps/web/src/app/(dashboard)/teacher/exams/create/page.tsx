@@ -3,6 +3,8 @@
 
 import { RichTextPreview } from '@/components/editors/RichTextEditor'
 import { CodeEditor } from '@/components/editors/CodeEditor'
+import { CodeTemplateRow } from '@/components/coding'
+import { ExamPreview } from '@/components/exam/ExamPreview'
 
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -24,9 +26,9 @@ interface Question {
   options?: string[]
   correctAnswer?: string | number
   code?: string
-  head?: string
-  body_template?: string
-  tail?: string
+  head?: Record<string, string>
+  body_template?: Record<string, string>
+  tail?: Record<string, string>
   testCases?: TestCase[]
   languages?: string[]
   isVisible: boolean
@@ -66,6 +68,9 @@ function CreateExamPageContent() {
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
   const [durationMinutes, setDurationMinutes] = useState(60)
+  const [testCode, setTestCode] = useState("")
+  const [testCodeType, setTestCodeType] = useState<"permanent" | "rotating">("permanent")
+  const [testCodeRotationMinutes, setTestCodeRotationMinutes] = useState(60)
   const [isPublished, setIsPublished] = useState(false)
   const [sections, setSections] = useState<Section[]>([])
   const [activeSection, setActiveSection] = useState<number | null>(null)
@@ -74,6 +79,7 @@ function CreateExamPageContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [showPreview, setShowPreview] = useState(false)
 
   // Load existing exam data if in edit mode
   useEffect(() => {
@@ -98,6 +104,9 @@ function CreateExamPageContent() {
       setExamSlug(exam.slug || "")
       setIsPublished(exam.is_published || false)
       setDurationMinutes(exam.duration_minutes || 60)
+      setTestCode(exam.test_code || "")
+      setTestCodeType(exam.test_code_type || "permanent")
+      setTestCodeRotationMinutes(exam.test_code_rotation_minutes || 60)
       
       // Format dates for datetime-local inputs
       if (exam.start_time) {
@@ -155,6 +164,15 @@ function CreateExamPageContent() {
             // Add coding specific data
             if (question.type === 'coding' && question.coding_questions && question.coding_questions[0]) {
               const codingData = question.coding_questions[0]
+              
+              console.log('Loading coding question data:', {
+                questionId: question.id,
+                head: codingData.head,
+                body_template: codingData.body_template,
+                tail: codingData.tail,
+                boilerplate_code: codingData.boilerplate_code
+              })
+              
               // Handle boilerplate code format
               if (typeof codingData.boilerplate_code === 'object') {
                 baseQuestion.code = codingData.boilerplate_code?.javascript || 
@@ -164,6 +182,18 @@ function CreateExamPageContent() {
               } else {
                 baseQuestion.code = codingData.boilerplate_code || "// Write your code here"
               }
+              
+              // Load head, body_template, and tail (these are objects with per-language code)
+              baseQuestion.head = codingData.head || {}
+              baseQuestion.body_template = codingData.body_template || codingData.boilerplate_code || {}
+              baseQuestion.tail = codingData.tail || {}
+              
+              console.log('Loaded into baseQuestion:', {
+                head: baseQuestion.head,
+                body_template: baseQuestion.body_template,
+                tail: baseQuestion.tail
+              })
+              
               baseQuestion.languages = Array.isArray(codingData.allowed_languages) ? 
                                      codingData.allowed_languages : 
                                      ["JavaScript", "Python"]
@@ -176,6 +206,9 @@ function CreateExamPageContent() {
                                      })) : []
             } else if (question.type === 'coding') {
               baseQuestion.code = "// Write your code here"
+              baseQuestion.head = {}
+              baseQuestion.body_template = {}
+              baseQuestion.tail = {}
               baseQuestion.languages = ["JavaScript", "Python"]
               baseQuestion.testCases = []
             }
@@ -257,6 +290,9 @@ function CreateExamPageContent() {
       newQuestion = {
         ...baseQuestion,
         code: "// Write your code here",
+        head: {},
+        body_template: {},
+        tail: {},
         testCases: [
           {
             id: Date.now(),
@@ -366,25 +402,63 @@ function CreateExamPageContent() {
     
     try {
       if (isEditMode && editExamId) {
-        // Update existing exam - use the existing PATCH endpoint
+        // Update existing exam - send full data including sections and questions
+        console.log('Updating exam with full data...')
+        
+        const examData = {
+          title: examTitle,
+          description: examDescription,
+          slug: examSlug,
+          start_time: new Date(startTime).toISOString(),
+          end_time: new Date(endTime).toISOString(),
+          duration_minutes: durationMinutes,
+          is_published: isPublished,
+          test_code: testCode || null,
+          test_code_type: testCodeType,
+          test_code_rotation_minutes: testCodeRotationMinutes,
+          test_code_last_rotated: testCode ? new Date().toISOString() : null,
+          sections: sections.map(section => ({
+            name: section.title,
+            description: section.description,
+            questions: section.questions.map(question => ({
+              type: question.type,
+              title: question.title,
+              content: question.content,
+              points: question.points,
+              ...(question.type === 'mcq' && {
+                options: question.options || ["", "", "", ""],
+                correctAnswer: question.correctAnswer || 0
+              }),
+              ...(question.type === 'coding' && {
+                head: question.head || {},
+                body_template: question.body_template || {},
+                tail: question.tail || {},
+                languages: question.languages || ["JavaScript", "Python"],
+                testCases: (question.testCases || []).map(tc => ({
+                  id: tc.id,
+                  input: tc.input,
+                  expectedOutput: tc.expectedOutput,
+                  isHidden: tc.isHidden
+                }))
+              })
+            }))
+          }))
+        }
+
+        console.log('Sending updated exam data to API:', JSON.stringify(examData, null, 2))
+
         const examResponse = await fetch(`/api/exams/${editExamId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            title: examTitle,
-            description: examDescription,
-            slug: examSlug,
-            start_time: new Date(startTime).toISOString(),
-            end_time: new Date(endTime).toISOString(),
-            duration_minutes: durationMinutes,
-            is_published: isPublished
-          })
+          body: JSON.stringify(examData)
         })
 
         if (!examResponse.ok) {
-          throw new Error('Failed to update exam')
+          const errorData = await examResponse.json()
+          console.error('Update API Error:', errorData)
+          throw new Error(errorData.error || 'Failed to update exam')
         }
 
         setSuccess('Exam updated successfully!')
@@ -405,6 +479,10 @@ function CreateExamPageContent() {
           end_time: new Date(endTime).toISOString(),
           duration_minutes: durationMinutes,
           is_published: isPublished,
+          test_code: testCode || null,
+          test_code_type: testCodeType,
+          test_code_rotation_minutes: testCodeRotationMinutes,
+          test_code_last_rotated: testCode ? new Date().toISOString() : null,
           sections: sections.map(section => ({
             name: section.title,
             questions: section.questions.map(question => ({
@@ -417,9 +495,9 @@ function CreateExamPageContent() {
                 correctAnswer: question.correctAnswer || 0
               }),
               ...(question.type === 'coding' && {
-                head: question.head || "",
-                body_template: question.body_template || question.code || "// Write your code here",
-                tail: question.tail || "",
+                head: question.head || {},
+                body_template: question.body_template || {},
+                tail: question.tail || {},
                 languages: question.languages || ["JavaScript", "Python"],
                 testCases: (question.testCases || []).map(tc => ({
                   id: tc.id,
@@ -606,36 +684,13 @@ function CreateExamPageContent() {
               </div>
 
               <div className="space-y-2">
-                <Label>Code Problem Setup</Label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label>Head (optional)</Label>
-                    <CodeEditor
-                      value={question.head || ""}
-                      onChange={val => updateQuestion(section.id, question.id, { head: val })}
-                      placeholder="// Setup code (e.g. imports, function signature)"
-                      height={120}
-                    />
-                  </div>
-                  <div>
-                    <Label>Body Template</Label>
-                    <CodeEditor
-                      value={question.body_template || ""}
-                      onChange={val => updateQuestion(section.id, question.id, { body_template: val })}
-                      placeholder="// Main code area for student"
-                      height={120}
-                    />
-                  </div>
-                  <div>
-                    <Label>Tail (optional)</Label>
-                    <CodeEditor
-                      value={question.tail || ""}
-                      onChange={val => updateQuestion(section.id, question.id, { tail: val })}
-                      placeholder="// Code to run after student code (e.g. output checks)"
-                      height={120}
-                    />
-                  </div>
-                </div>
+                <Label>Code Problem Setup (per language)</Label>
+                <CodeTemplateRow
+                  question={question}
+                  sectionId={section.id}
+                  updateQuestion={updateQuestion}
+                  programmingLanguages={programmingLanguages}
+                />
               </div>
 
               <div>
@@ -743,7 +798,11 @@ function CreateExamPageContent() {
               </h1>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="outline">
+              <Button 
+                variant="outline"
+                onClick={() => setShowPreview(true)}
+                disabled={!examTitle || sections.length === 0}
+              >
                 <Eye className="w-4 h-4 mr-2" />
                 Preview
               </Button>
@@ -884,7 +943,81 @@ function CreateExamPageContent() {
                     placeholder="60"
                   />
                 </div>
-                <div className="flex items-center space-x-2">
+
+                {/* Test Code Settings */}
+                <div className="space-y-3 pt-3 border-t">
+                  <Label className="text-base font-semibold">Test Code Authentication</Label>
+                  <div>
+                    <Label>Test Code (Optional)</Label>
+                    <Input
+                      type="text"
+                      value={testCode}
+                      onChange={(e) => setTestCode(e.target.value.toUpperCase())}
+                      placeholder="e.g., EXAM2024"
+                      className="uppercase"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Students must enter this code to access the exam
+                    </p>
+                  </div>
+                  {testCode && (
+                    <>
+                      <div>
+                        <Label>Test Code Type</Label>
+                        <div className="flex gap-4 mt-2">
+                          <label className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              checked={testCodeType === "permanent"}
+                              onChange={() => setTestCodeType("permanent")}
+                              className="h-4 w-4 text-purple-600"
+                            />
+                            <span className="text-sm">Permanent</span>
+                          </label>
+                          <label className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              checked={testCodeType === "rotating"}
+                              onChange={() => setTestCodeType("rotating")}
+                              className="h-4 w-4 text-purple-600"
+                            />
+                            <span className="text-sm">Rotating</span>
+                          </label>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {testCodeType === "permanent" 
+                            ? "Test code remains the same throughout the exam period" 
+                            : "Test code changes automatically after specified duration"}
+                        </p>
+                      </div>
+                      {testCodeType === "rotating" && (
+                        <div>
+                          <Label>Rotation Interval (minutes)</Label>
+                          <Input
+                            type="number"
+                            value={testCodeRotationMinutes}
+                            onChange={(e) => setTestCodeRotationMinutes(parseInt(e.target.value) || 60)}
+                            placeholder="60"
+                            min="5"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Test code will change every {testCodeRotationMinutes} minutes
+                          </p>
+                        </div>
+                      )}
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-800">
+                          <strong>Current Test Code:</strong> <code className="font-mono bg-white px-2 py-1 rounded">{testCode}</code>
+                        </p>
+                        <p className="text-xs text-blue-600 mt-1">
+                          This code will be displayed below each exam in your dashboard
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2 pt-3 border-t">
                   <Switch
                     checked={isPublished}
                     onCheckedChange={setIsPublished}
@@ -1017,6 +1150,40 @@ function CreateExamPageContent() {
           </div>
         </div>
       </div>
+
+      {/* Exam Preview Modal */}
+      {showPreview && (
+        <ExamPreview
+          examTitle={examTitle}
+          examDescription={examDescription}
+          durationMinutes={durationMinutes}
+          sections={sections.map(section => ({
+            id: section.id,
+            title: section.title,
+            description: section.description,
+            questions: section.questions.map(question => ({
+              id: question.id,
+              type: question.type,
+              title: question.title,
+              content: question.content,
+              points: question.points,
+              ...(question.type === 'mcq' && {
+                options: question.options || [],
+                correctAnswer: question.correctAnswer
+              }),
+              ...(question.type === 'coding' && {
+                code: question.code,
+                head: question.head || {},
+                body_template: question.body_template || {},
+                tail: question.tail || {},
+                testCases: question.testCases || [],
+                languages: question.languages || []
+              })
+            }))
+          }))}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
     </div>
   )
 }

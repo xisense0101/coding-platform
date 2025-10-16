@@ -228,6 +228,12 @@ CREATE TABLE exams (
   blocked_users UUID[] DEFAULT '{}',
   ip_restrictions TEXT[], -- CIDR blocks
   
+  -- Test code authentication
+  test_code TEXT,
+  test_code_type TEXT DEFAULT 'permanent' CHECK (test_code_type IN ('permanent', 'rotating')),
+  test_code_rotation_minutes INTEGER DEFAULT 60,
+  test_code_last_rotated TIMESTAMP WITH TIME ZONE,
+  
   -- Security settings
   security_settings JSONB DEFAULT '{}',
   proctoring_enabled BOOLEAN DEFAULT FALSE,

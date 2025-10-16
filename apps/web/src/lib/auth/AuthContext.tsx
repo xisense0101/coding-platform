@@ -319,14 +319,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       console.log('Starting logout process...')
+      setIsLoading(true)
       
-      // Clear local state immediately
+      // Sign out from Supabase FIRST (before clearing state)
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        console.error('Sign out error:', error)
+        // Continue with logout even if there's an error
+      } else {
+        console.log('Successfully signed out from Supabase')
+      }
+      
+      // Clear local state
       setUser(null)
       setUserProfile(null)
       setSession(null)
-      setIsLoading(true)
       
-      // Clear localStorage session data first
+      // Clear localStorage session data
       try {
         if (typeof window !== 'undefined') {
           const supabaseKeys = Object.keys(localStorage).filter(key => 
@@ -339,22 +349,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('Error clearing localStorage:', storageError)
       }
       
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut()
-      
-      if (error) {
-        console.error('Sign out error:', error)
-      } else {
-        console.log('Successfully signed out from Supabase')
-      }
-      
       // Force immediate navigation
       console.log('Redirecting to login page...')
       router.replace('/auth/login')
       
     } catch (error) {
       console.error('Sign out error:', error)
-      // Even if there's an error, try to redirect
+      // Even if there's an error, clear state and redirect
+      setUser(null)
+      setUserProfile(null)
+      setSession(null)
       router.replace('/auth/login')
     } finally {
       setIsLoading(false)

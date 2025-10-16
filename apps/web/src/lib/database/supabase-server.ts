@@ -10,13 +10,24 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 // Server-side Supabase client (for use in server components and API routes)
 export const createSupabaseServerClient = () => {
   const cookieStore = cookies()
+  
   return createServerClient<Database>(
     supabaseUrl,
     supabaseAnonKey,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options)
+            })
+          } catch (error) {
+            // Handle cookie setting errors in API routes
+            // This can happen if cookies are set in a Server Component
+          }
         },
       },
     }

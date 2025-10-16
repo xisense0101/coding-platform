@@ -93,6 +93,9 @@ export default function TeacherDashboard() {
       course: exam.description || 'No description',
       slug: exam.slug,
       isPublished: exam.is_published,
+      testCode: exam.test_code,
+      testCodeType: exam.test_code_type,
+      testCodeRotationMinutes: exam.test_code_rotation_minutes,
       date: startDate.toLocaleDateString('en-US', { 
         month: 'short', 
         day: 'numeric', 
@@ -431,6 +434,19 @@ export default function TeacherDashboard() {
                           <div className="mt-2 text-xs text-blue-600">
                             URL: /exam/{exam.slug}
                           </div>
+                          {exam.testCode && (
+                            <div className="mt-1 flex items-center gap-2">
+                              <span className="text-xs text-gray-500">Test Code:</span>
+                              <code className="text-xs font-mono bg-purple-100 text-purple-700 px-2 py-1 rounded">
+                                {exam.testCode}
+                              </code>
+                              {exam.testCodeType === 'rotating' && (
+                                <Badge variant="outline" className="text-xs">
+                                  Rotates every {exam.testCodeRotationMinutes}min
+                                </Badge>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center space-x-2">
                           <Badge 
@@ -481,7 +497,7 @@ export default function TeacherDashboard() {
                           >
                             {exam.isPublished ? 'Unpublish' : 'Publish'}
                           </Button>
-                          <Button size="sm" variant="outline">
+                          <Button size="sm" variant="outline" onClick={() => router.push(`/teacher/exams/${exam.originalId}/results`)}>
                             <BarChart3 className="h-4 w-4 mr-2" />
                             Results
                           </Button>

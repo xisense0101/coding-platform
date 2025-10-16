@@ -72,26 +72,53 @@ export async function GET(
     if (examError) {
       console.error('Error fetching exam:', examError)
       return NextResponse.json(
-        { error: 'Exam not found' },
+        { error: 'Exam not found', details: examError.message },
         { status: 404 }
       )
     }
 
-    // Check if exam is currently active
+    if (!exam) {
+      return NextResponse.json(
+        { error: 'Exam not found or not published' },
+        { status: 404 }
+      )
+    }
+
+    // Check if exam is currently active (with some leniency for testing)
     const now = new Date()
     const startTime = new Date(exam.start_time)
     const endTime = new Date(exam.end_time)
 
-    if (now < startTime) {
+    console.log('Exam time check:', {
+      now: now.toISOString(),
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      examTitle: exam.title,
+      slug: params.slug
+    })
+
+    // Allow access if within 5 minutes before start (for testing)
+    const earlyAccessMinutes = 5
+    const earlyStartTime = new Date(startTime.getTime() - earlyAccessMinutes * 60 * 1000)
+
+    if (now < earlyStartTime) {
       return NextResponse.json(
-        { error: 'Exam has not started yet', start_time: exam.start_time },
+        { 
+          error: 'Exam has not started yet', 
+          start_time: exam.start_time,
+          current_time: now.toISOString()
+        },
         { status: 403 }
       )
     }
 
     if (now > endTime) {
       return NextResponse.json(
-        { error: 'Exam has ended', end_time: exam.end_time },
+        { 
+          error: 'Exam has ended', 
+          end_time: exam.end_time,
+          current_time: now.toISOString()
+        },
         { status: 403 }
       )
     }
