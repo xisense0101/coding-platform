@@ -182,6 +182,23 @@ export async function POST(request: NextRequest) {
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             })
+        } else if (questionData.type === 'essay') {
+          // Create essay question data
+          await supabase
+            .from('essay_questions')
+            .insert({
+              question_id: question.id,
+              prompt: questionData.content || "",
+              rich_prompt: { content: questionData.content || "" },
+              min_words: 0,
+              max_words: null,
+              time_limit_minutes: null,
+              rubric: null,
+              enable_ai_feedback: false,
+              ai_model_settings: {},
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
         }
       }
     }

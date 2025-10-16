@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { ChevronLeft, ChevronRight, Play, Send, RotateCcw, Settings, Maximize2, Menu, X, Check, Info, Timer, BookOpen, Minus, Plus, Lock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Play, Send, RotateCcw, Settings, Maximize2, Menu, X, Check, Info, Timer, BookOpen, Minus, Plus, Lock, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 
@@ -71,6 +71,9 @@ type ApiExam = {
           allowed_languages: string[]
           time_limit?: number
           memory_limit?: number
+          head?: Record<string, string>
+          body_template?: Record<string, string>
+          tail?: Record<string, string>
         }
       }
     }>
@@ -88,6 +91,9 @@ type UIQuestion = {
   options?: { id: string; text: string; isCorrect?: boolean }[]
   codeTemplate?: string
   allowedLanguages?: string[]
+  head?: Record<string, string>
+  bodyTemplate?: Record<string, string>
+  tail?: Record<string, string>
 }
 
 type AnswerState = {
@@ -118,6 +124,8 @@ interface LocalCodingQuestion extends LocalQuestionBase {
   codeTemplate?: string
   language?: string
   userCode?: string
+  head?: string
+  tail?: string
 }
 
 const FONT_SIZES = ["text-xs", "text-sm", "text-base", "text-lg", "text-xl"]
@@ -183,6 +191,7 @@ export default function Component() {
           title: s.title,
           questions: (s.questions || []).map((q, idx) => {
             const base = q.question
+            const langKey = selectedLanguage.toLowerCase()
             return {
               id: base.id,
               sectionId: s.id,
@@ -195,8 +204,11 @@ export default function Component() {
                   ? base.coding_question?.problem_statement || base.description || ""
                   : base.mcq_question?.question_text || base.description || "",
               options: base.mcq_question?.options,
-              codeTemplate: (base.coding_question?.boilerplate_code || ({} as any))[selectedLanguage] || "",
+              codeTemplate: (base.coding_question?.body_template || base.coding_question?.boilerplate_code || ({} as any))[langKey] || "",
               allowedLanguages: base.coding_question?.allowed_languages || ["c", "cpp", "java", "python", "javascript"],
+              head: base.coding_question?.head || {},
+              bodyTemplate: base.coding_question?.body_template || base.coding_question?.boilerplate_code || {},
+              tail: base.coding_question?.tail || {},
             } as UIQuestion
           }),
         }))
@@ -742,6 +754,8 @@ export default function Component() {
                       language: selectedLanguage,
                       status: (answers[currentQ.id]?.status as any) || "unanswered",
                       userCode: (answers[currentQ.id]?.userCode as string) || "",
+                      head: (currentQ.head?.[selectedLanguage.toLowerCase()] || ''),
+                      tail: (currentQ.tail?.[selectedLanguage.toLowerCase()] || ''),
                     }}
                     selectedLanguage={selectedLanguage}
                     onLanguageChange={setSelectedLanguage}
@@ -903,6 +917,13 @@ function CodingEditorPanel({ question, selectedLanguage, onLanguageChange, onCod
   const [code, setCode] = useState(question.userCode || question.codeTemplate || "")
   const [customInput, setCustomInput] = useState("2\n2 3\n5 2")
   const [consoleOutput, setConsoleOutput] = useState("")
+  const [isHeadCollapsed, setIsHeadCollapsed] = useState(true)
+  const [isTailCollapsed, setIsTailCollapsed] = useState(true)
+  
+  // Normalize language to lowercase for accessing head/tail
+  const languageKey = selectedLanguage.toLowerCase()
+  const head = question.head || ''
+  const tail = question.tail || ''
 
   const isQuestionLocked = isSectionSubmitted
 
@@ -954,28 +975,62 @@ function CodingEditorPanel({ question, selectedLanguage, onLanguageChange, onCod
         </div>
       </div>
 
-      {/* Code Editor */}
+      {/* Code Editor with head (read-only collapsible), body (editable), tail (read-only collapsible) */}
       <div className="flex-1 relative" style={{ height: `${100 - bottomPanelHeight}%` }}>
-        <div className="absolute inset-0 bg-slate-900 text-slate-100 font-mono text-sm">
-          <div className="flex">
-            <div className="w-12 bg-slate-800 text-slate-400 text-right pr-2 py-4 select-none border-r border-slate-700">
-              {code.split("\n").map((_, i) => (
-                <div key={i} className="leading-6">
-                  {i + 1}
+        <div className="absolute inset-0 bg-white text-black font-mono text-sm flex flex-col overflow-auto">
+          {head && (
+            <div className="border-b border-gray-300">
+              <button
+                onClick={() => setIsHeadCollapsed(!isHeadCollapsed)}
+                className="w-full flex items-center justify-between px-4 py-2 bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  {isHeadCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  <span className="text-xs font-semibold text-gray-600">HEAD (Read-only)</span>
                 </div>
-              ))}
+                <span className="text-xs text-gray-500">{isHeadCollapsed ? 'Click to expand' : 'Click to collapse'}</span>
+              </button>
+              {!isHeadCollapsed && (
+                <div className="border-t border-gray-200 p-4 bg-gray-50 overflow-auto max-h-60">
+                  <pre className={cn("text-sm text-gray-700 whitespace-pre-wrap font-mono", fontSizeClass)}>{head}</pre>
+                </div>
+              )}
             </div>
-            <div className="flex-1 p-4">
-              <div className="text-sky-400 mb-2">#include</div>
+          )}
+          <div className="flex-1 overflow-auto border-b border-gray-300">
+            <div className="px-4 py-2 bg-sky-50 border-b border-sky-200">
+              <span className="text-xs font-semibold text-sky-700">BODY (Your Code)</span>
+            </div>
+            <div className="p-4">
               <Textarea
                 value={code}
                 onChange={(e) => handleCodeChange(e.target.value)}
-                className={cn("w-full h-full bg-transparent border-none text-slate-100 font-mono resize-none focus:ring-0 focus:outline-none", fontSizeClass)}
+                className={cn("w-full h-full bg-white border border-gray-300 text-black font-mono resize-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500", fontSizeClass)}
                 style={{ minHeight: "300px" }}
                 readOnly={isQuestionLocked}
+                placeholder="// Write your code here"
               />
             </div>
           </div>
+          {tail && (
+            <div className="border-t border-gray-300">
+              <button
+                onClick={() => setIsTailCollapsed(!isTailCollapsed)}
+                className="w-full flex items-center justify-between px-4 py-2 bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  {isTailCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  <span className="text-xs font-semibold text-gray-600">TAIL (Read-only)</span>
+                </div>
+                <span className="text-xs text-gray-500">{isTailCollapsed ? 'Click to expand' : 'Click to collapse'}</span>
+              </button>
+              {!isTailCollapsed && (
+                <div className="border-t border-gray-200 p-4 bg-gray-50 overflow-auto max-h-60">
+                  <pre className={cn("text-sm text-gray-700 whitespace-pre-wrap font-mono", fontSizeClass)}>{tail}</pre>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

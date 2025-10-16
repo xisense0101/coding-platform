@@ -13,47 +13,40 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const createClient = () => {
   return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
-      // Set session timeout to 3 hours (10800 seconds)
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true,
       flowType: 'pkce',
-      storage: {
-        // Custom storage implementation to handle session timeout
-        getItem: (key: string) => {
-          const item = localStorage.getItem(key)
-          if (!item) return null
-          
-          try {
-            const parsed = JSON.parse(item)
-            // Check if session has expired (3 hours = 10800 seconds)
-            if (parsed.expires_at && Date.now() / 1000 > parsed.expires_at) {
-              localStorage.removeItem(key)
-              return null
-            }
-            return item
-          } catch {
-            return item
-          }
-        },
-        setItem: (key: string, value: string) => {
-          try {
-            const parsed = JSON.parse(value)
-            // Set expiration time to 3 hours from now
-            if (parsed.access_token && !parsed.expires_at) {
-              parsed.expires_at = Math.floor(Date.now() / 1000) + 10800 // 3 hours
-              value = JSON.stringify(parsed)
-            }
-          } catch {
-            // If not JSON, store as is
-          }
-          localStorage.setItem(key, value)
-        },
-        removeItem: (key: string) => {
-          localStorage.removeItem(key)
-        }
-      }
-    }
+    },
+    cookies: {
+      get(name: string) {
+        // Use document.cookie to get cookies in the browser
+        if (typeof document === 'undefined') return null
+        const value = `; ${document.cookie}`
+        const parts = value.split(`; ${name}=`)
+        if (parts.length === 2) return parts.pop()?.split(';').shift() || null
+        return null
+      },
+      set(name: string, value: string, options: any) {
+        // Set cookies in the browser
+        if (typeof document === 'undefined') return
+        let cookie = `${name}=${value}`
+        if (options?.maxAge) cookie += `; max-age=${options.maxAge}`
+        if (options?.path) cookie += `; path=${options.path}`
+        if (options?.domain) cookie += `; domain=${options.domain}`
+        if (options?.secure) cookie += '; secure'
+        if (options?.sameSite) cookie += `; samesite=${options.sameSite}`
+        document.cookie = cookie
+      },
+      remove(name: string, options: any) {
+        // Remove cookies in the browser
+        if (typeof document === 'undefined') return
+        let cookie = `${name}=; max-age=0`
+        if (options?.path) cookie += `; path=${options.path}`
+        if (options?.domain) cookie += `; domain=${options.domain}`
+        document.cookie = cookie
+      },
+    },
   })
 }
 

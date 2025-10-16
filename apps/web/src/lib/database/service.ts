@@ -116,7 +116,13 @@ export class LessonService {
       .select(`
         *,
         mcq_questions (*),
-        coding_questions (*),
+        coding_questions (
+          *,
+          head,
+          body_template,
+          tail
+        ),
+        essay_questions (*),
         section:sections!questions_section_id_fkey (
           id,
           title,

@@ -301,6 +301,24 @@ export async function POST(
           if (codingError) {
             console.error('Error creating coding details:', codingError)
           }
+        } else if (questionData.type === 'essay') {
+          const { error: essayError } = await supabase
+            .from('essay_questions')
+            .insert({
+              question_id: question.id,
+              prompt: questionData.description || questionData.title || "",
+              rich_prompt: questionData.description ? { content: questionData.description } : null,
+              min_words: 0,
+              max_words: null,
+              time_limit_minutes: null,
+              rubric: null,
+              enable_ai_feedback: false,
+              ai_model_settings: {}
+            })
+
+          if (essayError) {
+            console.error('Error creating essay details:', essayError)
+          }
         }
 
         createdQuestions.push(question)

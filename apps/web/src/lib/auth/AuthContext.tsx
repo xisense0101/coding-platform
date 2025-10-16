@@ -75,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (error) {
           console.error('Error getting initial session:', error)
+          setIsLoading(false)
           return
         }
 
@@ -84,9 +85,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (initialSession?.user) {
           await loadUserProfile(initialSession.user.id)
         }
+        
+        setIsLoading(false)
       } catch (error) {
         console.error('Error in getInitialSession:', error)
-      } finally {
         setIsLoading(false)
       }
     }
@@ -96,18 +98,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Listen for auth changes
   useEffect(() => {
-    let lastSessionId: string | null = null
-    let isSigningIn = false
-    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: any, session: Session | null) => {
-        // Prevent duplicate processing of the same session
-        const currentSessionId = session?.access_token || null
-        if (lastSessionId === currentSessionId && event === 'INITIAL_SESSION') {
-          return
-        }
-        lastSessionId = currentSessionId
-        
         // Only log significant events, not initial session loads
         if (event !== 'INITIAL_SESSION') {
           console.log('Auth state changed:', event, session?.user?.id)
@@ -115,57 +107,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Handle different auth events
         if (event === 'SIGNED_IN') {
-          isSigningIn = true
-          // Don't process here, let signIn method handle it
+          setSession(session)
+          setUser(session?.user ?? null)
+          if (session?.user) {
+            await loadUserProfile(session.user.id)
+          }
           return
         }
         
         if (event === 'SIGNED_OUT') {
-          isSigningIn = false
           setSession(null)
           setUser(null)
           setUserProfile(null)
           router.replace('/auth/login')
           return
         }
-        
-        // Only process INITIAL_SESSION if not currently signing in
-        if (event === 'INITIAL_SESSION' && !isSigningIn) {
+
+        if (event === 'TOKEN_REFRESHED') {
           setSession(session)
           setUser(session?.user ?? null)
-
           if (session?.user) {
             await loadUserProfile(session.user.id)
-          } else {
-            setUserProfile(null)
           }
+          return
         }
 
-        if (event === 'TOKEN_REFRESHED' && !session) {
-          setUserProfile(null)
-          router.replace('/auth/login')
+        if (event === 'USER_UPDATED' && session) {
+          setSession(session)
+          setUser(session?.user ?? null)
+          if (session?.user) {
+            await loadUserProfile(session.user.id)
+          }
+          return
         }
-
-        setIsLoading(false)
       }
     )
 
-    // Check for session expiration every 5 minutes (reduced frequency)
-    const sessionCheckInterval = setInterval(async () => {
-      if (!isSigningIn) {
-        const { data: { session: currentSession } } = await supabase.auth.getSession()
-        
-        if (!currentSession && user) {
-          // Session has expired
-          console.log('Session expired, logging out user')
-          await signOut()
-        }
-      }
-    }, 300000) // Check every 5 minutes
-
     return () => {
       subscription.unsubscribe()
-      clearInterval(sessionCheckInterval)
     }
   }, [router])
 

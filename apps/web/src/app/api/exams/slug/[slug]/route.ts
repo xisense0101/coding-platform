@@ -56,7 +56,10 @@ export async function GET(
                 test_cases,
                 allowed_languages,
                 time_limit,
-                memory_limit
+                memory_limit,
+                head,
+                body_template,
+                tail
               )
             )
           )
@@ -120,7 +123,10 @@ export async function GET(
                 test_cases: question.coding_questions[0].test_cases,
                 allowed_languages: question.coding_questions[0].allowed_languages,
                 time_limit: question.coding_questions[0].time_limit,
-                memory_limit: question.coding_questions[0].memory_limit
+                memory_limit: question.coding_questions[0].memory_limit,
+                head: question.coding_questions[0].head,
+                body_template: question.coding_questions[0].body_template,
+                tail: question.coding_questions[0].tail
               } : undefined
             }
           }

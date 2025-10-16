@@ -25,6 +25,9 @@ const codingQuestionSchema = z.object({
   content: z.string(),
   points: z.number(),
   code: z.string().optional(),
+  head: z.string().optional(),
+  body_template: z.string().optional(),
+  tail: z.string().optional(),
   languages: z.array(z.string()).optional(),
   testCases: z.array(testCaseSchema).optional()
 })
@@ -247,12 +250,31 @@ export async function POST(request: NextRequest) {
             return acc
           }, {} as Record<string, string>) || { javascript: question.code || '' }
 
+          // Format head, body_template, tail per language
+          const head = question.languages?.reduce((acc, lang) => {
+            acc[lang.toLowerCase()] = question.head || ''
+            return acc
+          }, {} as Record<string, string>) || {}
+
+          const bodyTemplate = question.languages?.reduce((acc, lang) => {
+            acc[lang.toLowerCase()] = question.body_template || question.code || ''
+            return acc
+          }, {} as Record<string, string>) || { javascript: question.body_template || question.code || '' }
+
+          const tail = question.languages?.reduce((acc, lang) => {
+            acc[lang.toLowerCase()] = question.tail || ''
+            return acc
+          }, {} as Record<string, string>) || {}
+
           const { error: codingError } = await supabase
             .from('coding_questions')
             .insert({
               question_id: baseQuestion.id,
               problem_statement: question.content,
               boilerplate_code: boilerplateCode,
+              head: head,
+              body_template: bodyTemplate,
+              tail: tail,
               test_cases: formattedTestCases,
               allowed_languages: question.languages || ['javascript'],
               time_limit: 30,

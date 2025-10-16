@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import dynamic from 'next/dynamic'
 import { RichTextPreview } from '@/components/editors/RichTextEditor'
-import { ChevronLeft, Code, FileText, CheckCircle2, PenTool, Send } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Code, FileText, CheckCircle2, PenTool, Send } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface Question {
@@ -29,6 +29,17 @@ interface Question {
     allowed_languages: string[]
     time_limit?: number
     memory_limit?: number
+    head?: Record<string, string>
+    body_template?: Record<string, string>
+    tail?: Record<string, string>
+  }
+  essay_question?: {
+    prompt: string
+    rich_prompt?: any
+    min_words?: number
+    max_words?: number
+    time_limit_minutes?: number
+    rubric?: any
   }
 }
 
@@ -37,12 +48,17 @@ interface LessonViewProps {
   courseId: string
   courseTitle: string
   userId: string
+  navigation?: {
+    prev: string | null
+    next: string | null
+  }
 }
 
 const CodingEditor = dynamic(() => import('./CodingEditor'), { ssr: false })
 const McqEditor = dynamic(() => import('./McqEditor'), { ssr: false })
+const EssayEditor = dynamic(() => import('./EssayEditor'), { ssr: false })
 
-export default function LessonView({ question, courseId, courseTitle, userId }: LessonViewProps) {
+export default function LessonView({ question, courseId, courseTitle, userId, navigation }: LessonViewProps) {
   const [essayAnswer, setEssayAnswer] = useState("")
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -59,8 +75,31 @@ export default function LessonView({ question, courseId, courseTitle, userId }: 
     Array.isArray((question as any).coding_questions) ? (question as any).coding_questions[0] : (question as any).coding_questions
   )
 
+  // Debug logging
+  console.log('LessonView - question:', question)
+  console.log('LessonView - resolvedCoding:', resolvedCoding)
+  console.log('LessonView - resolvedCoding.head:', resolvedCoding?.head)
+  console.log('LessonView - resolvedCoding.body_template:', resolvedCoding?.body_template)
+  console.log('LessonView - resolvedCoding.tail:', resolvedCoding?.tail)
+
+  const resolvedEssay: any = (question as any).essay_question ?? (
+    Array.isArray((question as any).essay_questions) ? (question as any).essay_questions[0] : (question as any).essay_questions
+  )
+
   const handleBackClick = () => {
     router.push(`/student/courses/${courseId}`)
+  }
+
+  const handlePrevious = () => {
+    if (navigation?.prev) {
+      router.push(`/student/courses/${courseId}/lesson/${navigation.prev}`)
+    }
+  }
+
+  const handleNext = () => {
+    if (navigation?.next) {
+      router.push(`/student/courses/${courseId}/lesson/${navigation.next}`)
+    }
   }
 
   const handleSubmit = async () => {
@@ -138,10 +177,36 @@ export default function LessonView({ question, courseId, courseTitle, userId }: 
               <p className="text-sky-600 text-sm">{question.title}</p>
             </div>
           </div>
-          <Badge className={`${getTypeColor(question.type)} text-white`}>
-            {getTypeIcon(question.type)}
-            <span className="ml-2 capitalize">{question.type}</span>
-          </Badge>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrevious}
+                disabled={!navigation?.prev}
+                className="border-sky-300 text-sky-700 hover:bg-sky-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={navigation?.prev ? "Previous question" : "No previous question"}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNext}
+                disabled={!navigation?.next}
+                className="border-sky-300 text-sky-700 hover:bg-sky-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={navigation?.next ? "Next question" : "No next question"}
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+            <Badge className={`${getTypeColor(question.type)} text-white`}>
+              {getTypeIcon(question.type)}
+              <span className="ml-2 capitalize">{question.type}</span>
+            </Badge>
+          </div>
         </div>
       </div>
 
@@ -158,6 +223,9 @@ export default function LessonView({ question, courseId, courseTitle, userId }: 
             allowed_languages: question.coding_question?.allowed_languages || ['javascript', 'python'],
             time_limit: question.coding_question?.time_limit,
             memory_limit: question.coding_question?.memory_limit,
+            head: question.coding_question?.head || {},
+            body_template: question.coding_question?.body_template || {},
+            tail: question.coding_question?.tail || {},
             rich_problem_statement: question.rich_content || ''
           }}
         />
@@ -172,6 +240,21 @@ export default function LessonView({ question, courseId, courseTitle, userId }: 
             options: question.mcq_question?.options || ["", "", "", ""],
             correct_answers: question.mcq_question?.correct_answers || [0],
             explanation: question.mcq_question?.explanation || ''
+          }}
+        />
+      ) : question.type === 'essay' && (resolvedEssay || question.essay_question) ? (
+        <EssayEditor
+          questionId={question.id}
+          userId={userId}
+          courseId={courseId}
+          title={question.title}
+          essay={resolvedEssay || {
+            prompt: question.essay_question?.prompt || question.description || '',
+            rich_prompt: question.rich_content || question.essay_question?.rich_prompt || '',
+            min_words: question.essay_question?.min_words,
+            max_words: question.essay_question?.max_words,
+            time_limit_minutes: question.essay_question?.time_limit_minutes,
+            rubric: question.essay_question?.rubric
           }}
         />
       ) : (

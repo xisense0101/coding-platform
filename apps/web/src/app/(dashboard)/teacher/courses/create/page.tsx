@@ -581,6 +581,60 @@ function CreateCoursePageContent() {
 
                 if (!questionResponse.ok) {
                   console.error('Failed to create question:', question.title)
+                } else {
+                  // After successfully creating the question, create type-specific data
+                  const createdQuestion = await questionResponse.json()
+                  
+                  if (question.type === 'mcq' && question.options && question.correctAnswer !== undefined) {
+                    const correctAnswer = typeof question.correctAnswer === 'string' 
+                      ? parseInt(question.correctAnswer) || 0 
+                      : question.correctAnswer || 0
+                    
+                    await fetch(`/api/questions/${createdQuestion.id}/mcq`, {
+                      method: 'PATCH',
+                      headers: {
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({
+                        options: question.options || ["", "", "", ""],
+                        correct_answers: [correctAnswer],
+                        is_multiple_choice: false,
+                        question_text: question.content || "",
+                        rich_question_text: question.content || ""
+                      })
+                    })
+                  } else if (question.type === 'coding' && question.testCases) {
+                    const testCases = (question.testCases || []).map(tc => ({
+                      input: tc.input || "",
+                      expected_output: tc.expectedOutput || "",
+                      is_hidden: tc.isHidden || false,
+                      weight: tc.weight || 1
+                    }))
+                    
+                    await fetch(`/api/questions/${createdQuestion.id}/coding`, {
+                      method: 'PATCH',
+                      headers: {
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({
+                        problem_statement: question.content || "",
+                        rich_problem_statement: question.content || "",
+                        test_cases: testCases,
+                        allowed_languages: question.languages || ["javascript", "python"]
+                      })
+                    })
+                  } else if (question.type === 'essay') {
+                    await fetch(`/api/questions/${createdQuestion.id}/essay`, {
+                      method: 'PATCH',
+                      headers: {
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({
+                        prompt: question.content || "",
+                        rich_prompt: question.content || ""
+                      })
+                    })
+                  }
                 }
               } else if (question.hasChanges) {
                 // Update existing question only if it has changes
@@ -667,6 +721,26 @@ function CreateCoursePageContent() {
                       const errorData = await codingResponse.text()
                       console.error('Coding update error:', errorData)
                     }
+                  } else if (question.type === 'essay') {
+                    // Handle essay question updates
+                    const essayData = {
+                      prompt: question.content || "",
+                      rich_prompt: question.content || "",
+                      min_words: 0,
+                      max_words: null,
+                      time_limit_minutes: null,
+                      rubric: null,
+                      enable_ai_feedback: false,
+                      ai_model_settings: {}
+                    }
+
+                    await fetch(`/api/questions/${question.id}/essay`, {
+                      method: 'PATCH',
+                      headers: {
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify(essayData)
+                    })
                   }
                   
                   // Clear the hasChanges flag after successful update
