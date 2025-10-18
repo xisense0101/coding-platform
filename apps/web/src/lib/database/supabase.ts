@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './types'
 
+import { logger } from '@/lib/utils/logger'
+
 // Environment variables validation
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -37,7 +39,7 @@ export type SupabaseClient = typeof supabase
 
 // Helper function to handle Supabase errors
 export const handleSupabaseError = (error: any) => {
-  console.error('Supabase error:', error)
+  logger.error('Supabase error:', error)
   
   if (error?.message) {
     return error.message
@@ -56,13 +58,13 @@ export const checkAuth = async (client: any) => {
     const { data: { user }, error } = await client.auth.getUser()
     
     if (error) {
-      console.error('Auth check error:', error)
+      logger.error('Auth check error:', error)
       return null
     }
     
     return user
   } catch (error) {
-    console.error('Auth check failed:', error)
+    logger.error('Auth check failed:', error)
     return null
   }
 }
@@ -80,13 +82,13 @@ export const getUserProfile = async (
       .single()
     
     if (error) {
-      console.error('Error fetching user profile:', error)
+      logger.error('Error fetching user profile:', error)
       return null
     }
     
     return data
   } catch (error) {
-    console.error('Error fetching user profile:', error)
+    logger.error('Error fetching user profile:', error)
     return null
   }
 }
@@ -104,13 +106,13 @@ export const getOrganization = async (
       .single()
     
     if (error) {
-      console.error('Error fetching organization:', error)
+      logger.error('Error fetching organization:', error)
       return null
     }
     
     return data
   } catch (error) {
-    console.error('Error fetching organization:', error)
+    logger.error('Error fetching organization:', error)
     return null
   }
 }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { z } from 'zod'
 
+import { logger } from '@/lib/utils/logger'
+
 const updateMcqSchema = z.object({
   options: z.array(z.string()),
   correct_answers: z.array(z.number().int().min(0)),
@@ -37,7 +39,7 @@ export async function GET(
       .single()
 
     if (mcqError) {
-      console.error('Error fetching MCQ details:', mcqError)
+      logger.error('Error fetching MCQ details:', mcqError)
       
       // If no MCQ details exist, return default values
       const defaultMcqData = {
@@ -56,7 +58,7 @@ export async function GET(
     return NextResponse.json(mcqData)
 
   } catch (error) {
-    console.error('Error in MCQ question API:', error)
+    logger.error('Error in MCQ question API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -82,7 +84,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    console.log('Received MCQ update data:', JSON.stringify(body, null, 2))
+    logger.log('Received MCQ update data:', JSON.stringify(body, null, 2))
     
     const validatedData = updateMcqSchema.parse(body)
 
@@ -94,7 +96,7 @@ export async function PATCH(
       .single()
 
     if (questionError || !questionData) {
-      console.error('Question not found:', questionError)
+      logger.error('Question not found:', questionError)
       return NextResponse.json(
         { error: 'Question not found' },
         { status: 404 }
@@ -127,8 +129,8 @@ export async function PATCH(
         .single()
 
       if (updateError) {
-        console.error('Database error updating MCQ details:', updateError)
-        console.error('Question ID:', params.questionId)
+        logger.error('Database error updating MCQ details:', updateError)
+        logger.error('Question ID:', params.questionId)
         return NextResponse.json(
           { error: 'Failed to update MCQ question', details: updateError.message },
           { status: 500 }
@@ -152,9 +154,9 @@ export async function PATCH(
         .single()
 
       if (insertError) {
-        console.error('Database error creating MCQ details:', insertError)
-        console.error('Question ID:', params.questionId)
-        console.error('Data being inserted:', JSON.stringify({
+        logger.error('Database error creating MCQ details:', insertError)
+        logger.error('Question ID:', params.questionId)
+        logger.error('Data being inserted:', JSON.stringify({
           question_id: params.questionId,
           question_text: validatedData.question_text || "",
           options: validatedData.options || ["", "", "", ""],
@@ -173,7 +175,7 @@ export async function PATCH(
     return NextResponse.json(mcqData)
 
   } catch (error) {
-    console.error('Error in update MCQ question API:', error)
+    logger.error('Error in update MCQ question API:', error)
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(

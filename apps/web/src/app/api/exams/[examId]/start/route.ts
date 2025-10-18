@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 
+import { logger } from '@/lib/utils/logger'
+
 /**
  * POST /api/exams/[examId]/start
  * Starts or resumes an exam submission
@@ -29,7 +31,7 @@ export async function POST(
 
     const supabase = createSupabaseServerClient()
 
-    console.log('🔍 Checking for existing submission...', {
+    logger.log('🔍 Checking for existing submission...', {
       examId: params.examId,
       userId,
       studentEmail
@@ -45,7 +47,7 @@ export async function POST(
       .maybeSingle()
 
     if (fetchError) {
-      console.error('❌ Error fetching submission:', fetchError)
+      logger.error('❌ Error fetching submission:', fetchError)
       return NextResponse.json(
         { 
           error: 'Failed to check existing submission', 
@@ -57,7 +59,7 @@ export async function POST(
 
     // Log submission details for debugging
     if (existingSubmission) {
-      console.log('📋 Existing submission found:', {
+      logger.log('📋 Existing submission found:', {
         id: existingSubmission.id,
         is_submitted: existingSubmission.is_submitted,
         submission_status: existingSubmission.submission_status,
@@ -69,7 +71,7 @@ export async function POST(
 
     // If submission exists and is already submitted, reject
     if (existingSubmission && existingSubmission.is_submitted) {
-      console.log('❌ Submission already submitted:', {
+      logger.log('❌ Submission already submitted:', {
         submittedAt: existingSubmission.submitted_at,
         status: existingSubmission.submission_status
       })
@@ -86,7 +88,7 @@ export async function POST(
 
     // If submission exists and is in progress, return it
     if (existingSubmission) {
-      console.log('✅ Found existing submission:', existingSubmission.id)
+      logger.log('✅ Found existing submission:', existingSubmission.id)
       return NextResponse.json({
         success: true,
         submission: {
@@ -99,7 +101,7 @@ export async function POST(
     }
 
     // No existing submission, create a new one
-    console.log('📝 Creating new submission...')
+    logger.log('📝 Creating new submission...')
 
     // Get client IP (optional)
     let ipAddress = null
@@ -108,7 +110,7 @@ export async function POST(
       const realIp = request.headers.get('x-real-ip')
       ipAddress = forwarded?.split(',')[0] || realIp || null
     } catch (error) {
-      console.warn('⚠️ Could not determine IP address:', error)
+      logger.warn('⚠️ Could not determine IP address:', error)
     }
 
     const { data: newSubmission, error: insertError } = await supabase
@@ -131,7 +133,7 @@ export async function POST(
       .single()
 
     if (insertError) {
-      console.error('❌ Error creating submission:', insertError)
+      logger.error('❌ Error creating submission:', insertError)
       return NextResponse.json(
         { 
           error: 'Failed to create exam submission', 
@@ -141,7 +143,7 @@ export async function POST(
       )
     }
 
-    console.log('✅ Created new submission:', newSubmission.id)
+    logger.log('✅ Created new submission:', newSubmission.id)
 
     return NextResponse.json({
       success: true,
@@ -154,7 +156,7 @@ export async function POST(
     })
 
   } catch (error) {
-    console.error('💥 Error in exam start:', error)
+    logger.error('💥 Error in exam start:', error)
     return NextResponse.json(
       { 
         error: 'Internal server error', 

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { z } from 'zod'
 
+import { logger } from '@/lib/utils/logger'
+
 // Define the schema for course creation
 const createCourseSchema = z.object({
   title: z.string().min(1, 'Course title is required'),
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (courseError) {
-      console.error('Error creating course:', courseError)
+      logger.error('Error creating course:', courseError)
       return NextResponse.json(
         { error: 'Failed to create course' },
         { status: 500 }
@@ -111,7 +113,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (sectionError) {
-        console.error('Error creating section:', sectionError)
+        logger.error('Error creating section:', sectionError)
         continue // Continue with other sections
       }
 
@@ -139,7 +141,7 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (questionError) {
-          console.error('Error creating question:', questionError)
+          logger.error('Error creating question:', questionError)
           continue // Continue with other questions
         }
 
@@ -215,7 +217,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error in create-course API:', error)
+    logger.error('Error in create-course API:', error)
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 
+import { logger } from '@/lib/utils/logger'
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { examId: string } }
@@ -29,7 +31,7 @@ export async function POST(
         .maybeSingle()
 
       if (submissionError && submissionError.code !== 'PGRST116') {
-        console.error('Error checking existing submission:', submissionError)
+        logger.error('Error checking existing submission:', submissionError)
       } else if (existingSubmission) {
         return NextResponse.json(
           { 
@@ -106,7 +108,7 @@ export async function POST(
     return NextResponse.json({ valid: true })
 
   } catch (error) {
-    console.error('Error validating test code:', error)
+    logger.error('Error validating test code:', error)
     return NextResponse.json(
       { valid: false, message: 'Internal server error' },
       { status: 500 }

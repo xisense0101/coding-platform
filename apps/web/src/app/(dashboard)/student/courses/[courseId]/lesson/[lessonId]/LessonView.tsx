@@ -9,6 +9,7 @@ import dynamic from 'next/dynamic'
 import { RichTextPreview } from '@/components/editors/RichTextEditor'
 import { ChevronLeft, ChevronRight, Code, FileText, CheckCircle2, PenTool, Send } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { logger } from '@/lib/utils/logger'
 
 interface Question {
   id: string
@@ -76,11 +77,11 @@ export default function LessonView({ question, courseId, courseTitle, userId, na
   )
 
   // Debug logging
-  console.log('LessonView - question:', question)
-  console.log('LessonView - resolvedCoding:', resolvedCoding)
-  console.log('LessonView - resolvedCoding.head:', resolvedCoding?.head)
-  console.log('LessonView - resolvedCoding.body_template:', resolvedCoding?.body_template)
-  console.log('LessonView - resolvedCoding.tail:', resolvedCoding?.tail)
+  logger.log('LessonView - question:', question)
+  logger.log('LessonView - resolvedCoding:', resolvedCoding)
+  logger.log('LessonView - resolvedCoding.head:', resolvedCoding?.head)
+  logger.log('LessonView - resolvedCoding.body_template:', resolvedCoding?.body_template)
+  logger.log('LessonView - resolvedCoding.tail:', resolvedCoding?.tail)
 
   const resolvedEssay: any = (question as any).essay_question ?? (
     Array.isArray((question as any).essay_questions) ? (question as any).essay_questions[0] : (question as any).essay_questions
@@ -131,7 +132,7 @@ export default function LessonView({ question, courseId, courseTitle, userId, na
 
       setIsSubmitted(true)
     } catch (error) {
-      console.error('Error submitting answer:', error)
+      logger.error('Error submitting answer:', error)
       alert('Failed to submit answer. Please try again.')
     } finally {
       setIsLoading(false)

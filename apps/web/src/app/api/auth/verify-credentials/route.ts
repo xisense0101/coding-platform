@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 
+import { logger } from '@/lib/utils/logger'
+
 /**
  * POST /api/auth/verify-credentials
  * Verifies user email and password WITHOUT creating a session
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error verifying credentials:', error)
+    logger.error('Error verifying credentials:', error)
     return NextResponse.json(
       { 
         valid: false, 

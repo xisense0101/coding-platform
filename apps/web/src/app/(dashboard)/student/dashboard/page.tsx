@@ -32,6 +32,8 @@ import { useUser, useStudentCourses } from "@/hooks/useData"
 import { useAuth } from '@/lib/auth/AuthContext'
 import Link from 'next/link'
 
+import { logger } from '@/lib/utils/logger'
+
 export default function StudentDashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const { user, loading: userLoading } = useUser()
@@ -194,7 +196,7 @@ export default function StudentDashboard() {
                   if (btn) { btn.disabled = true; btn.textContent = 'Logging out...' }
                   await signOut()
                 } catch (err) {
-                  console.error('Logout error:', err)
+                  logger.error('Logout error:', err)
                   window.location.href = '/auth/login'
                 }
               }}

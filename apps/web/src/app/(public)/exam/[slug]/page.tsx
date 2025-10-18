@@ -28,6 +28,8 @@ import createClient from "@/lib/database/client"
 import { useAuth } from "@/lib/auth/AuthContext"
 import type { Tables, TablesInsert, TablesUpdate } from "@/lib/database/types"
 
+import { logger } from '@/lib/utils/logger'
+
 // -----------------------------------------------------------------------------
 // Local UI types built from API shape
 // -----------------------------------------------------------------------------
@@ -185,13 +187,13 @@ export default function Component() {
         const res = await fetch(`/api/exams/slug/${params.slug}`)
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
-          console.error('Exam fetch error:', err)
+          logger.error('Exam fetch error:', err)
           const errorMessage = err?.error || `Failed to load exam (${res.status})`
           const detailsMessage = err?.details ? ` - ${err.details}` : ''
           throw new Error(errorMessage + detailsMessage)
         }
         const json = await res.json()
-        console.log('Exam loaded successfully:', json.exam?.title)
+        logger.log('Exam loaded successfully:', json.exam?.title)
         const ex: ApiExam = json.exam
         if (!mounted) return
         setExam(ex)
@@ -271,28 +273,28 @@ export default function Component() {
   const handleStudentAuth = (data: StudentAuthData) => {
     setStudentAuthData(data)
     setShowStudentAuth(false)
-    console.log('Student authenticated:', data)
+    logger.log('Student authenticated:', data)
   }
 
   // Start exam -> ensure submission row exists and preload answers
   const startExam = async () => {
     try {
-      console.log('🚀 Start Exam clicked')
+      logger.log('🚀 Start Exam clicked')
       if (!exam) {
-        console.error('❌ No exam data available')
+        logger.error('❌ No exam data available')
         throw new Error('Exam data not available')
       }
-      console.log('✅ Exam data exists:', exam.title)
+      logger.log('✅ Exam data exists:', exam.title)
       
       if (!studentAuthData || !studentAuthData.userId) {
-        console.error('❌ No authenticated student data')
+        logger.error('❌ No authenticated student data')
         throw new Error('Student authentication data not available')
       }
       
       const userId = studentAuthData.userId
-      console.log('👤 User ID from auth:', userId)
+      logger.log('👤 User ID from auth:', userId)
 
-      console.log('🔍 Calling start exam API...')
+      logger.log('🔍 Calling start exam API...')
       
       // Call API to create or get existing submission
       const response = await fetch(`/api/exams/${exam.id}/start`, {
@@ -312,38 +314,38 @@ export default function Component() {
       const result = await response.json()
 
       if (!response.ok) {
-        console.error('❌ Start exam API error:', result)
+        logger.error('❌ Start exam API error:', result)
         if (result.alreadySubmitted) {
           alert('You have already submitted this exam. You cannot take it again.')
         }
         throw new Error(result.error || 'Failed to start exam')
       }
 
-      console.log('✅ Start exam API response:', result)
+      logger.log('✅ Start exam API response:', result)
 
       // Set submission ID
       setSubmissionId(result.submission.id)
 
       // If existing submission, restore answers
       if (!result.isNew && result.submission.answers) {
-        console.log('📋 Restoring previous answers...')
+        logger.log('📋 Restoring previous answers...')
         const pre = result.submission.answers || {}
         const ans: Record<string, AnswerState> = {}
         Object.keys(pre).forEach((qid) => {
           ans[qid] = { ...pre[qid], status: pre[qid]?.status || "answered" }
         })
         setAnswers(ans)
-        console.log('✅ Restored answers for', Object.keys(ans).length, 'questions')
+        logger.log('✅ Restored answers for', Object.keys(ans).length, 'questions')
       } else {
-        console.log('📝 Starting fresh exam (no previous answers)')
+        logger.log('📝 Starting fresh exam (no previous answers)')
       }
 
-      console.log('🎯 Setting exam as started...')
+      logger.log('🎯 Setting exam as started...')
       setIsExamStarted(true)
       setShowInstructions(false)
-      console.log('✅ Exam started successfully!')
+      logger.log('✅ Exam started successfully!')
     } catch (error) {
-      console.error('💥 Error starting exam:', error)
+      logger.error('💥 Error starting exam:', error)
       throw error // Re-throw to be caught by ExamInstructions
     }
   }
@@ -952,13 +954,13 @@ function ExamInstructions({ onStart }: { onStart: () => Promise<void> }) {
   
   const handleStart = async () => {
     try {
-      console.log('📋 Instructions: Start button clicked')
+      logger.log('📋 Instructions: Start button clicked')
       setIsStarting(true)
       await onStart()
-      console.log('📋 Instructions: onStart completed successfully')
+      logger.log('📋 Instructions: onStart completed successfully')
       // Don't reset isStarting here - the component will unmount when exam starts
     } catch (error) {
-      console.error('❌ Instructions: Error during start:', error)
+      logger.error('❌ Instructions: Error during start:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       alert(`Failed to start exam: ${errorMessage}`)
       setIsStarting(false)

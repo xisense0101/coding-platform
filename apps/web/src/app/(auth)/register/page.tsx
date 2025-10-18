@@ -5,13 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, GraduationCap } from 'lucide-react'
 
+import { logger } from '@/lib/utils/logger'
+
 export const metadata: Metadata = {
   title: 'Register - Enterprise Educational Platform',
   description: 'Create your account to get started with our learning platform.',
 }
 
 export default function RegisterPage() {
-  console.log('RegisterPage component loaded')
+  logger.log('RegisterPage component loaded')
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex flex-col">

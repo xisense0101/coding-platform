@@ -18,6 +18,8 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { ArrowLeft, Plus, Save, Eye, EyeOff, Code, CheckCircle, Trash2, Settings } from 'lucide-react'
 
+import { logger } from '@/lib/utils/logger'
+
 interface Question {
   id: number
   type: "mcq" | "coding"
@@ -97,7 +99,7 @@ function CreateExamPageContent() {
       if (!examResponse.ok) throw new Error('Failed to fetch exam')
       const { exam } = await examResponse.json()
       
-      console.log('Loaded exam data for editing:', exam)
+      logger.log('Loaded exam data for editing:', exam)
       
       setExamTitle(exam.title)
       setExamDescription(exam.description || "")
@@ -120,12 +122,12 @@ function CreateExamPageContent() {
 
       // Convert exam sections data to the format expected by the UI
       if (exam.exam_sections && exam.exam_sections.length > 0) {
-        console.log('Converting exam sections:', exam.exam_sections)
+        logger.log('Converting exam sections:', exam.exam_sections)
         const convertedSections: Section[] = exam.exam_sections.map((section: any) => {
-          console.log('Processing section:', section)
+          logger.log('Processing section:', section)
           const questions: Question[] = section.exam_questions.map((examQuestion: any) => {
             const question = examQuestion.question
-            console.log('Processing question:', question)
+            logger.log('Processing question:', question)
             
             const baseQuestion: Question = {
               id: question.id,
@@ -165,7 +167,7 @@ function CreateExamPageContent() {
             if (question.type === 'coding' && question.coding_questions && question.coding_questions[0]) {
               const codingData = question.coding_questions[0]
               
-              console.log('Loading coding question data:', {
+              logger.log('Loading coding question data:', {
                 questionId: question.id,
                 head: codingData.head,
                 body_template: codingData.body_template,
@@ -188,7 +190,7 @@ function CreateExamPageContent() {
               baseQuestion.body_template = codingData.body_template || codingData.boilerplate_code || {}
               baseQuestion.tail = codingData.tail || {}
               
-              console.log('Loaded into baseQuestion:', {
+              logger.log('Loaded into baseQuestion:', {
                 head: baseQuestion.head,
                 body_template: baseQuestion.body_template,
                 tail: baseQuestion.tail
@@ -231,7 +233,7 @@ function CreateExamPageContent() {
         }
       }
     } catch (error) {
-      console.error('Error loading exam data:', error)
+      logger.error('Error loading exam data:', error)
       alert('Failed to load exam data')
     } finally {
       setIsLoading(false)
@@ -403,7 +405,7 @@ function CreateExamPageContent() {
     try {
       if (isEditMode && editExamId) {
         // Update existing exam - send full data including sections and questions
-        console.log('Updating exam with full data...')
+        logger.log('Updating exam with full data...')
         
         const examData = {
           title: examTitle,
@@ -445,7 +447,7 @@ function CreateExamPageContent() {
           }))
         }
 
-        console.log('Sending updated exam data to API:', JSON.stringify(examData, null, 2))
+        logger.log('Sending updated exam data to API:', JSON.stringify(examData, null, 2))
 
         const examResponse = await fetch(`/api/exams/${editExamId}`, {
           method: 'PATCH',
@@ -457,7 +459,7 @@ function CreateExamPageContent() {
 
         if (!examResponse.ok) {
           const errorData = await examResponse.json()
-          console.error('Update API Error:', errorData)
+          logger.error('Update API Error:', errorData)
           throw new Error(errorData.error || 'Failed to update exam')
         }
 
@@ -467,9 +469,9 @@ function CreateExamPageContent() {
         }, 1500)
       } else {
         // Create new exam - send datetime values directly to API
-        console.log('Frontend date processing:')
-        console.log('startTime input:', startTime)
-        console.log('endTime input:', endTime)
+        logger.log('Frontend date processing:')
+        logger.log('startTime input:', startTime)
+        logger.log('endTime input:', endTime)
         
         const examData = {
           title: examTitle,
@@ -510,7 +512,7 @@ function CreateExamPageContent() {
           }))
         }
 
-        console.log('Sending exam data to API:', JSON.stringify(examData, null, 2))
+        logger.log('Sending exam data to API:', JSON.stringify(examData, null, 2))
 
         const response = await fetch('/api/exams', {
           method: 'POST',
@@ -528,12 +530,12 @@ function CreateExamPageContent() {
           }, 1500)
         } else {
           const errorData = await response.json()
-          console.error('API Error:', errorData)
+          logger.error('API Error:', errorData)
           throw new Error(errorData.error || 'Failed to create exam')
         }
       }
     } catch (error) {
-      console.error('Error saving exam:', error)
+      logger.error('Error saving exam:', error)
       setError(`Failed to ${isEditMode ? 'update' : 'create'} exam. Please try again.`)
     } finally {
       setIsSubmitting(false)
@@ -571,7 +573,7 @@ function CreateExamPageContent() {
       }, 1500)
       
     } catch (error) {
-      console.error('Error deleting exam:', error)
+      logger.error('Error deleting exam:', error)
       setError('Failed to delete exam. Please try again.')
     } finally {
       setIsDeleting(false)

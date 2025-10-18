@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { z } from 'zod'
 
+import { logger } from '@/lib/utils/logger'
+
 const createSectionSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
@@ -36,20 +38,20 @@ export async function GET(
   try {
     const supabase = createSupabaseServerClient()
     
-    console.log('Sections API: Starting request for course:', params.courseId)
+    logger.log('Sections API: Starting request for course:', params.courseId)
     
     // Get the current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
-      console.log('Sections API: Auth error')
+      logger.log('Sections API: Auth error')
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    console.log('Sections API: User authenticated:', user.id)
+    logger.log('Sections API: User authenticated:', user.id)
 
     // First verify the user has access to this course
     const { data: course, error: courseError } = await supabase
@@ -59,14 +61,14 @@ export async function GET(
       .single()
 
     if (courseError) {
-      console.error('Sections API: Course error:', courseError)
+      logger.error('Sections API: Course error:', courseError)
       return NextResponse.json(
         { error: 'Course not found' },
         { status: 404 }
       )
     }
 
-    console.log('Sections API: Course found:', course)
+    logger.log('Sections API: Course found:', course)
 
     // Check permissions
     const { data: userProfile, error: profileError } = await supabase
@@ -76,26 +78,26 @@ export async function GET(
       .single()
 
     if (profileError || !userProfile) {
-      console.error('Sections API: Profile error:', profileError)
+      logger.error('Sections API: Profile error:', profileError)
       return NextResponse.json(
         { error: 'User profile not found' },
         { status: 404 }
       )
     }
 
-    console.log('Sections API: User profile:', userProfile)
+    logger.log('Sections API: User profile:', userProfile)
 
     if (course.teacher_id !== user.id && 
         userProfile.role !== 'admin' && 
         course.organization_id !== userProfile.organization_id) {
-      console.log('Sections API: Permission denied')
+      logger.log('Sections API: Permission denied')
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }
       )
     }
 
-    console.log('Sections API: Fetching sections for course:', params.courseId)
+    logger.log('Sections API: Fetching sections for course:', params.courseId)
 
     // Fetch sections first
     const { data: sections, error: sectionsError } = await supabase
@@ -105,14 +107,14 @@ export async function GET(
       .order('order_index', { ascending: true })
 
     if (sectionsError) {
-      console.error('Sections API: Sections query error:', sectionsError)
+      logger.error('Sections API: Sections query error:', sectionsError)
       return NextResponse.json(
         { error: 'Failed to fetch sections', details: sectionsError.message },
         { status: 500 }
       )
     }
 
-    console.log('Sections API: Found sections:', sections?.length || 0)
+    logger.log('Sections API: Found sections:', sections?.length || 0)
 
     // If no sections found, return empty array
     if (!sections || sections.length === 0) {
@@ -129,7 +131,7 @@ export async function GET(
           .order('order_index', { ascending: true })
 
         if (questionsError) {
-          console.error(`Questions query error for section ${section.id}:`, questionsError)
+          logger.error(`Questions query error for section ${section.id}:`, questionsError)
           return {
             ...section,
             questions: []
@@ -143,12 +145,12 @@ export async function GET(
       })
     )
 
-    console.log('Sections API: Returning sections with questions')
+    logger.log('Sections API: Returning sections with questions')
 
     return NextResponse.json(sectionsWithQuestions)
 
   } catch (error) {
-    console.error('Sections API: Unexpected error:', error)
+    logger.error('Sections API: Unexpected error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -211,7 +213,7 @@ export async function POST(
       .single()
 
     if (sectionError) {
-      console.error('Error creating section:', sectionError)
+      logger.error('Error creating section:', sectionError)
       return NextResponse.json(
         { error: 'Failed to create section' },
         { status: 500 }
@@ -238,7 +240,7 @@ export async function POST(
         .single()
 
       if (questionError) {
-        console.error('Error creating question:', questionError)
+        logger.error('Error creating question:', questionError)
       } else {
         // Create type-specific question data
         if (questionData.type === 'mcq') {
@@ -259,7 +261,7 @@ export async function POST(
             })
 
           if (mcqError) {
-            console.error('Error creating MCQ details:', mcqError)
+            logger.error('Error creating MCQ details:', mcqError)
           }
         } else if (questionData.type === 'coding') {
           const allowedLanguages = questionData.languages || ["javascript", "python"]
@@ -299,7 +301,7 @@ export async function POST(
             })
 
           if (codingError) {
-            console.error('Error creating coding details:', codingError)
+            logger.error('Error creating coding details:', codingError)
           }
         } else if (questionData.type === 'essay') {
           const { error: essayError } = await supabase
@@ -317,7 +319,7 @@ export async function POST(
             })
 
           if (essayError) {
-            console.error('Error creating essay details:', essayError)
+            logger.error('Error creating essay details:', essayError)
           }
         }
 
@@ -334,7 +336,7 @@ export async function POST(
     return NextResponse.json(sectionWithQuestions)
 
   } catch (error) {
-    console.error('Error in create section API:', error)
+    logger.error('Error in create section API:', error)
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(

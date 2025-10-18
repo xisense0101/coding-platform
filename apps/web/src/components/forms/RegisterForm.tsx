@@ -15,6 +15,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '@/lib/auth/AuthContext'
 
+import { logger } from '@/lib/utils/logger'
+
 const registerSchema = z.object({
   full_name: z.string().min(2, 'Full name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email address'),
@@ -105,7 +107,7 @@ export function RegisterForm() {
         router.push('/student/dashboard')
       }
     } catch (error) {
-      console.error('Registration error:', error)
+      logger.error('Registration error:', error)
       setError('An unexpected error occurred. Please try again.')
     } finally {
       setIsLoading(false)

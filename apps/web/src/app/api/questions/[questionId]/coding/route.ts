@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { z } from 'zod'
 
+import { logger } from '@/lib/utils/logger'
+
 const updateCodingSchema = z.object({
   problem_statement: z.string().optional(),
   rich_problem_statement: z.any().optional(),
@@ -45,7 +47,7 @@ export async function GET(
       .single()
 
     if (codingError) {
-      console.error('Error fetching coding details:', codingError)
+      logger.error('Error fetching coding details:', codingError)
       
       // If no coding details exist, return default values
       const defaultCodingData = {
@@ -74,7 +76,7 @@ export async function GET(
     return NextResponse.json(codingData)
 
   } catch (error) {
-    console.error('Error in coding question API:', error)
+    logger.error('Error in coding question API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -100,10 +102,10 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    console.log('Received coding update data:', JSON.stringify(body, null, 2))
+    logger.log('Received coding update data:', JSON.stringify(body, null, 2))
     
     const validatedData = updateCodingSchema.parse(body)
-    console.log('Validated data:', JSON.stringify(validatedData, null, 2))
+    logger.log('Validated data:', JSON.stringify(validatedData, null, 2))
 
     // First, verify the question exists
     const { data: questionData, error: questionError } = await supabase
@@ -113,7 +115,7 @@ export async function PATCH(
       .single()
 
     if (questionError || !questionData) {
-      console.error('Question not found:', questionError)
+      logger.error('Question not found:', questionError)
       return NextResponse.json(
         { error: 'Question not found' },
         { status: 404 }
@@ -150,8 +152,8 @@ export async function PATCH(
         .single()
 
       if (updateError) {
-        console.error('Database error updating coding details:', updateError)
-        console.error('Question ID:', params.questionId)
+        logger.error('Database error updating coding details:', updateError)
+        logger.error('Question ID:', params.questionId)
         return NextResponse.json(
           { error: 'Failed to update coding question', details: updateError.message },
           { status: 500 }
@@ -179,9 +181,9 @@ export async function PATCH(
         .single()
 
       if (insertError) {
-        console.error('Database error creating coding details:', insertError)
-        console.error('Question ID:', params.questionId)
-        console.error('Data being inserted:', JSON.stringify({
+        logger.error('Database error creating coding details:', insertError)
+        logger.error('Question ID:', params.questionId)
+        logger.error('Data being inserted:', JSON.stringify({
           question_id: params.questionId,
           problem_statement: validatedData.problem_statement || "",
           boilerplate_code: validatedData.boilerplate_code || {},
@@ -201,10 +203,10 @@ export async function PATCH(
     return NextResponse.json(codingData)
 
   } catch (error) {
-    console.error('Error in update coding question API:', error)
+    logger.error('Error in update coding question API:', error)
     
     if (error instanceof z.ZodError) {
-      console.error('Validation errors:', error.errors)
+      logger.error('Validation errors:', error.errors)
       return NextResponse.json(
         { error: 'Invalid input data', details: error.errors },
         { status: 400 }

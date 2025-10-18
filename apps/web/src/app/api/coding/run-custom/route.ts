@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { submitToJudge0, pollSubmissionResult, cleanErrorMessage } from '@/lib/judge0'
 
+import { logger } from '@/lib/utils/logger'
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -50,7 +52,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error('Error running custom input:', error)
+    logger.error('Error running custom input:', error)
     return NextResponse.json(
       { 
         error: 'Failed to execute code',

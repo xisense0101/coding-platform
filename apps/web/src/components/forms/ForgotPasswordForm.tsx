@@ -12,6 +12,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Mail, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/lib/auth/AuthContext'
 
+import { logger } from '@/lib/utils/logger'
+
 const forgotPasswordSchema = z.object({
   email: z
     .string()
@@ -53,7 +55,7 @@ export function ForgotPasswordForm() {
 
       setEmailSent(true)
     } catch (err) {
-      console.error('Password reset error:', err)
+      logger.error('Password reset error:', err)
       setError(
         err instanceof Error 
           ? err.message 

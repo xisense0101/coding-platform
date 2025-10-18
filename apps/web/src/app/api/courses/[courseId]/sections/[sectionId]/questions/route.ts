@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { z } from 'zod'
 
+import { logger } from '@/lib/utils/logger'
+
 const createQuestionSchema = z.object({
   type: z.enum(['mcq', 'coding', 'essay']),
   title: z.string().min(1, 'Question title is required'),
@@ -93,7 +95,7 @@ export async function POST(
       .single()
 
     if (questionError) {
-      console.error('Error creating question:', questionError)
+      logger.error('Error creating question:', questionError)
       return NextResponse.json(
         { error: 'Failed to create question' },
         { status: 500 }
@@ -103,7 +105,7 @@ export async function POST(
     return NextResponse.json(question)
 
   } catch (error) {
-    console.error('Error in create question API:', error)
+    logger.error('Error in create question API:', error)
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(

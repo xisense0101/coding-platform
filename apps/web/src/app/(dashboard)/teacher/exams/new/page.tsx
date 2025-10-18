@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { logger } from '@/lib/utils/logger'
+
 import { 
   ArrowLeft, 
   Save, 
@@ -66,7 +68,7 @@ export default function CreateExamPage() {
         throw new Error('Failed to create exam')
       }
     } catch (error) {
-      console.error('Error creating exam:', error)
+      logger.error('Error creating exam:', error)
       alert('Failed to create exam. Please try again.')
     } finally {
       setLoading(false)

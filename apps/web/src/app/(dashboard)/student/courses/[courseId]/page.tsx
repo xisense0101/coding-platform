@@ -7,6 +7,8 @@ import { useAuth } from '@/lib/auth/AuthContext'
 import CourseSections from './CourseSections'
 import { Loader2 } from 'lucide-react'
 
+import { logger } from '@/lib/utils/logger'
+
 interface Props {
   params: {
     courseId: string
@@ -37,7 +39,7 @@ export default function CoursePage({ params }: Props) {
 
         setCourse(courseData)
       } catch (err) {
-        console.error('Error loading course:', err)
+        logger.error('Error loading course:', err)
         setError('Failed to load course data')
       } finally {
         setLoading(false)

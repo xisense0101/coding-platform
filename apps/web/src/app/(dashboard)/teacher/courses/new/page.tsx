@@ -28,6 +28,8 @@ import {
 } from 'lucide-react'
 import { RichTextEditor } from '@/components/editors/RichTextEditor'
 
+import { logger } from '@/lib/utils/logger'
+
 interface Section {
   id: string
   title: string
@@ -72,7 +74,7 @@ export default function CreateCoursePage() {
         throw new Error('Failed to create course')
       }
     } catch (error) {
-      console.error('Error creating course:', error)
+      logger.error('Error creating course:', error)
       alert('Failed to create course. Please try again.')
     } finally {
       setLoading(false)

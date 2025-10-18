@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, Edit, Settings, Users, BarChart, Eye, EyeOff, Plus } from 'lucide-react'
 
+import { logger } from '@/lib/utils/logger'
+
 interface Course {
   id: string
   title: string
@@ -64,13 +66,13 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
       const sectionsResponse = await fetch(`/api/courses/${params.courseId}/sections`)
       if (sectionsResponse.ok) {
         const sectionsData = await sectionsResponse.json()
-        console.log('Sections data:', sectionsData)
+        logger.log('Sections data:', sectionsData)
         setSections(sectionsData)
       } else {
-        console.error('Failed to fetch sections:', sectionsResponse.status)
+        logger.error('Failed to fetch sections:', sectionsResponse.status)
       }
     } catch (err) {
-      console.error('Error fetching course data:', err)
+      logger.error('Error fetching course data:', err)
       setError('Failed to load course data')
     } finally {
       setLoading(false)
@@ -101,7 +103,7 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
         setCourse(prev => prev ? { ...prev, is_published: !prev.is_published } : null)
       }
     } catch (error) {
-      console.error('Error updating course:', error)
+      logger.error('Error updating course:', error)
     }
   }
 

@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AlertCircle, Lock, User, Mail, Hash, Shield, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+import { logger } from '@/lib/utils/logger'
+
 interface StudentAuthModalProps {
   examTitle: string
   examId: string
@@ -156,7 +158,7 @@ export default function StudentAuthModal({
         userId: credentialsData.user.id
       } as any)
     } catch (error) {
-      console.error('Error during authentication:', error)
+      logger.error('Error during authentication:', error)
       setErrors(prev => ({
         ...prev,
         testCode: 'Failed to authenticate. Please try again.'

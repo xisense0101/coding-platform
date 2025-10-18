@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 
+import { logger } from '@/lib/utils/logger'
+
 export async function POST(request: Request) {
   try {
     const supabase = createSupabaseServerClient()
@@ -59,7 +61,7 @@ export async function POST(request: Request) {
       .single()
 
     if (error) {
-      console.error('Error inserting MCQ attempt:', error)
+      logger.error('Error inserting MCQ attempt:', error)
       return NextResponse.json({ error: 'Failed to create submission' }, { status: 500 })
     }
 
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
       message: isCorrect ? 'Correct answer!' : 'Incorrect answer. Try again!'
     })
   } catch (err) {
-    console.error('Unexpected error in MCQ submit API:', err)
+    logger.error('Unexpected error in MCQ submit API:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

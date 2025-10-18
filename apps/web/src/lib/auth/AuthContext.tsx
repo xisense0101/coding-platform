@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/database/client'
 import type { User as DatabaseUser } from '@/lib/database/types'
 
+import { logger } from '@/lib/utils/logger'
+
 interface AuthContextType {
   user: User | null
   userProfile: DatabaseUser | null
@@ -42,16 +44,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         // If profile doesn't exist, return null instead of throwing error
         if (error.code === 'PGRST116') {
-          console.log('User profile not found, user might be in the process of registration')
+          logger.log('User profile not found, user might be in the process of registration')
           return null
         }
-        console.error('Error fetching user profile:', error)
+        logger.error('Error fetching user profile:', error)
         return null
       }
       
       return data
     } catch (error) {
-      console.error('Unexpected error fetching user profile:', error)
+      logger.error('Unexpected error fetching user profile:', error)
       return null
     }
   }
@@ -74,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { session: initialSession }, error } = await supabase.auth.getSession()
         
         if (error) {
-          console.error('Error getting initial session:', error)
+          logger.error('Error getting initial session:', error)
           setIsLoading(false)
           return
         }
@@ -88,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         setIsLoading(false)
       } catch (error) {
-        console.error('Error in getInitialSession:', error)
+        logger.error('Error in getInitialSession:', error)
         setIsLoading(false)
       }
     }
@@ -102,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event: any, session: Session | null) => {
         // Only log significant events, not initial session loads
         if (event !== 'INITIAL_SESSION') {
-          console.log('Auth state changed:', event, session?.user?.id)
+          logger.log('Auth state changed:', event, session?.user?.id)
         }
         
         // Handle different auth events
@@ -183,7 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .from('users')
             .update({ last_login: new Date().toISOString() })
             .eq('id', data.user.id)
-            .then(() => console.log('Last login updated'))
+            .then(() => logger.log('Last login updated'))
 
           // If a nextPath was provided and is a safe internal path, prefer it
           const isSafeNext = !!nextPath && nextPath.startsWith('/') && !nextPath.startsWith('//')
@@ -222,7 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false)
       return { data }
     } catch (error) {
-      console.error('Sign in error:', error)
+      logger.error('Sign in error:', error)
       setIsLoading(false)
       return { error: error as AuthError }
     }
@@ -266,7 +268,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           organizationId = orgData.id
         }
       } catch (orgError) {
-        console.error('Error handling organization:', orgError)
+        logger.error('Error handling organization:', orgError)
         throw new Error('Failed to setup organization')
       }
       
@@ -302,14 +304,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           })
 
         if (profileError) {
-          console.error('Error creating user profile:', profileError)
+          logger.error('Error creating user profile:', profileError)
           return { error: { message: profileError.message } as AuthError }
         }
       }
 
       return { data: authData }
     } catch (error) {
-      console.error('Sign up error:', error)
+      logger.error('Sign up error:', error)
       return { error: error as AuthError }
     } finally {
       setIsLoading(false)
@@ -318,17 +320,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
-      console.log('Starting logout process...')
+      logger.log('Starting logout process...')
       setIsLoading(true)
       
       // Sign out from Supabase FIRST (before clearing state)
       const { error } = await supabase.auth.signOut()
       
       if (error) {
-        console.error('Sign out error:', error)
+        logger.error('Sign out error:', error)
         // Continue with logout even if there's an error
       } else {
-        console.log('Successfully signed out from Supabase')
+        logger.log('Successfully signed out from Supabase')
       }
       
       // Clear local state
@@ -343,18 +345,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             key.startsWith('sb-') || key.includes('supabase')
           )
           supabaseKeys.forEach(key => localStorage.removeItem(key))
-          console.log('Cleared localStorage session data')
+          logger.log('Cleared localStorage session data')
         }
       } catch (storageError) {
-        console.error('Error clearing localStorage:', storageError)
+        logger.error('Error clearing localStorage:', storageError)
       }
       
       // Force immediate navigation
-      console.log('Redirecting to login page...')
+      logger.log('Redirecting to login page...')
       router.replace('/auth/login')
       
     } catch (error) {
-      console.error('Sign out error:', error)
+      logger.error('Sign out error:', error)
       // Even if there's an error, clear state and redirect
       setUser(null)
       setUserProfile(null)

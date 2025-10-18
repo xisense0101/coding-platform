@@ -32,6 +32,8 @@ import { useAuth } from '@/lib/auth/AuthContext'
 
 import { useRouter } from 'next/navigation'
 
+import { logger } from '@/lib/utils/logger'
+
 export default function TeacherDashboard() {
   const router = useRouter()
   const { signOut, userProfile } = useAuth()
@@ -53,7 +55,7 @@ export default function TeacherDashboard() {
 
   const handleLogout = async () => {
     try {
-      console.log('Logout button clicked')
+      logger.log('Logout button clicked')
       
       // Prevent multiple clicks
       const button = document.querySelector('[data-logout-btn]') as HTMLButtonElement
@@ -64,7 +66,7 @@ export default function TeacherDashboard() {
       
       await signOut()
     } catch (error) {
-      console.error('Logout error:', error)
+      logger.error('Logout error:', error)
       // Fallback: Force navigation to login even if signOut fails
       window.location.href = '/auth/login'
     }
@@ -131,7 +133,7 @@ export default function TeacherDashboard() {
         alert('Failed to update exam status')
       }
     } catch (error) {
-      console.error('Error updating exam status:', error)
+      logger.error('Error updating exam status:', error)
       alert('Failed to update exam status')
     }
   }

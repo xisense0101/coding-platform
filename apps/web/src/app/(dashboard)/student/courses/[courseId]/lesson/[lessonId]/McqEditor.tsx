@@ -11,6 +11,7 @@ import { RichTextPreview } from '@/components/editors/RichTextEditor'
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { ChevronLeft, Menu, X, Check, Info, Send, RotateCcw } from 'lucide-react'
+import { logger } from '@/lib/utils/logger'
 
 interface McqQuestionProps {
   questionId: string
@@ -89,7 +90,7 @@ export default function McqEditor({ questionId, userId, courseId, title, mcq }: 
         setAttempts(data.attempts || [])
       }
     } catch (err) {
-      console.error('Error fetching attempts:', err)
+      logger.error('Error fetching attempts:', err)
     } finally {
       setLoadingAttempts(false)
     }
@@ -127,7 +128,7 @@ export default function McqEditor({ questionId, userId, courseId, title, mcq }: 
         alert('Failed to submit answer. Please try again.')
       }
     } catch (error) {
-      console.error('Error submitting answer:', error)
+      logger.error('Error submitting answer:', error)
       alert('Failed to submit answer. Please try again.')
     } finally {
       setIsLoading(false)

@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, Edit, Settings, Users, BarChart, Eye, EyeOff, Plus, ExternalLink, Copy, Clock, Calendar } from 'lucide-react'
 
+import { logger } from '@/lib/utils/logger'
+
 interface Exam {
   id: string
   title: string
@@ -69,7 +71,7 @@ export default function ExamDetailPage({ params }: { params: { examId: string } 
       const examData = await response.json()
       setExam(examData.exam)
     } catch (err) {
-      console.error('Error fetching exam data:', err)
+      logger.error('Error fetching exam data:', err)
       setError('Failed to load exam data')
     } finally {
       setLoading(false)
@@ -100,7 +102,7 @@ export default function ExamDetailPage({ params }: { params: { examId: string } 
         setExam(prev => prev ? { ...prev, is_published: !prev.is_published } : null)
       }
     } catch (error) {
-      console.error('Error updating exam:', error)
+      logger.error('Error updating exam:', error)
     }
   }
 

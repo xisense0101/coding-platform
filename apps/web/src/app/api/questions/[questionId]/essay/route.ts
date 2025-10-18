@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { z } from 'zod'
 
+import { logger } from '@/lib/utils/logger'
+
 const updateEssaySchema = z.object({
   prompt: z.string(),
   rich_prompt: z.any().optional(),
@@ -38,7 +40,7 @@ export async function GET(
       .single()
 
     if (essayError) {
-      console.error('Error fetching essay details:', essayError)
+      logger.error('Error fetching essay details:', essayError)
       
       // If no essay details exist, return default values
       const defaultEssayData = {
@@ -59,7 +61,7 @@ export async function GET(
     return NextResponse.json(essayData)
 
   } catch (error) {
-    console.error('Error in essay question API:', error)
+    logger.error('Error in essay question API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -85,7 +87,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    console.log('Received essay update data:', JSON.stringify(body, null, 2))
+    logger.log('Received essay update data:', JSON.stringify(body, null, 2))
     
     const validatedData = updateEssaySchema.parse(body)
 
@@ -97,7 +99,7 @@ export async function PATCH(
       .single()
 
     if (questionError || !questionData) {
-      console.error('Question not found:', questionError)
+      logger.error('Question not found:', questionError)
       return NextResponse.json(
         { error: 'Question not found' },
         { status: 404 }
@@ -132,8 +134,8 @@ export async function PATCH(
         .single()
 
       if (updateError) {
-        console.error('Database error updating essay details:', updateError)
-        console.error('Question ID:', params.questionId)
+        logger.error('Database error updating essay details:', updateError)
+        logger.error('Question ID:', params.questionId)
         return NextResponse.json(
           { error: 'Failed to update essay question', details: updateError.message },
           { status: 500 }
@@ -159,8 +161,8 @@ export async function PATCH(
         .single()
 
       if (insertError) {
-        console.error('Database error creating essay details:', insertError)
-        console.error('Question ID:', params.questionId)
+        logger.error('Database error creating essay details:', insertError)
+        logger.error('Question ID:', params.questionId)
         return NextResponse.json(
           { error: 'Failed to create essay question', details: insertError.message },
           { status: 500 }
@@ -172,7 +174,7 @@ export async function PATCH(
     return NextResponse.json(essayData)
 
   } catch (error) {
-    console.error('Error in update essay question API:', error)
+    logger.error('Error in update essay question API:', error)
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(

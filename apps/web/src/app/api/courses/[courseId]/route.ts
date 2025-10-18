@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 
+import { logger } from '@/lib/utils/logger'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { courseId: string } }
@@ -26,7 +28,7 @@ export async function GET(
       .single()
 
     if (courseError) {
-      console.error('Error fetching course:', courseError)
+      logger.error('Error fetching course:', courseError)
       return NextResponse.json(
         { error: 'Course not found' },
         { status: 404 }
@@ -53,7 +55,7 @@ export async function GET(
     return NextResponse.json(course)
 
   } catch (error) {
-    console.error('Error in course API:', error)
+    logger.error('Error in course API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -93,7 +95,7 @@ export async function PATCH(
       .single()
 
     if (updateError) {
-      console.error('Error updating course:', updateError)
+      logger.error('Error updating course:', updateError)
       return NextResponse.json(
         { error: 'Failed to update course' },
         { status: 500 }
@@ -103,7 +105,7 @@ export async function PATCH(
     return NextResponse.json(course)
 
   } catch (error) {
-    console.error('Error in course update API:', error)
+    logger.error('Error in course update API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -156,7 +158,7 @@ export async function DELETE(
       .eq('id', params.courseId)
 
     if (deleteError) {
-      console.error('Error deleting course:', deleteError)
+      logger.error('Error deleting course:', deleteError)
       return NextResponse.json(
         { error: 'Failed to delete course' },
         { status: 500 }
@@ -166,7 +168,7 @@ export async function DELETE(
     return NextResponse.json({ success: true })
 
   } catch (error) {
-    console.error('Error in delete course API:', error)
+    logger.error('Error in delete course API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

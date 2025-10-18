@@ -21,6 +21,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth/AuthContext'
 
+import { logger } from '@/lib/utils/logger'
+
 const resetPasswordSchema = z.object({
   password: z
     .string()
@@ -159,7 +161,7 @@ export function ResetPasswordForm() {
       }, 2000)
 
     } catch (err) {
-      console.error('Password reset error:', err)
+      logger.error('Password reset error:', err)
       setError(
         err instanceof Error 
           ? err.message 

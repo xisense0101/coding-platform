@@ -20,6 +20,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth/AuthContext'
 
+import { logger } from '@/lib/utils/logger'
+
 interface Course {
   id: string
   title: string
@@ -66,10 +68,10 @@ export default function CoursesPage() {
         const data = await response.json()
         setCourses(data.courses || [])
       } else {
-        console.error('Failed to fetch courses:', response.status)
+        logger.error('Failed to fetch courses:', response.status)
       }
     } catch (error) {
-      console.error('Error fetching courses:', error)
+      logger.error('Error fetching courses:', error)
     } finally {
       setLoading(false)
     }
@@ -90,7 +92,7 @@ export default function CoursesPage() {
         setEnrolledCourses(enrolledIds)
       }
     } catch (error) {
-      console.error('Error fetching enrolled courses:', error)
+      logger.error('Error fetching enrolled courses:', error)
     }
   }
 
@@ -117,7 +119,7 @@ export default function CoursesPage() {
         alert(errorData.error || 'Failed to enroll in course')
       }
     } catch (error) {
-      console.error('Error enrolling in course:', error)
+      logger.error('Error enrolling in course:', error)
       alert('Failed to enroll in course')
     } finally {
       setEnrollingCourseId(null)

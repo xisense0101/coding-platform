@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 
+import { logger } from '@/lib/utils/logger'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { examId: string } }
@@ -83,7 +85,7 @@ export async function GET(
       .order('submitted_at', { ascending: false })
 
     if (submissionsError) {
-      console.error('Error fetching submissions:', submissionsError)
+      logger.error('Error fetching submissions:', submissionsError)
       return NextResponse.json(
         { error: 'Failed to fetch submissions' },
         { status: 500 }
@@ -157,7 +159,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error fetching exam results:', error)
+    logger.error('Error fetching exam results:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

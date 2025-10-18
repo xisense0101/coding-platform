@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { z } from 'zod'
 
+import { logger } from '@/lib/utils/logger'
+
 const updateSectionSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
@@ -34,7 +36,7 @@ export async function PATCH(
       .single()
 
     if (sectionError) {
-      console.error('Section query error:', sectionError)
+      logger.error('Section query error:', sectionError)
       return NextResponse.json(
         { error: 'Section not found' },
         { status: 404 }
@@ -70,7 +72,7 @@ export async function PATCH(
       .single()
 
     if (updateError) {
-      console.error('Error updating section:', updateError)
+      logger.error('Error updating section:', updateError)
       return NextResponse.json(
         { error: 'Failed to update section' },
         { status: 500 }
@@ -80,7 +82,7 @@ export async function PATCH(
     return NextResponse.json(updatedSection)
 
   } catch (error) {
-    console.error('Error in update section API:', error)
+    logger.error('Error in update section API:', error)
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -148,7 +150,7 @@ export async function DELETE(
       .eq('id', params.sectionId)
 
     if (deleteError) {
-      console.error('Error deleting section:', deleteError)
+      logger.error('Error deleting section:', deleteError)
       return NextResponse.json(
         { error: 'Failed to delete section' },
         { status: 500 }
@@ -158,7 +160,7 @@ export async function DELETE(
     return NextResponse.json({ success: true })
 
   } catch (error) {
-    console.error('Error in delete section API:', error)
+    logger.error('Error in delete section API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

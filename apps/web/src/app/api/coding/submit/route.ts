@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 
+import { logger } from '@/lib/utils/logger'
+
 export async function POST(request: Request) {
   try {
     const supabase = createSupabaseServerClient()
@@ -67,7 +69,7 @@ export async function POST(request: Request) {
       .single()
 
     if (error) {
-      console.error('Error inserting submit attempt:', error)
+      logger.error('Error inserting submit attempt:', error)
       return NextResponse.json({ error: 'Failed to create submission' }, { status: 500 })
     }
 
@@ -79,7 +81,7 @@ export async function POST(request: Request) {
         : 'Code submitted successfully!'
     })
   } catch (err) {
-    console.error('Unexpected error in coding submit API:', err)
+    logger.error('Unexpected error in coding submit API:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

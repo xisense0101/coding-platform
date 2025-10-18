@@ -7,6 +7,8 @@ import { useAuth } from '@/lib/auth/AuthContext'
 import LessonView from './LessonView'
 import { Loader2 } from 'lucide-react'
 
+import { logger } from '@/lib/utils/logger'
+
 interface Props {
   params: {
     courseId: string
@@ -77,7 +79,7 @@ export default function LessonPage({ params }: Props) {
           setLoading(false)
         }
       } catch (err) {
-        console.error('Error loading lesson data:', err)
+        logger.error('Error loading lesson data:', err)
         setError('Failed to load lesson data')
         setLoading(false)
       }

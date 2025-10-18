@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { z } from 'zod'
 
+import { logger } from '@/lib/utils/logger'
+
 const enrollmentSchema = z.object({
   emails: z.array(z.string().email())
 })
@@ -160,7 +162,7 @@ export async function POST(
     })
 
   } catch (error) {
-    console.error('Error in bulk enrollment API:', error)
+    logger.error('Error in bulk enrollment API:', error)
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(

@@ -20,6 +20,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+import { logger } from '@/lib/utils/logger'
+
 interface QuestionAnswer {
   questionId: string
   questionTitle: string
@@ -110,7 +112,7 @@ export default function SubmissionPreviewPage() {
 
       setQuestionsWithAnswers(allQuestions)
     } catch (error) {
-      console.error('Error loading submission preview:', error)
+      logger.error('Error loading submission preview:', error)
       alert('Failed to load submission preview')
     } finally {
       setLoading(false)

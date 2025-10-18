@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 
+import { logger } from '@/lib/utils/logger'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } }
@@ -70,7 +72,7 @@ export async function GET(
       .single()
 
     if (examError) {
-      console.error('Error fetching exam:', examError)
+      logger.error('Error fetching exam:', examError)
       return NextResponse.json(
         { error: 'Exam not found', details: examError.message },
         { status: 404 }
@@ -89,7 +91,7 @@ export async function GET(
     const startTime = new Date(exam.start_time)
     const endTime = new Date(exam.end_time)
 
-    console.log('Exam time check:', {
+    logger.log('Exam time check:', {
       now: now.toISOString(),
       startTime: startTime.toISOString(),
       endTime: endTime.toISOString(),
@@ -167,7 +169,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error in exam fetch by slug:', error)
+    logger.error('Error in exam fetch by slug:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

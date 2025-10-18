@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { z } from 'zod'
 
+import { logger } from '@/lib/utils/logger'
+
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -85,7 +87,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (profileError) {
-      console.error('Error creating user profile:', profileError)
+      logger.error('Error creating user profile:', profileError)
       // Try to clean up auth user
       await supabase.auth.admin.deleteUser(authData.user.id)
       
@@ -129,7 +131,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Registration API error:', error)
+    logger.error('Registration API error:', error)
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(

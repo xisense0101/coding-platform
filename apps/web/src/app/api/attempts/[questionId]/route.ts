@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 
+import { logger } from '@/lib/utils/logger'
+
 export async function GET(
   request: Request,
   { params }: { params: { questionId: string } }
@@ -29,13 +31,13 @@ export async function GET(
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetching attempts:', error)
+      logger.error('Error fetching attempts:', error)
       return NextResponse.json({ error: 'Failed to fetch attempts' }, { status: 500 })
     }
 
     return NextResponse.json({ attempts: attempts || [] })
   } catch (err) {
-    console.error('Unexpected error in attempts API:', err)
+    logger.error('Unexpected error in attempts API:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 
+import { logger } from '@/lib/utils/logger'
+
 /**
  * GET /api/exams/[examId]/submissions/check
  * Check submission status for a user (for debugging)
@@ -52,7 +54,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error checking submissions:', error)
+    logger.error('Error checking submissions:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -112,7 +114,7 @@ export async function DELETE(
     })
 
   } catch (error) {
-    console.error('Error deleting submissions:', error)
+    logger.error('Error deleting submissions:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 
+import { logger } from '@/lib/utils/logger'
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { courseId: string } }
@@ -98,7 +100,7 @@ export async function POST(
       .single()
 
     if (enrollmentError) {
-      console.error('Error creating enrollment:', enrollmentError)
+      logger.error('Error creating enrollment:', enrollmentError)
       return NextResponse.json(
         { error: 'Failed to enroll in course' },
         { status: 500 }
@@ -125,7 +127,7 @@ export async function POST(
     })
 
   } catch (error) {
-    console.error('Error in enrollment API:', error)
+    logger.error('Error in enrollment API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -158,7 +160,7 @@ export async function DELETE(
       .eq('course_id', params.courseId)
 
     if (deleteError) {
-      console.error('Error removing enrollment:', deleteError)
+      logger.error('Error removing enrollment:', deleteError)
       return NextResponse.json(
         { error: 'Failed to unenroll from course' },
         { status: 500 }
@@ -171,7 +173,7 @@ export async function DELETE(
     })
 
   } catch (error) {
-    console.error('Error in unenrollment API:', error)
+    logger.error('Error in unenrollment API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

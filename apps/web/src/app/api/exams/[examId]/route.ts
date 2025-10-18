@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 
+import { logger } from '@/lib/utils/logger'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { examId: string } }
@@ -99,7 +101,7 @@ export async function GET(
       .single()
 
     if (examError) {
-      console.error('Error fetching exam:', examError)
+      logger.error('Error fetching exam:', examError)
       return NextResponse.json(
         { error: 'Exam not found' },
         { status: 404 }
@@ -128,7 +130,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error in exam fetch:', error)
+    logger.error('Error in exam fetch:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -169,7 +171,7 @@ export async function PATCH(
 
     // Parse request body
     const body = await request.json()
-    console.log('PATCH exam received data:', JSON.stringify(body, null, 2))
+    logger.log('PATCH exam received data:', JSON.stringify(body, null, 2))
 
     // Update exam basic info
     const examUpdateData: any = {
@@ -199,7 +201,7 @@ export async function PATCH(
       .single()
 
     if (examError) {
-      console.error('Error updating exam:', examError)
+      logger.error('Error updating exam:', examError)
       return NextResponse.json(
         { error: 'Failed to update exam' },
         { status: 500 }
@@ -208,7 +210,7 @@ export async function PATCH(
 
     // If sections are provided, update them (delete old ones and create new ones)
     if (body.sections && Array.isArray(body.sections)) {
-      console.log('Updating exam sections and questions...')
+      logger.log('Updating exam sections and questions...')
       
       // Delete existing sections (cascade will delete questions)
       const { error: deleteSectionsError } = await supabase
@@ -217,7 +219,7 @@ export async function PATCH(
         .eq('exam_id', params.examId)
 
       if (deleteSectionsError) {
-        console.error('Error deleting old sections:', deleteSectionsError)
+        logger.error('Error deleting old sections:', deleteSectionsError)
       }
 
       // Create new sections and questions
@@ -238,7 +240,7 @@ export async function PATCH(
           .single()
 
         if (sectionError) {
-          console.error('Error creating exam section:', sectionError)
+          logger.error('Error creating exam section:', sectionError)
           continue
         }
 
@@ -263,7 +265,7 @@ export async function PATCH(
             .single()
 
           if (baseQuestionError) {
-            console.error('Error creating base question:', baseQuestionError)
+            logger.error('Error creating base question:', baseQuestionError)
             continue
           }
 
@@ -288,7 +290,7 @@ export async function PATCH(
               })
 
             if (mcqError) {
-              console.error('Error creating MCQ question:', mcqError)
+              logger.error('Error creating MCQ question:', mcqError)
             }
           } else if (question.type === 'coding') {
             // Format test cases for database
@@ -348,7 +350,7 @@ export async function PATCH(
               })
 
             if (codingError) {
-              console.error('Error creating coding question:', codingError)
+              logger.error('Error creating coding question:', codingError)
             }
           }
 
@@ -365,7 +367,7 @@ export async function PATCH(
             })
 
           if (examQuestionError) {
-            console.error('Error linking question to exam:', examQuestionError)
+            logger.error('Error linking question to exam:', examQuestionError)
           }
 
           totalMarks += question.points
@@ -382,7 +384,7 @@ export async function PATCH(
         .eq('id', params.examId)
 
       if (updateError) {
-        console.error('Error updating exam total marks:', updateError)
+        logger.error('Error updating exam total marks:', updateError)
       }
     }
 
@@ -392,7 +394,7 @@ export async function PATCH(
     })
 
   } catch (error) {
-    console.error('Error in exam update:', error)
+    logger.error('Error in exam update:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -440,7 +442,7 @@ export async function DELETE(
       .eq('teacher_id', session.user.id)
 
     if (examError) {
-      console.error('Error deleting exam:', examError)
+      logger.error('Error deleting exam:', examError)
       return NextResponse.json(
         { error: 'Failed to delete exam' },
         { status: 500 }
@@ -453,7 +455,7 @@ export async function DELETE(
     })
 
   } catch (error) {
-    console.error('Error in exam deletion:', error)
+    logger.error('Error in exam deletion:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

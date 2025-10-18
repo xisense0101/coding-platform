@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { z } from 'zod'
 
+import { logger } from '@/lib/utils/logger'
+
 // Validation schemas
 const testCaseSchema = z.object({
   id: z.number(),
@@ -91,15 +93,15 @@ export async function POST(request: NextRequest) {
 
     // Parse and validate request body
     const body = await request.json()
-    console.log('Received exam data:', JSON.stringify(body, null, 2))
+    logger.log('Received exam data:', JSON.stringify(body, null, 2))
     
     let validatedData
     try {
       validatedData = examSchema.parse(body)
     } catch (validationError) {
-      console.error('Validation error details:', validationError)
+      logger.error('Validation error details:', validationError)
       if (validationError instanceof z.ZodError) {
-        console.error('Specific validation errors:', validationError.errors)
+        logger.error('Specific validation errors:', validationError.errors)
         return NextResponse.json(
           { 
             error: 'Validation failed', 
@@ -120,11 +122,11 @@ export async function POST(request: NextRequest) {
     const startDateTime = new Date(validatedData.start_time)
     const endDateTime = new Date(validatedData.end_time)
 
-    console.log('Date processing:')
-    console.log('start_time:', validatedData.start_time)
-    console.log('end_time:', validatedData.end_time)
-    console.log('startDateTime:', startDateTime.toISOString())
-    console.log('endDateTime:', endDateTime.toISOString())
+    logger.log('Date processing:')
+    logger.log('start_time:', validatedData.start_time)
+    logger.log('end_time:', validatedData.end_time)
+    logger.log('startDateTime:', startDateTime.toISOString())
+    logger.log('endDateTime:', endDateTime.toISOString())
 
     // Validate the datetime objects
     if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
@@ -166,7 +168,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (examError) {
-      console.error('Error creating exam:', examError)
+      logger.error('Error creating exam:', examError)
       return NextResponse.json(
         { error: 'Failed to create exam', details: examError.message },
         { status: 500 }
@@ -191,7 +193,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (sectionError) {
-        console.error('Error creating exam section:', sectionError)
+        logger.error('Error creating exam section:', sectionError)
         continue
       }
 
@@ -216,7 +218,7 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (baseQuestionError) {
-          console.error('Error creating base question:', baseQuestionError)
+          logger.error('Error creating base question:', baseQuestionError)
           continue
         }
 
@@ -241,7 +243,7 @@ export async function POST(request: NextRequest) {
             })
 
           if (mcqError) {
-            console.error('Error creating MCQ question:', mcqError)
+            logger.error('Error creating MCQ question:', mcqError)
           }
         } else if (question.type === 'coding') {
           // Format test cases for database
@@ -302,7 +304,7 @@ export async function POST(request: NextRequest) {
             })
 
           if (codingError) {
-            console.error('Error creating coding question:', codingError)
+            logger.error('Error creating coding question:', codingError)
           }
         }
 
@@ -319,7 +321,7 @@ export async function POST(request: NextRequest) {
           })
 
         if (examQuestionError) {
-          console.error('Error linking question to exam:', examQuestionError)
+          logger.error('Error linking question to exam:', examQuestionError)
         }
 
         totalMarks += question.points
@@ -336,7 +338,7 @@ export async function POST(request: NextRequest) {
       .eq('id', examData.id)
 
     if (updateError) {
-      console.error('Error updating exam total marks:', updateError)
+      logger.error('Error updating exam total marks:', updateError)
     }
 
     return NextResponse.json({
@@ -347,7 +349,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error in exam creation:', error)
+    logger.error('Error in exam creation:', error)
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -442,7 +444,7 @@ export async function GET(request: NextRequest) {
     const { data: exams, error: examsError } = await query
 
     if (examsError) {
-      console.error('Error fetching exams:', examsError)
+      logger.error('Error fetching exams:', examsError)
       return NextResponse.json(
         { error: 'Failed to fetch exams', details: examsError.message },
         { status: 500 }
@@ -455,7 +457,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error in exam fetch:', error)
+    logger.error('Error in exam fetch:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

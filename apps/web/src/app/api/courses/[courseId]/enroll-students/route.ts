@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { z } from 'zod'
 
+import { logger } from '@/lib/utils/logger'
+
 const enrollStudentsSchema = z.object({
   emails: z.array(z.string().email('Invalid email format')).min(1, 'At least one email is required')
 })
@@ -100,7 +102,7 @@ export async function POST(
           })
 
         if (enrollError) {
-          console.error('Error enrolling student:', enrollError)
+          logger.error('Error enrolling student:', enrollError)
           results.errors.push(`Failed to enroll ${email}`)
         } else {
           results.enrolled.push(email)
@@ -122,7 +124,7 @@ export async function POST(
             })
         }
       } catch (error) {
-        console.error(`Error processing ${email}:`, error)
+        logger.error(`Error processing ${email}:`, error)
         results.errors.push(`Error processing ${email}`)
       }
     }
@@ -130,7 +132,7 @@ export async function POST(
     return NextResponse.json(results)
 
   } catch (error) {
-    console.error('Error in enroll students API:', error)
+    logger.error('Error in enroll students API:', error)
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(

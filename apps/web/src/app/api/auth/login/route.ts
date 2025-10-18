@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { z } from 'zod'
 
+import { logger } from '@/lib/utils/logger'
+
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
       .eq('id', data.user.id)
 
     if (updateError) {
-      console.error('Error updating user login time:', updateError)
+      logger.error('Error updating user login time:', updateError)
     }
 
     // Get user profile
@@ -56,7 +58,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (profileError) {
-      console.error('Error fetching user profile:', profileError)
+      logger.error('Error fetching user profile:', profileError)
     }
 
     // Log security event
@@ -81,7 +83,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Login API error:', error)
+    logger.error('Login API error:', error)
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(

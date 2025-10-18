@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { z } from 'zod'
 
+import { logger } from '@/lib/utils/logger'
+
 const createCourseSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   description: z.string().optional(),
@@ -30,16 +32,16 @@ export async function GET(request: NextRequest) {
     const supabase = createSupabaseServerClient()
     const { searchParams } = new URL(request.url)
     
-    console.log('Courses API: Starting request processing')
+    logger.log('Courses API: Starting request processing')
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      console.log('Courses API: Auth error or no user')
+      logger.log('Courses API: Auth error or no user')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('Courses API: User authenticated:', user.id)
+    logger.log('Courses API: User authenticated:', user.id)
 
     // Get user profile for organization context
     const { data: userProfile, error: profileError } = await supabase
@@ -49,11 +51,11 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (profileError || !userProfile) {
-      console.error('Courses API: Profile error:', profileError)
+      logger.error('Courses API: Profile error:', profileError)
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
-    console.log('Courses API: User profile:', userProfile)
+    logger.log('Courses API: User profile:', userProfile)
 
     // Parse query parameters
     const page = parseInt(searchParams.get('page') || '1')
@@ -65,14 +67,14 @@ export async function GET(request: NextRequest) {
     const is_published = searchParams.get('published') !== 'false'
     const my_courses = searchParams.get('my_courses') === 'true'
 
-    console.log('Courses API: Query params:', { my_courses, userProfile: userProfile.role })
+    logger.log('Courses API: Query params:', { my_courses, userProfile: userProfile.role })
 
     let query = supabase
       .from('courses')
       .select('*')
       .eq('organization_id', userProfile.organization_id)
 
-    console.log('Courses API: Base query created')
+    logger.log('Courses API: Base query created')
 
     // Apply filters
     if (is_published && !['teacher', 'admin', 'super_admin'].includes(userProfile.role)) {
@@ -96,7 +98,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (my_courses && userProfile.role === 'teacher') {
-      console.log('Courses API: Filtering for teacher courses')
+      logger.log('Courses API: Filtering for teacher courses')
       query = query.eq('teacher_id', user.id)
     } else if (my_courses && userProfile.role === 'student') {
       // For students, get enrolled courses
@@ -121,21 +123,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log('Courses API: About to execute query')
+    logger.log('Courses API: About to execute query')
 
     // Fetch courses
     const { data: courses, error } = await query
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Courses API: Query error:', error)
+      logger.error('Courses API: Query error:', error)
       return NextResponse.json(
         { error: 'Failed to fetch courses', details: error.message },
         { status: 500 }
       )
     }
 
-    console.log('Courses API: Found courses:', courses?.length || 0)
+    logger.log('Courses API: Found courses:', courses?.length || 0)
 
     // Fetch teacher names for courses
     const coursesWithTeachers = await Promise.all(
@@ -164,7 +166,7 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit
     const paginatedCourses = coursesWithTeachers.slice(offset, offset + limit)
 
-    console.log('Courses API: Returning response')
+    logger.log('Courses API: Returning response')
 
     return NextResponse.json({
       courses: paginatedCourses,
@@ -175,7 +177,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Courses API error:', error)
+    logger.error('Courses API error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -239,7 +241,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error creating course:', error)
+      logger.error('Error creating course:', error)
       return NextResponse.json(
         { error: 'Failed to create course' },
         { status: 500 }
@@ -264,7 +266,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(course)
 
   } catch (error) {
-    console.error('Create course API error:', error)
+    logger.error('Create course API error:', error)
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(

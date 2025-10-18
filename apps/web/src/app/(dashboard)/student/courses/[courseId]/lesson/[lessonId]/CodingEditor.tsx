@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { CodeEditor } from '@/components/editors/CodeEditor'
 import { Badge } from "@/components/ui/badge"
 import { RichTextPreview } from '@/components/editors/RichTextEditor'
+import { logger } from '@/lib/utils/logger'
 import {
   Play,
   RotateCcw,
@@ -54,24 +55,24 @@ export default function CodingEditor({ questionId, userId, courseId, coding }: C
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
   // Debug: Log the coding data to see what we're receiving
-  console.log('CodingEditor - coding data:', coding)
-  console.log('CodingEditor - head:', coding.head)
-  console.log('CodingEditor - body_template:', coding.body_template)
-  console.log('CodingEditor - tail:', coding.tail)
-  console.log('CodingEditor - selectedLanguage:', selectedLanguage)
+  logger.log('CodingEditor - coding data:', coding)
+  logger.log('CodingEditor - head:', coding.head)
+  logger.log('CodingEditor - body_template:', coding.body_template)
+  logger.log('CodingEditor - tail:', coding.tail)
+  logger.log('CodingEditor - selectedLanguage:', selectedLanguage)
   
   // Normalize language to lowercase for key lookup
   const languageKey = selectedLanguage.toLowerCase()
-  console.log('CodingEditor - languageKey (normalized):', languageKey)
+  logger.log('CodingEditor - languageKey (normalized):', languageKey)
   
   // Get head, body, and tail for the selected language
   const head = coding.head?.[languageKey] || ''
   const tail = coding.tail?.[languageKey] || ''
   const initialBody = coding.body_template?.[languageKey] || (coding.boilerplate_code && coding.boilerplate_code[languageKey]) || ''
   
-  console.log('CodingEditor - extracted head:', head)
-  console.log('CodingEditor - extracted tail:', tail)
-  console.log('CodingEditor - extracted initialBody:', initialBody)
+  logger.log('CodingEditor - extracted head:', head)
+  logger.log('CodingEditor - extracted tail:', tail)
+  logger.log('CodingEditor - extracted initialBody:', initialBody)
   
   // Create a unique key for localStorage based on question, user, and language
   const getStorageKey = (lang: string) => `coding-editor-${questionId}-${userId}-${lang.toLowerCase()}`
@@ -191,7 +192,7 @@ export default function CodingEditor({ questionId, userId, courseId, coding }: C
         setAttempts(data.attempts || [])
       }
     } catch (err) {
-      console.error('Error fetching attempts:', err)
+      logger.error('Error fetching attempts:', err)
     } finally {
       setLoadingAttempts(false)
     }
@@ -449,7 +450,7 @@ export default function CodingEditor({ questionId, userId, courseId, coding }: C
         setConsoleOutput(`${errorData.details || errorData.error}`)
       }
     } catch (err: any) {
-      console.error('Error running test cases before submission:', err)
+      logger.error('Error running test cases before submission:', err)
       setActiveTab("console")
       setConsoleOutput(`${err?.message || String(err)}`)
     }

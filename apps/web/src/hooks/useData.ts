@@ -3,6 +3,8 @@ import { createClient } from '@/lib/database/client'
 import type { Database } from '@/lib/database/types'
 import { useAuth } from '@/lib/auth/AuthContext'
 
+import { logger } from '@/lib/utils/logger'
+
 type Tables = Database['public']['Tables']
 
 // Mock data for development
@@ -78,7 +80,7 @@ export function useStudentCourses() {
         .eq('is_active', true)
 
       if (error) {
-        console.error('Error fetching student enrollments:', error)
+        logger.error('Error fetching student enrollments:', error)
         setCourses([])
         return
       }
@@ -105,7 +107,7 @@ export function useStudentCourses() {
 
       setCourses(mapped)
     } catch (err) {
-      console.error('Unexpected error fetching enrollments:', err)
+      logger.error('Unexpected error fetching enrollments:', err)
       setCourses([])
     } finally {
       setLoading(false)
@@ -147,11 +149,11 @@ export function useTeacherCourses() {
         const data = await response.json()
         setCourses(data.courses || [])
       } else {
-        console.error('Failed to fetch courses:', response.status)
+        logger.error('Failed to fetch courses:', response.status)
         setCourses([])
       }
     } catch (error) {
-      console.error('Error fetching courses:', error)
+      logger.error('Error fetching courses:', error)
       setCourses([])
     } finally {
       setLoading(false)
@@ -206,7 +208,7 @@ export function useTeacherStats() {
         averageScore: 85 // Mock for now
       })
     } catch (error) {
-      console.error('Error fetching teacher stats:', error)
+      logger.error('Error fetching teacher stats:', error)
     } finally {
       setLoading(false)
     }
@@ -241,11 +243,11 @@ export function useTeacherExams() {
         const data = await response.json()
         setExams(data.exams || [])
       } else {
-        console.error('Failed to fetch exams:', response.status)
+        logger.error('Failed to fetch exams:', response.status)
         setExams([])
       }
     } catch (error) {
-      console.error('Error fetching exams:', error)
+      logger.error('Error fetching exams:', error)
       setExams([])
     } finally {
       setLoading(false)

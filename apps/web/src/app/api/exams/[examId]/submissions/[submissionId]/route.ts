@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 
+import { logger } from '@/lib/utils/logger'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { examId: string; submissionId: string } }
@@ -84,7 +86,7 @@ export async function GET(
       .single()
 
     if (submissionError) {
-      console.error('Error fetching submission:', submissionError)
+      logger.error('Error fetching submission:', submissionError)
       return NextResponse.json(
         { error: 'Submission not found' },
         { status: 404 }
@@ -97,7 +99,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error fetching submission:', error)
+    logger.error('Error fetching submission:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -13,6 +13,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/lib/auth/AuthContext'
 
+import { logger } from '@/lib/utils/logger'
+
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(1, 'Password is required'),
@@ -54,7 +56,7 @@ export function LoginForm() {
       // Redirect is handled by auth context based on user role
       // No need for manual redirect here
     } catch (error) {
-      console.error('Login error:', error)
+      logger.error('Login error:', error)
       setError('An unexpected error occurred. Please try again.')
     } finally {
       setIsLoading(false)

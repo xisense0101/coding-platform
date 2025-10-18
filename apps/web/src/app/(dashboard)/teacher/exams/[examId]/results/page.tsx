@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { logger } from '@/lib/utils/logger'
+
 import {
   ArrowLeft,
   Eye,
@@ -94,7 +96,7 @@ export default function ExamResultsPage() {
         setStats(data.stats)
       }
     } catch (error) {
-      console.error('Error fetching results:', error)
+      logger.error('Error fetching results:', error)
       alert('Failed to load exam results')
     } finally {
       setLoading(false)

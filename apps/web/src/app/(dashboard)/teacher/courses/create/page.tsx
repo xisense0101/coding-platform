@@ -15,6 +15,8 @@ import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { ArrowLeft, Plus, Save, Eye, EyeOff, Code, FileText, Trash2, Settings, Users, Mail } from 'lucide-react'
 
+import { logger } from '@/lib/utils/logger'
+
 // Using shared CodeTemplateRow from @/components/coding
 
 interface Question {
@@ -157,7 +159,7 @@ function CreateCoursePageContent() {
 
                   return questionDetails
                 } catch (error) {
-                  console.error('Error loading question details:', error)
+                  logger.error('Error loading question details:', error)
                   // Return basic question data if detailed fetch fails
                   return {
                     id: question.id,
@@ -199,7 +201,7 @@ function CreateCoursePageContent() {
         }
       }
     } catch (error) {
-      console.error('Error loading course data:', error)
+      logger.error('Error loading course data:', error)
       alert('Failed to load course data')
     } finally {
       setIsLoading(false)
@@ -347,9 +349,9 @@ function CreateCoursePageContent() {
           throw new Error('Failed to delete section from database')
         }
 
-        console.log('Section deleted from database successfully')
+        logger.log('Section deleted from database successfully')
       } catch (error) {
-        console.error('Error deleting section from database:', error)
+        logger.error('Error deleting section from database:', error)
         alert('Failed to delete section from database. Please try again.')
         return
       }
@@ -379,9 +381,9 @@ function CreateCoursePageContent() {
           throw new Error('Failed to delete question from database')
         }
 
-        console.log('Question deleted from database successfully')
+        logger.log('Question deleted from database successfully')
       } catch (error) {
-        console.error('Error deleting question from database:', error)
+        logger.error('Error deleting question from database:', error)
         alert('Failed to delete question from database. Please try again.')
         return
       }
@@ -460,7 +462,7 @@ function CreateCoursePageContent() {
             })
 
             if (!sectionResponse.ok) {
-              console.error('Failed to create section:', section.title)
+              logger.error('Failed to create section:', section.title)
             }
           } else {
             // Update existing section
@@ -480,7 +482,7 @@ function CreateCoursePageContent() {
             })
 
             if (!sectionResponse.ok) {
-              console.error('Failed to update section:', section.title)
+              logger.error('Failed to update section:', section.title)
             }
 
             // Handle questions in existing sections
@@ -509,7 +511,7 @@ function CreateCoursePageContent() {
                 })
 
                 if (!questionResponse.ok) {
-                  console.error('Failed to create question:', question.title)
+                  logger.error('Failed to create question:', question.title)
                 } else {
                   // After successfully creating the question, create type-specific data
                   const createdQuestion = await questionResponse.json()
@@ -648,7 +650,7 @@ function CreateCoursePageContent() {
                     
                     if (!codingResponse.ok) {
                       const errorData = await codingResponse.text()
-                      console.error('Coding update error:', errorData)
+                      logger.error('Coding update error:', errorData)
                     }
                   } else if (question.type === 'essay') {
                     // Handle essay question updates
@@ -675,7 +677,7 @@ function CreateCoursePageContent() {
                   // Clear the hasChanges flag after successful update
                   updateQuestion(section.id, question.id, { hasChanges: false })
                 } else {
-                  console.error('Failed to update question:', question.title)
+                  logger.error('Failed to update question:', question.title)
                 }
               }
             }
@@ -734,7 +736,7 @@ function CreateCoursePageContent() {
         }
       }
     } catch (error) {
-      console.error('Error saving course:', error)
+      logger.error('Error saving course:', error)
       setError(`Failed to ${isEditMode ? 'update' : 'create'} course. Please try again.`)
     } finally {
       setIsSubmitting(false)
@@ -772,7 +774,7 @@ function CreateCoursePageContent() {
       }, 1500)
       
     } catch (error) {
-      console.error('Error deleting course:', error)
+      logger.error('Error deleting course:', error)
       setError('Failed to delete course. Please try again.')
     } finally {
       setIsDeleting(false)
@@ -835,7 +837,7 @@ function CreateCoursePageContent() {
         throw new Error(errorData.error || 'Failed to enroll students')
       }
     } catch (error) {
-      console.error('Error enrolling students:', error)
+      logger.error('Error enrolling students:', error)
       alert('Failed to enroll students. Please try again.')
     } finally {
       setEnrolling(false)
