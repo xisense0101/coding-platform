@@ -1,4 +1,6 @@
-import { Metadata } from 'next'
+'use client'
+
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { 
@@ -17,13 +19,46 @@ import {
   TrendingUp,
   Clock
 } from 'lucide-react'
-
-export const metadata: Metadata = {
-  title: 'Admin Dashboard - Enterprise Educational Platform',
-  description: 'System overview, user management, and administrative controls.',
-}
+import { logger } from '@/lib/utils/logger'
 
 export default function AdminDashboard() {
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    newUsersThisMonth: 0,
+    activeCourses: 0,
+    coursesThisWeek: 0,
+    completedExams: 0,
+    completedCourses: 0,
+    dailyActiveUsers: 0,
+    avgSessionDuration: 0,
+    systemUptime: 99.9,
+    securityAlerts: 0
+  })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchStats()
+  }, [])
+
+  const fetchStats = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/admin/stats', {
+        credentials: 'include'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setStats(data)
+      } else {
+        logger.error('Failed to fetch admin stats:', response.status)
+      }
+    } catch (error) {
+      logger.error('Error fetching admin stats:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
@@ -53,9 +88,9 @@ export default function AdminDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">2,847</div>
+            <div className="text-2xl font-bold">{loading ? '...' : stats.totalUsers.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              +182 new this month
+              +{stats.newUsersThisMonth} new this month
             </p>
           </CardContent>
         </Card>
@@ -65,9 +100,9 @@ export default function AdminDashboard() {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">156</div>
+            <div className="text-2xl font-bold">{loading ? '...' : stats.activeCourses}</div>
             <p className="text-xs text-muted-foreground">
-              +12 published this week
+              +{stats.coursesThisWeek} published this week
             </p>
           </CardContent>
         </Card>
@@ -77,7 +112,7 @@ export default function AdminDashboard() {
             <Server className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">99.9%</div>
+            <div className="text-2xl font-bold">{stats.systemUptime}%</div>
             <p className="text-xs text-muted-foreground">
               Last 30 days
             </p>
@@ -89,9 +124,9 @@ export default function AdminDashboard() {
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
+            <div className="text-2xl font-bold">{stats.securityAlerts}</div>
             <p className="text-xs text-muted-foreground">
-              Require attention
+              {stats.securityAlerts > 0 ? 'Require attention' : 'All clear'}
             </p>
           </CardContent>
         </Card>
@@ -249,28 +284,28 @@ export default function AdminDashboard() {
                 <FileText className="h-4 w-4 text-blue-600" />
                 <span className="text-sm">Exams Completed</span>
               </div>
-              <span className="text-sm font-medium">12,847</span>
+              <span className="text-sm font-medium">{loading ? '...' : stats.completedExams.toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <TrendingUp className="h-4 w-4 text-green-600" />
                 <span className="text-sm">Course Completions</span>
               </div>
-              <span className="text-sm font-medium">3,456</span>
+              <span className="text-sm font-medium">{loading ? '...' : stats.completedCourses.toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Clock className="h-4 w-4 text-orange-600" />
                 <span className="text-sm">Avg. Session Duration</span>
               </div>
-              <span className="text-sm font-medium">24 min</span>
+              <span className="text-sm font-medium">{loading ? '...' : `${stats.avgSessionDuration} min`}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <BarChart3 className="h-4 w-4 text-purple-600" />
                 <span className="text-sm">Daily Active Users</span>
               </div>
-              <span className="text-sm font-medium">1,847</span>
+              <span className="text-sm font-medium">{loading ? '...' : stats.dailyActiveUsers.toLocaleString()}</span>
             </div>
           </CardContent>
         </Card>

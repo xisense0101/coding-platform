@@ -28,7 +28,7 @@ import {
   Bell
 } from 'lucide-react'
 import { StatCard, CourseCard, ActivityItem } from '@/components/common/UIComponents'
-import { useUser, useStudentCourses } from "@/hooks/useData"
+import { useUser, useStudentCourses, useStudentActivity } from "@/hooks/useData"
 import { useAuth } from '@/lib/auth/AuthContext'
 import Link from 'next/link'
 
@@ -38,6 +38,7 @@ export default function StudentDashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const { user, loading: userLoading } = useUser()
   const { courses, loading: coursesLoading, refetch } = useStudentCourses()
+  const { recentActivity, upcomingDeadlines, currentStreak, loading: activityLoading } = useStudentActivity()
   const { signOut, userProfile } = useAuth()
 
   // Use real data; userProfile is surfaced via AuthContext
@@ -48,14 +49,14 @@ export default function StudentDashboard() {
   const stats = {
     coursesEnrolled: studentCourses.length,
     coursesCompleted: studentCourses.filter(c => c.progress >= 100).length,
-    currentStreak: 7, // This would come from activity tracking
+    currentStreak: currentStreak, // Now from real data
     overallProgress: studentCourses.length > 0 
       ? Math.round(studentCourses.reduce((sum, course) => sum + (course.progress || 0), 0) / studentCourses.length)
       : 0
   }
 
   // Transform courses for display
-  const enrolledCourses = studentCourses.map((course, index) => ({
+  const enrolledCourses = studentCourses.map((course) => ({
     id: course.id,
     title: course.title,
     description: course.description || "No description available",
@@ -63,24 +64,13 @@ export default function StudentDashboard() {
     status: course.progress >= 100 ? "completed" as const : "active" as const,
     instructor: course.instructor || "Unknown Instructor",
     nextDeadline: course.progress >= 100 ? "Course Completed ✓" : `Continue learning - ${course.nextLesson || 'Next lesson'}`,
-    difficulty: "Beginner" as const,
-    rating: 4.5 + (index * 0.1), // Mock rating
+    difficulty: "Beginner" as const, // Could be enhanced to fetch from course data
     totalLessons: course.totalLessons || 20,
     completedLessons: course.completedLessons || Math.round((course.progress / 100) * (course.totalLessons || 20))
   }))
 
-  const recentActivity = [
-    { id: 1, type: "course" as const, message: "Continued learning in Database Management", time: "2 hours ago" },
-    { id: 2, type: "exam" as const, message: "Started new practice session", time: "1 day ago" },
-    { id: 3, type: "course" as const, message: "Accessed course materials", time: "2 days ago" },
-    { id: 4, type: "student" as const, message: "Profile updated successfully", time: "3 days ago" }
-  ]
-
-  const upcomingDeadlines = [
-    { id: 1, title: "Database Final Exam", course: "Database Management", dueDate: "Jan 15, 2024", priority: "high", slug: "database-final-exam" },
-    { id: 2, title: "React Assessment", course: "Frontend Development", dueDate: "Jan 18, 2024", priority: "medium", slug: "react-assessment" },
-    { id: 3, title: "Data Structures Quiz", course: "DSA Course", dueDate: "Jan 22, 2024", priority: "high", slug: "dsa-quiz" }
-  ]
+  // Recent activity now comes from useStudentActivity hook
+  // Upcoming deadlines now come from useStudentActivity hook
 
   const achievements = [
     { id: 1, title: "First Course", description: "Successfully enrolled in first course", icon: "🎓", earned: true },
@@ -299,9 +289,9 @@ export default function StudentDashboard() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {recentActivity.map((activity) => (
+                    {recentActivity.map((activity, index) => (
                       <ActivityItem
-                        key={activity.id}
+                        key={`activity-${index}`}
                         type={activity.type}
                         message={activity.message}
                         time={activity.time}
@@ -410,10 +400,6 @@ export default function StudentDashboard() {
                         <Badge className={`text-xs ${getDifficultyColor(course.difficulty)}`}>
                           {course.difficulty}
                         </Badge>
-                        <div className="flex items-center">
-                          <Star className="h-3 w-3 text-yellow-500 mr-1" />
-                          <span className="text-xs">{course.rating}</span>
-                        </div>
                       </div>
                       <CardTitle className="text-lg group-hover:text-blue-600 transition-colors">
                         {course.title}

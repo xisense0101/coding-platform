@@ -169,7 +169,9 @@ export function useTeacherStats() {
     totalStudents: 0,
     totalExams: 0,
     publishedCourses: 0,
-    averageScore: 0
+    activeExams: 0,
+    averageScore: 0,
+    courseStats: [] as Array<{courseId: string, studentCount: number, avgProgress: number, completionCount: number}>
   })
   const [loading, setLoading] = useState(true)
   const { user } = useAuth()
@@ -184,29 +186,26 @@ export function useTeacherStats() {
     try {
       setLoading(true)
       
-      // Fetch courses count
-      const coursesResponse = await fetch('/api/courses?my_courses=true', {
+      // Fetch comprehensive stats from new endpoint
+      const statsResponse = await fetch('/api/teacher/stats', {
         credentials: 'include'
       })
-      const coursesData = coursesResponse.ok ? await coursesResponse.json() : { courses: [] }
       
-      // Fetch exams count
-      const examsResponse = await fetch('/api/exams?my_exams=true', {
-        credentials: 'include'
-      })
-      const examsData = examsResponse.ok ? await examsResponse.json() : { exams: [] }
-      
-      const totalCourses = coursesData.courses?.length || 0
-      const totalExams = examsData.exams?.length || 0
-      const publishedCourses = coursesData.courses?.filter((course: any) => course.is_published)?.length || 0
-      
-      setStats({
-        totalCourses,
-        totalStudents: 0, // Will need to calculate from enrollments
-        totalExams,
-        publishedCourses,
-        averageScore: 85 // Mock for now
-      })
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json()
+        setStats({
+          totalCourses: statsData.totalCourses || 0,
+          totalStudents: statsData.totalStudents || 0,
+          totalExams: statsData.totalExams || 0,
+          publishedCourses: statsData.publishedCourses || 0,
+          activeExams: statsData.activeExams || 0,
+          averageScore: statsData.averageScore || 0,
+          courseStats: statsData.courseStats || []
+        })
+      } else {
+        logger.error('Failed to fetch teacher stats:', statsResponse.status)
+        // Keep default values
+      }
     } catch (error) {
       logger.error('Error fetching teacher stats:', error)
     } finally {
@@ -275,6 +274,48 @@ export function useTeacherActivity() {
   const [loading, setLoading] = useState(false)
   
   return { activities, loading }
+}
+
+export function useStudentActivity() {
+  const [data, setData] = useState({
+    recentActivity: [] as Array<{ type: 'course' | 'exam' | 'student'; message: string; time: string }>,
+    upcomingDeadlines: [] as Array<{ id: string; title: string; course: string; dueDate: string; priority: 'high' | 'medium' | 'low'; slug: string }>,
+    currentStreak: 0
+  })
+  const [loading, setLoading] = useState(true)
+  const { user } = useAuth()
+
+  useEffect(() => {
+    if (user) {
+      fetchActivity()
+    }
+  }, [user])
+
+  const fetchActivity = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/student/activity', {
+        credentials: 'include'
+      })
+
+      if (response.ok) {
+        const activityData = await response.json()
+        setData({
+          recentActivity: activityData.recentActivity || [],
+          upcomingDeadlines: activityData.upcomingDeadlines || [],
+          currentStreak: activityData.currentStreak || 0
+        })
+      } else {
+        logger.error('Failed to fetch student activity:', response.status)
+      }
+    } catch (error) {
+      logger.error('Error fetching student activity:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  return { ...data, loading, refetch: fetchActivity }
 }
 
 export function useData() {

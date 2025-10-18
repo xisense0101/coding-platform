@@ -72,16 +72,23 @@ export default function TeacherDashboard() {
     }
   }
 
-  // Transform courses data for UI
-  const transformedCourses = courses.map(course => ({
-    id: course.id,
-    title: course.title,
-    description: course.description || 'No description available',
-    progress: Math.floor(Math.random() * 100), // Mock progress for now
-    status: course.published ? 'active' as const : 'completed' as const, // Use completed instead of draft
-    studentCount: Math.floor(Math.random() * 50) + 10, // Mock student count
-    nextDeadline: 'Assignment due Jan 15' // Mock deadline
-  }))
+  // Transform courses data for UI with real stats
+  const transformedCourses = courses.map(course => {
+    // Find real stats for this course
+    const courseStats = stats?.courseStats?.find(s => s.courseId === course.id)
+    
+    return {
+      id: course.id,
+      title: course.title,
+      description: course.description || 'No description available',
+      progress: courseStats?.avgProgress || 0, // Real average progress from enrolled students
+      status: course.published ? 'active' as const : 'completed' as const, // Use completed instead of draft
+      studentCount: courseStats?.studentCount || 0, // Real student count
+      nextDeadline: courseStats && courseStats.completionCount > 0 
+        ? `${courseStats.completionCount} students completed` 
+        : 'No completions yet'
+    }
+  })
 
   // Transform exams data for UI
   const upcomingExams = exams.map(exam => {
@@ -210,7 +217,7 @@ export default function TeacherDashboard() {
               />
               <StatCard
                 title="Active Exams"
-                value={stats?.totalExams || 0}
+                value={stats?.activeExams || 0}
                 description="Currently running"
                 icon={<FileText className="h-5 w-5 text-purple-600" />}
                 color="purple"
