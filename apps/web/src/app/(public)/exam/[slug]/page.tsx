@@ -793,8 +793,53 @@ export default function Component() {
                       tail: currentQ.tail || {}
                     }}
                     onRun={async (code, language, customInput) => {
-                      await runCode()
-                      return { output: "Test execution complete" }
+                      // If custom input is provided, use run-custom endpoint
+                      if (customInput !== undefined && customInput !== null) {
+                        try {
+                          const res = await fetch('/api/coding/run-custom', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              code,
+                              language,
+                              input: customInput
+                            })
+                          })
+                          
+                          if (!res.ok) {
+                            const errorData = await res.json().catch(() => ({ error: 'Unknown error' }))
+                            return { error: errorData.error || 'Failed to run code' }
+                          }
+                          
+                          const data = await res.json()
+                          return data
+                        } catch (err: any) {
+                          return { error: err?.message || 'Failed to run code' }
+                        }
+                      }
+                      
+                      // Otherwise, run test cases
+                      try {
+                        const res = await fetch('/api/coding/run', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            code,
+                            language,
+                            testCases: currentQ.testCases || []
+                          })
+                        })
+                        
+                        if (!res.ok) {
+                          const errorData = await res.json().catch(() => ({ error: 'Unknown error' }))
+                          return { error: errorData.error || 'Failed to run test cases' }
+                        }
+                        
+                        const data = await res.json()
+                        return data
+                      } catch (err: any) {
+                        return { error: err?.message || 'Failed to run test cases' }
+                      }
                     }}
                     onSubmit={async (code, language) => {
                       updateAnswer(currentQ.id, { userCode: code, status: "answered" })
@@ -832,10 +877,6 @@ export default function Component() {
 
   function reportProblem() {
     alert("Report problem functionality would be implemented here")
-  }
-  async function runCode() {
-    // Placeholder for code execution - actual execution handled by CodingQuestionInterface
-    await new Promise((r) => setTimeout(r, 500))
   }
 }
 
