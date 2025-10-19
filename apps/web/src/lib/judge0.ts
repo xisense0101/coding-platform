@@ -25,6 +25,8 @@ export interface TestCaseResult {
   executionTime: string | null
   memory: number | null
   status: string
+  weight?: number
+  marksEarned?: number
 }
 
 // Judge0 Language IDs
@@ -214,6 +216,7 @@ export async function executeTestCases(
     input: string
     expected_output: string
     is_hidden: boolean
+    weight?: number
   }>
 ): Promise<TestCaseResult[]> {
   const results: TestCaseResult[] = []
@@ -230,6 +233,7 @@ export async function executeTestCases(
       const cleanError = cleanErrorMessage(compileError)
       
       for (let i = 0; i < testCases.length; i++) {
+        const weight = testCases[i].weight || 1
         results.push({
           testCaseIndex: i,
           passed: false,
@@ -240,7 +244,9 @@ export async function executeTestCases(
           error: cleanError || compileError,
           executionTime: null,
           memory: null,
-          status: 'Compilation Error'
+          status: 'Compilation Error',
+          weight: weight,
+          marksEarned: 0
         })
       }
       return results
@@ -248,6 +254,7 @@ export async function executeTestCases(
   } catch (error: any) {
     // If initial test fails, mark all as error
     for (let i = 0; i < testCases.length; i++) {
+      const weight = testCases[i].weight || 1
       results.push({
         testCaseIndex: i,
         passed: false,
@@ -258,7 +265,9 @@ export async function executeTestCases(
         error: error.message,
         executionTime: null,
         memory: null,
-        status: 'Submission Error'
+        status: 'Submission Error',
+        weight: weight,
+        marksEarned: 0
       })
     }
     return results
@@ -290,6 +299,7 @@ export async function executeTestCases(
   // Poll for results
   for (const { token, index, testCase, error } of tokens) {
     if (error || !token) {
+      const weight = testCase.weight || 1
       results.push({
         testCaseIndex: index,
         passed: false,
@@ -300,7 +310,9 @@ export async function executeTestCases(
         error: error || 'Failed to submit',
         executionTime: null,
         memory: null,
-        status: 'Submission Error'
+        status: 'Submission Error',
+        weight: weight,
+        marksEarned: 0
       })
       continue
     }
@@ -313,6 +325,10 @@ export async function executeTestCases(
       
       // Status 3 = Accepted
       const passed = result.status.id === 3 && actualOutput === expectedOutput
+      
+      // Calculate marks based on weight
+      const weight = testCase.weight || 1
+      const marksEarned = passed ? weight : 0
       
       // Only include error for runtime errors, not for wrong output
       const hasRuntimeError = result.stderr || result.message
@@ -328,9 +344,12 @@ export async function executeTestCases(
         error: runtimeError,
         executionTime: result.time,
         memory: result.memory,
-        status: result.status.description
+        status: result.status.description,
+        weight: weight,
+        marksEarned: marksEarned
       })
     } catch (error: any) {
+      const weight = testCase.weight || 1
       results.push({
         testCaseIndex: index,
         passed: false,
@@ -341,7 +360,9 @@ export async function executeTestCases(
         error: error.message,
         executionTime: null,
         memory: null,
-        status: 'Execution Error'
+        status: 'Execution Error',
+        weight: weight,
+        marksEarned: 0
       })
     }
   }

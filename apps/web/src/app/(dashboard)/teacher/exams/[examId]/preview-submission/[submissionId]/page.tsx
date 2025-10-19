@@ -81,20 +81,69 @@ export default function SubmissionPreviewPage() {
 
           if (question.type === 'mcq') {
             const mcqData = question.mcq_questions?.[0]
+            
+            // Check if we have graded answer data
+            const isCorrect = studentAnswer?.is_correct !== undefined 
+              ? studentAnswer.is_correct 
+              : false
+            
+            const pointsEarned = studentAnswer?.points_earned !== undefined
+              ? studentAnswer.points_earned
+              : 0
+            
+            // Format options with letter IDs (a, b, c, d)
+            const formattedOptions = (mcqData?.options || []).map((opt: any, index: number) => ({
+              id: String.fromCharCode(97 + index), // 'a', 'b', 'c', 'd'
+              text: typeof opt === 'string' ? opt : opt.text || opt.toString()
+            }))
+            
+            // Convert numeric correct answers to letter IDs
+            const correctAnswerLetters = (mcqData?.correct_answers || []).map((idx: number) => 
+              String.fromCharCode(97 + idx)
+            )
+            
+            // Ensure userAnswer is in letter format (handle legacy numeric answers)
+            let userAnswerLetter = studentAnswer?.userAnswer
+            if (userAnswerLetter !== undefined && userAnswerLetter !== null) {
+              // If it's a number or numeric string, convert to letter
+              const numAnswer = typeof userAnswerLetter === 'number' ? userAnswerLetter : parseInt(userAnswerLetter)
+              if (!isNaN(numAnswer) && numAnswer >= 0 && numAnswer < 26) {
+                userAnswerLetter = String.fromCharCode(97 + numAnswer)
+                logger.log(`📊 Converted numeric answer ${numAnswer} to letter ${userAnswerLetter} for question ${questionId}`)
+              }
+            }
+            
+            logger.log(`📊 Teacher preview MCQ:`, {
+              questionId,
+              questionTitle: question.title,
+              userAnswer: userAnswerLetter,
+              correctAnswers: correctAnswerLetters,
+              options: formattedOptions.map((opt: { id: string; text: string }) => opt.id)
+            })
+            
             allQuestions.push({
               questionId,
               questionTitle: question.title,
               questionType: 'mcq',
               questionContent: mcqData?.question_text || question.description || '',
-              options: mcqData?.options || [],
-              correctAnswer: mcqData?.correct_answers || [],
-              userAnswer: studentAnswer?.userAnswer,
-              isCorrect: studentAnswer?.is_correct || false,
-              pointsEarned: studentAnswer?.points_earned || 0,
-              maxPoints: examQuestion.points || question.points || 0
+              options: formattedOptions,
+              correctAnswer: correctAnswerLetters,
+              userAnswer: userAnswerLetter,
+              isCorrect: isCorrect,
+              pointsEarned: pointsEarned,
+              maxPoints: studentAnswer?.max_points || examQuestion.points || question.points || 0
             })
           } else if (question.type === 'coding') {
             const codingData = question.coding_questions?.[0]
+            
+            const isCorrect = studentAnswer?.is_correct !== undefined 
+              ? studentAnswer.is_correct 
+              : false
+            
+            const pointsEarned = studentAnswer?.points_earned !== undefined
+              ? studentAnswer.points_earned
+              : 0
+            
             allQuestions.push({
               questionId,
               questionTitle: question.title,
@@ -102,9 +151,9 @@ export default function SubmissionPreviewPage() {
               questionContent: codingData?.problem_statement || question.description || '',
               userCode: studentAnswer?.userCode || '',
               selectedLanguage: studentAnswer?.language || 'javascript',
-              isCorrect: studentAnswer?.is_correct || false,
-              pointsEarned: studentAnswer?.points_earned || 0,
-              maxPoints: examQuestion.points || question.points || 0
+              isCorrect: isCorrect,
+              pointsEarned: pointsEarned,
+              maxPoints: studentAnswer?.max_points || examQuestion.points || question.points || 0
             })
           }
         })
@@ -313,16 +362,21 @@ export default function SubmissionPreviewPage() {
                               )}
                             >
                               <div className="flex items-center justify-between">
-                                <span className="text-base">{option.text}</span>
+                                <div className="flex items-center gap-3">
+                                  <span className="font-semibold text-gray-700 text-sm uppercase bg-white px-2 py-1 rounded border">
+                                    {option.id})
+                                  </span>
+                                  <span className="text-base">{option.text}</span>
+                                </div>
                                 <div className="flex items-center gap-2">
                                   {isSelected && (
-                                    <Badge variant="outline" className="text-xs">
-                                      Selected
+                                    <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
+                                      Student's Answer
                                     </Badge>
                                   )}
                                   {isCorrect && (
                                     <Badge variant="default" className="bg-green-600 text-xs">
-                                      Correct Answer
+                                      ✓ Correct
                                     </Badge>
                                   )}
                                 </div>
@@ -331,8 +385,8 @@ export default function SubmissionPreviewPage() {
                           )
                         })}
                         {!currentQuestion.userAnswer && (
-                          <p className="text-gray-500 italic p-4 bg-gray-50 rounded-lg">
-                            No answer provided
+                          <p className="text-gray-500 italic p-4 bg-gray-50 rounded-lg border-2 border-dashed">
+                            ⚠️ No answer provided by student
                           </p>
                         )}
                       </div>

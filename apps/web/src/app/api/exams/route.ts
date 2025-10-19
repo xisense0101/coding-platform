@@ -9,7 +9,8 @@ const testCaseSchema = z.object({
   id: z.number(),
   input: z.string(),
   expectedOutput: z.string(),
-  isHidden: z.boolean()
+  isHidden: z.boolean(),
+  weight: z.number().optional()
 })
 
 const mcqQuestionSchema = z.object({
@@ -251,7 +252,7 @@ export async function POST(request: NextRequest) {
             input: tc.input,
             expected_output: tc.expectedOutput,
             is_hidden: tc.isHidden,
-            weight: 1
+            weight: tc.weight || 1
           }))
 
           // Format boilerplate code

@@ -3,10 +3,12 @@
 import { RichTextPreview } from '@/components/editors/RichTextEditor'
 import { CodingQuestionInterface } from '@/components/coding'
 import StudentAuthModal, { StudentAuthData } from '@/components/exam/StudentAuthModal'
+import { MonitoringStatus } from '@/components/exam/MonitoringStatus'
+import { ViolationAlert, ViolationAlertData } from '@/components/exam/ViolationAlert'
 
 import type React from "react"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 
 // UI
@@ -19,7 +21,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { ChevronLeft, ChevronRight, Play, Send, RotateCcw, Settings, Maximize2, Menu, X, Check, Info, Timer, BookOpen, Minus, Plus, Lock, ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Play, Send, RotateCcw, Settings, Maximize2, Menu, X, Check, Info, Timer, BookOpen, Minus, Plus, Lock, ChevronDown, ChevronUp, AlertTriangle, Star } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 
@@ -29,6 +31,7 @@ import { useAuth } from "@/lib/auth/AuthContext"
 import type { Tables, TablesInsert, TablesUpdate } from "@/lib/database/types"
 
 import { logger } from '@/lib/utils/logger'
+import { useElectronMonitoring } from '@/hooks/useElectronMonitoring'
 
 // -----------------------------------------------------------------------------
 // Local UI types built from API shape
@@ -44,6 +47,15 @@ type ApiExam = {
   end_time: string
   duration_minutes: number
   total_marks: number
+  strict_level?: number
+  max_tab_switches?: number
+  max_screen_lock_duration?: number
+  auto_terminate_on_violations?: boolean
+  track_tab_switches?: boolean
+  track_screen_locks?: boolean
+  detect_vm?: boolean
+  require_single_monitor?: boolean
+  allow_zoom_changes?: boolean
   sections: Array<{
     id: string
     title: string
@@ -170,6 +182,13 @@ export default function Component() {
   const [loadingError, setLoadingError] = useState<string | null>(null)
   const [submissionId, setSubmissionId] = useState<string | null>(null)
   const [selectedLanguage, setSelectedLanguage] = useState("JavaScript")
+  const [currentViolation, setCurrentViolation] = useState<ViolationAlertData | null>(null)
+  const [isClosing, setIsClosing] = useState(false)
+  const [feedbackRating, setFeedbackRating] = useState<number>(0)
+  const [feedbackText, setFeedbackText] = useState<string>("")
+  const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false)
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
+  const lastViolationIdRef = useRef<string | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const rightPanelRef = useRef<HTMLDivElement>(null)
@@ -177,6 +196,47 @@ export default function Component() {
 
   const sb: any = useMemo(() => createClient() as any, [])
   const { user, isLoading: authLoading } = useAuth()
+
+  // Electron monitoring integration
+  const {
+    isElectronApp,
+    appVersion,
+    isVM,
+    metrics: monitoringMetrics,
+    notifyExamComplete,
+    closeElectronApp,
+    handleZoomChange
+  } = useElectronMonitoring({
+    submissionId,
+    examId: exam?.id || null,
+    studentId: studentAuthData?.userId || user?.id || null,
+    onViolation: useCallback((violation: any) => {
+      logger.warn('Violation detected:', violation)
+      
+      // Prevent duplicate violation alerts
+      const violationId = `${violation.type}-${violation.violationCount}`
+      if (lastViolationIdRef.current === violationId) {
+        logger.log('Skipping duplicate violation alert:', violationId)
+        return
+      }
+      lastViolationIdRef.current = violationId
+      
+      // Show in-app violation alert instead of system alert
+      const alertData: ViolationAlertData = {
+        id: `violation-${Date.now()}`,
+        message: violation.message,
+        violationCount: violation.violationCount,
+        shouldTerminate: violation.shouldTerminate,
+        timestamp: Date.now()
+      }
+      
+      setCurrentViolation(alertData)
+    }, []),
+    onMetricsUpdate: (metrics) => {
+      // Metrics updated - can trigger UI updates if needed
+      logger.log('Monitoring metrics updated:', metrics)
+    }
+  })
 
   // Fetch exam by slug
   useEffect(() => {
@@ -255,9 +315,88 @@ export default function Component() {
 
   useEffect(() => {
     if (timeLeft === 0 && isExamStarted && !isExamFinished) {
-      handleFinalSubmitClick()
+      logger.log('⏱️ Time expired - auto-submitting exam')
+      autoSubmitExam()
     }
   }, [timeLeft, isExamStarted, isExamFinished])
+  
+  const autoSubmitExam = async () => {
+    try {
+      if (!exam || !submissionId) return
+      
+      const { total, max, gradedAnswers } = computeScore()
+      
+      // Notify Electron app that exam is complete
+      notifyExamComplete()
+      
+      // Check if any questions require manual grading
+      const requiresManualGrading = Object.values(gradedAnswers).some((ans: any) => ans.requires_manual_grading)
+      
+      const percentage = max > 0 ? (total / max) * 100 : 0
+      const isPassed = percentage >= 50
+      
+      const finalUpdate: TablesUpdate<'exam_submissions'> = {
+        is_submitted: true,
+        submitted_at: new Date().toISOString(),
+        total_score: total,
+        max_score: max,
+        percentage: percentage,
+        is_passed: isPassed,
+        submission_status: requiresManualGrading ? 'submitted' : 'graded',
+        requires_manual_grading: requiresManualGrading,
+        auto_submitted: true,
+        time_taken_minutes: exam.duration_minutes,
+        answers: gradedAnswers as any,
+      }
+      
+      await sb
+        .from("exam_submissions")
+        .update(finalUpdate as any)
+        .eq("id", submissionId)
+      
+      setIsExamFinished(true)
+      logger.log('✅ Exam auto-submitted due to time expiry')
+    } catch (error) {
+      logger.error('❌ Error auto-submitting exam:', error)
+    }
+  }
+  
+  const autoSubmitExpiredExam = async (subId: string) => {
+    try {
+      if (!exam) return
+      
+      const { total, max, gradedAnswers } = computeScore()
+      
+      // Check if any questions require manual grading
+      const requiresManualGrading = Object.values(gradedAnswers).some((ans: any) => ans.requires_manual_grading)
+      
+      const percentage = max > 0 ? (total / max) * 100 : 0
+      const isPassed = percentage >= 50
+      
+      const finalUpdate: TablesUpdate<'exam_submissions'> = {
+        is_submitted: true,
+        submitted_at: new Date().toISOString(),
+        total_score: total,
+        max_score: max,
+        percentage: percentage,
+        is_passed: isPassed,
+        submission_status: requiresManualGrading ? 'submitted' : 'graded',
+        requires_manual_grading: requiresManualGrading,
+        auto_submitted: true,
+        time_taken_minutes: exam.duration_minutes,
+        answers: gradedAnswers as any,
+      }
+      
+      await sb
+        .from("exam_submissions")
+        .update(finalUpdate as any)
+        .eq("id", subId)
+      
+      logger.log('✅ Expired exam auto-submitted on re-login')
+    } catch (error) {
+      logger.error('❌ Error auto-submitting expired exam:', error)
+    }
+  }
 
   const currentSection = uiSections[currentSectionIdx]
   const currentQ = currentSection?.questions[currentQuestionIdx]
@@ -316,7 +455,9 @@ export default function Component() {
       if (!response.ok) {
         logger.error('❌ Start exam API error:', result)
         if (result.alreadySubmitted) {
-          alert('You have already submitted this exam. You cannot take it again.')
+          setIsExamFinished(true)
+          setShowInstructions(false)
+          return
         }
         throw new Error(result.error || 'Failed to start exam')
       }
@@ -325,17 +466,94 @@ export default function Component() {
 
       // Set submission ID
       setSubmissionId(result.submission.id)
+      
+      // Check if exam was already submitted
+      if (result.submission.is_submitted) {
+        logger.log('📝 Exam was already submitted')
+        setIsExamFinished(true)
+        setShowInstructions(false)
+        return
+      }
 
-      // If existing submission, restore answers
+      // Set time remaining from API (handles both new and resumed exams)
+      if (result.submission.timeRemainingSeconds !== undefined) {
+        const timeRemaining = Math.max(0, Math.floor(result.submission.timeRemainingSeconds))
+        setTimeLeft(timeRemaining)
+        logger.log('⏱️ Time set to:', timeRemaining, 'seconds')
+        
+        // If time has expired, auto-submit if not already submitted and show finished message
+        if (timeRemaining === 0) {
+          logger.log('⏱️ Time expired - marking exam as finished')
+          
+          // If not yet submitted, auto-submit now
+          if (!result.submission.is_submitted) {
+            logger.log('⏱️ Auto-submitting expired exam')
+            await autoSubmitExpiredExam(result.submission.id)
+          }
+          
+          setIsExamFinished(true)
+          setShowInstructions(false)
+          return
+        }
+      }
+
+      // If existing submission, restore answers and section progress
       if (!result.isNew && result.submission.answers) {
         logger.log('📋 Restoring previous answers...')
         const pre = result.submission.answers || {}
         const ans: Record<string, AnswerState> = {}
+        const submittedSections: Record<string, boolean> = {}
+        const unlockedSectionsMap: Record<string, boolean> = {}
+        
+        // Restore answers with all fields
         Object.keys(pre).forEach((qid) => {
-          ans[qid] = { ...pre[qid], status: pre[qid]?.status || "answered" }
+          const savedAnswer = pre[qid]
+          ans[qid] = {
+            userAnswer: savedAnswer.userAnswer,
+            userCode: savedAnswer.userCode,
+            status: savedAnswer.status || "unanswered"
+          }
         })
+        
+        // Determine which sections have been submitted and should be unlocked
+        uiSections.forEach((section, idx) => {
+          const allQuestionsSubmitted = section.questions.every((q) => {
+            const questionStatus = ans[q.id]?.status
+            return questionStatus === "submitted"
+          })
+          
+          if (allQuestionsSubmitted && section.questions.length > 0) {
+            submittedSections[section.id] = true
+          }
+          
+          // Unlock sections: first one, or any with answered/submitted questions
+          const hasProgress = section.questions.some((q) => ans[q.id]?.status !== "unanswered" && ans[q.id]?.status !== undefined)
+          if (idx === 0 || hasProgress || allQuestionsSubmitted) {
+            unlockedSectionsMap[section.id] = true
+          }
+        })
+        
+        // Find the current section (first non-submitted or last)
+        let currentSecIdx = 0
+        for (let i = 0; i < uiSections.length; i++) {
+          if (!submittedSections[uiSections[i].id]) {
+            currentSecIdx = i
+            break
+          }
+          currentSecIdx = i // If all submitted, stay on last
+        }
+        
         setAnswers(ans)
-        logger.log('✅ Restored answers for', Object.keys(ans).length, 'questions')
+        setSectionSubmitted(submittedSections)
+        setUnlockedSections(unlockedSectionsMap)
+        setCurrentSectionIdx(currentSecIdx)
+        
+        logger.log('✅ Restored state:', {
+          answersCount: Object.keys(ans).length,
+          submittedSections: Object.keys(submittedSections),
+          unlockedSections: Object.keys(unlockedSectionsMap),
+          currentSectionIdx: currentSecIdx
+        })
       } else {
         logger.log('📝 Starting fresh exam (no previous answers)')
       }
@@ -368,10 +586,12 @@ export default function Component() {
   }
 
   const updateAnswer = (qid: string, patch: Partial<AnswerState>) => {
+    logger.log('🔵 updateAnswer called:', { qid, patch })
     setAnswers((prev) => {
       const base: AnswerState = prev[qid] || { status: 'unanswered' }
       const merged: AnswerState = { ...base, ...patch }
       const next = { ...prev, [qid]: merged }
+      logger.log('🔵 Answer updated:', { qid, before: base, after: merged })
       void persistAnswers(next)
       return next
     })
@@ -388,6 +608,8 @@ export default function Component() {
 
   // Submit single question (just marks answered and moves next)
   const handleQuestionSubmit = (question: UIQuestion) => {
+    logger.log('✅ handleQuestionSubmit called for question:', question.id)
+    logger.log('✅ Current answer state:', answers[question.id])
     updateAnswer(question.id, { status: "answered" })
     const nextIdx = currentQuestionIdx + 1
     if (currentSection && nextIdx < currentSection.questions.length) {
@@ -398,6 +620,62 @@ export default function Component() {
   const clearSelection = () => {
     if (!currentQ) return
     updateAnswer(currentQ.id, { userAnswer: undefined, status: "unanswered" })
+  }
+
+  const handleViolationDismiss = () => {
+    setCurrentViolation(null)
+    // Don't reset lastViolationIdRef to prevent same violation from showing again
+  }
+
+  const handleViolationTerminate = () => {
+    setCurrentViolation(null)
+    setSubmitDialogType("final")
+    setShowSubmitDialog(true)
+  }
+
+  // Submit feedback
+  const handleSubmitFeedback = async () => {
+    if (!exam || !submissionId || !studentAuthData) return
+    
+    // Skip if no rating and no feedback text
+    if (!feedbackRating && !feedbackText.trim()) {
+      setFeedbackSubmitted(true)
+      return
+    }
+
+    setIsFeedbackSubmitting(true)
+
+    try {
+      const response = await fetch('/api/exam/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          examId: exam.id,
+          submissionId: submissionId,
+          studentId: studentAuthData.userId || user?.id,
+          studentEmail: studentAuthData.studentEmail,
+          studentName: studentAuthData.studentName,
+          rollNumber: studentAuthData.rollNumber,
+          rating: feedbackRating || null,
+          feedbackText: feedbackText.trim() || null
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        logger.log('✅ Feedback submitted successfully')
+        setFeedbackSubmitted(true)
+      } else {
+        logger.error('Failed to submit feedback:', result.error)
+        alert('Failed to submit feedback. Please try again.')
+      }
+    } catch (error) {
+      logger.error('Error submitting feedback:', error)
+      alert('Error submitting feedback. Please try again.')
+    } finally {
+      setIsFeedbackSubmitting(false)
+    }
   }
 
   const increaseFontSize = () => setCurrentFontSizeIndex((p) => Math.min(p + 1, FONT_SIZES.length - 1))
@@ -415,23 +693,73 @@ export default function Component() {
   }
 
   const computeScore = () => {
-    if (!exam) return { total: 0, max: 0 }
+    if (!exam) return { total: 0, max: 0, gradedAnswers: {} }
     let total = 0
     let max = 0
+    const gradedAnswers: Record<string, any> = {}
+    
+    logger.log('🔍 computeScore - All answers:', answers)
+    
     uiSections.forEach((s) => {
       s.questions.forEach((q) => {
         const apiQ = exam.sections.find((ss) => ss.id === s.id)?.questions.find((qq) => qq.question.id === q.id)
         if (!apiQ) return
         const pts = apiQ.points || 1
+        const answer = answers[q.id]
+        
         if (q.type === "mcq") {
           max += pts
-          const ans = answers[q.id]?.userAnswer as string | undefined
-          const correct = apiQ.question.mcq_question?.correct_answers || []
-          if (ans != null && correct.includes(ans)) total += pts
+          const userAns = answer?.userAnswer as string | undefined
+          const correctAnswers = apiQ.question.mcq_question?.correct_answers || []
+          
+          logger.log('🔍 MCQ grading:', {
+            questionId: q.id,
+            questionTitle: q.title,
+            userAnswer: userAns,
+            correctAnswers: correctAnswers,
+            answerObject: answer
+          })
+          
+          // Convert to numbers if they're strings
+          const correct: number[] = correctAnswers.map((ans: any) => 
+            typeof ans === 'number' ? ans : parseInt(ans, 10)
+          ).filter((n: number) => !isNaN(n))
+          
+          // Convert letter ID to index: 'a' -> 0, 'b' -> 1, 'c' -> 2, 'd' -> 3
+          let userAnswerIndex: number | undefined
+          if (userAns && userAns.length === 1) {
+            userAnswerIndex = userAns.charCodeAt(0) - 97  // 'a'.charCodeAt(0) = 97
+          }
+          
+          const isCorrect = userAnswerIndex !== undefined && correct.includes(userAnswerIndex)
+          const pointsEarned = isCorrect ? pts : 0
+          total += pointsEarned
+          
+          // Store graded answer with both letter and index for compatibility
+          gradedAnswers[q.id] = {
+            userAnswer: userAns,
+            userAnswerIndex: userAnswerIndex,
+            status: answer?.status || "unanswered",
+            is_correct: isCorrect,
+            points_earned: pointsEarned,
+            max_points: pts
+          }
+        } else if (q.type === "coding") {
+          max += pts
+          // For coding questions, store the code but mark as requires manual grading
+          gradedAnswers[q.id] = {
+            userCode: answer?.userCode,
+            status: answer?.status || "unanswered",
+            is_correct: false, // To be graded manually
+            points_earned: 0,
+            max_points: pts,
+            requires_manual_grading: true
+          }
         }
       })
     })
-    return { total, max }
+    
+    return { total, max, gradedAnswers }
   }
 
   const confirmSubmit = async (isVerified: boolean) => {
@@ -461,14 +789,32 @@ export default function Component() {
       setShowSubmitDialog(false)
     } else {
       // Final submit
-      const { total, max } = computeScore()
-      if (submissionId) {
+      const { total, max, gradedAnswers } = computeScore()
+      
+      // Notify Electron app that exam is complete
+      notifyExamComplete()
+      
+      if (submissionId && exam) {
+        // Calculate time taken based on remaining time
+        const timeTakenMinutes = Math.ceil((exam.duration_minutes * 60 - timeLeft) / 60)
+        
+        // Check if any questions require manual grading
+        const requiresManualGrading = Object.values(gradedAnswers).some((ans: any) => ans.requires_manual_grading)
+        
+        const percentage = max > 0 ? (total / max) * 100 : 0
+        const isPassed = percentage >= 50 // Default pass percentage
+        
         const finalUpdate: TablesUpdate<'exam_submissions'> = {
           is_submitted: true,
           submitted_at: new Date().toISOString(),
           total_score: total,
           max_score: max,
-          submission_status: 'submitted',
+          percentage: percentage,
+          is_passed: isPassed,
+          submission_status: requiresManualGrading ? 'submitted' : 'graded',
+          requires_manual_grading: requiresManualGrading,
+          time_taken_minutes: timeTakenMinutes,
+          answers: gradedAnswers as any,
         }
         await sb
           .from("exam_submissions")
@@ -531,8 +877,149 @@ export default function Component() {
 
   if (isExamFinished) {
     return (
-      <div className="h-screen w-screen bg-white flex items-center justify-center text-2xl font-bold text-sky-800">
-        Exam Submitted Successfully!
+      <div className="h-screen w-screen bg-gradient-to-br from-sky-50 to-white flex items-center justify-center p-4">
+        <Card className="max-w-md w-full border-sky-200 shadow-lg">
+          <CardContent className="p-8 text-center space-y-4">
+            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+              <Check className="h-8 w-8 text-green-600" />
+            </div>
+            <h1 className="text-3xl font-bold text-sky-900">Exam Submitted Successfully!</h1>
+            <p className="text-sky-700">
+              Your responses have been recorded. {isElectronApp ? 'Please share your experience before closing.' : 'Thank you for participating!'}
+            </p>
+            {exam && (
+              <div className="mt-4 p-4 bg-sky-50 rounded-lg text-sm text-left space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Exam:</span>
+                  <span className="font-medium">{exam.title}</span>
+                </div>
+                {studentAuthData && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Student:</span>
+                      <span className="font-medium">{studentAuthData.studentName}</span>
+                    </div>
+                    {studentAuthData.rollNumber && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Roll Number:</span>
+                        <span className="font-medium">{studentAuthData.rollNumber}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Submitted At:</span>
+                  <span className="font-medium">{new Date().toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Feedback Section */}
+            {!feedbackSubmitted ? (
+              <div className="mt-6 p-4 bg-white border border-sky-200 rounded-lg text-left space-y-4">
+                <h3 className="text-lg font-semibold text-sky-900 text-center">How was your experience?</h3>
+                
+                {/* Star Rating */}
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setFeedbackRating(star)}
+                        className="focus:outline-none transition-transform hover:scale-110"
+                        type="button"
+                      >
+                        <Star
+                          className={cn(
+                            "h-8 w-8 transition-colors",
+                            star <= feedbackRating
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-gray-300 hover:text-yellow-200"
+                          )}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  {feedbackRating > 0 && (
+                    <span className="text-sm text-gray-600">
+                      {feedbackRating === 5 ? "Excellent!" : feedbackRating === 4 ? "Good!" : feedbackRating === 3 ? "Fair" : feedbackRating === 2 ? "Poor" : "Very Poor"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Feedback Text */}
+                <div className="space-y-2">
+                  <Label htmlFor="feedback" className="text-sm text-gray-700">
+                    Share your feedback (optional)
+                  </Label>
+                  <Textarea
+                    id="feedback"
+                    placeholder="Tell us about your exam experience..."
+                    value={feedbackText}
+                    onChange={(e) => setFeedbackText(e.target.value)}
+                    rows={3}
+                    className="resize-none"
+                    maxLength={500}
+                  />
+                  <div className="text-right text-xs text-gray-500">
+                    {feedbackText.length}/500
+                  </div>
+                </div>
+
+                {/* Submit Feedback Button */}
+                <Button
+                  onClick={handleSubmitFeedback}
+                  disabled={isFeedbackSubmitting}
+                  className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+                >
+                  {isFeedbackSubmitting ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full inline-block" />
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Feedback'
+                  )}
+                </Button>
+
+                {/* Skip Button */}
+                <button
+                  onClick={() => setFeedbackSubmitted(true)}
+                  className="w-full text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Skip for now
+                </button>
+              </div>
+            ) : (
+              <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-green-800 text-center">
+                  ✓ Thank you for your feedback!
+                </p>
+              </div>
+            )}
+
+            {/* Close Application Button - Only show after feedback is submitted or skipped */}
+            {isElectronApp && feedbackSubmitted && (
+              <Button
+                onClick={() => {
+                  setIsClosing(true)
+                  closeElectronApp()
+                }}
+                disabled={isClosing}
+                className="mt-4 bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white shadow-md transition-all duration-200 hover:shadow-lg font-semibold w-full disabled:opacity-50"
+              >
+                {isClosing ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full inline-block" />
+                    Closing Application...
+                  </>
+                ) : (
+                  'Close Application'
+                )}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -616,6 +1103,16 @@ export default function Component() {
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
+          {/* Monitoring Status - Tab Switches Only */}
+          {isElectronApp && (
+            <MonitoringStatus
+              metrics={monitoringMetrics}
+              isElectronApp={isElectronApp}
+              isVM={isVM}
+              appVersion={appVersion}
+              maxTabSwitches={exam?.max_tab_switches || 3}
+            />
+          )}
         </div>
         {/* Central Submit Buttons */}
         <div className="flex items-center gap-4">
@@ -641,10 +1138,28 @@ export default function Component() {
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" className="hover:bg-sky-100 text-sky-600" onClick={decreaseFontSize} disabled={currentFontSizeIndex === 0}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="hover:bg-sky-100 text-sky-600" 
+              onClick={() => {
+                decreaseFontSize()
+                handleZoomChange(-10)
+              }} 
+              disabled={currentFontSizeIndex === 0}
+            >
               <Minus className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="hover:bg-sky-100 text-sky-600" onClick={increaseFontSize} disabled={currentFontSizeIndex === FONT_SIZES.length - 1}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="hover:bg-sky-100 text-sky-600" 
+              onClick={() => {
+                increaseFontSize()
+                handleZoomChange(10)
+              }} 
+              disabled={currentFontSizeIndex === FONT_SIZES.length - 1}
+            >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
@@ -659,7 +1174,7 @@ export default function Component() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar - Sections/Questions */}
-        <div className={`${isSidebarOpen ? "w-28" : "w-0"} transition-all duration-300 border-r border-sky-200 bg-white shadow-sm overflow-hidden`}>
+        <div className={`${isSidebarOpen ? "w-80" : "w-0"} transition-all duration-300 border-r border-sky-200 bg-white shadow-sm overflow-hidden`}>
           <ScrollArea className="h-full">
             <div className="p-2 space-y-4">
               {uiSections.map((s, sIdx) => {
@@ -743,7 +1258,10 @@ export default function Component() {
                     status: (answers[currentQ.id]?.status as any) || "unanswered",
                     userAnswer: (answers[currentQ.id]?.userAnswer as string) || "",
                   }}
-                  onAnswerChange={(answer) => updateAnswer(currentQ.id, { userAnswer: answer, status: "answered" })}
+                  onAnswerChange={(answer) => {
+                    logger.log('📝 MCQ answer changed:', { questionId: currentQ.id, answer })
+                    updateAnswer(currentQ.id, { userAnswer: answer, status: "answered" })
+                  }}
                   onClearSelection={clearSelection}
                   fontSizeClass={currentFontSizeClass}
                   isSectionSubmitted={!!sectionSubmitted[currentSection?.id || ""]}
@@ -872,11 +1390,27 @@ export default function Component() {
           requireVerification={true}
         />
       )}
+
+      {/* Violation Alert - In-app popup instead of system alert */}
+      <ViolationAlert
+        violation={currentViolation}
+        onDismiss={handleViolationDismiss}
+        onTerminate={handleViolationTerminate}
+      />
     </div>
   )
 
   function reportProblem() {
-    alert("Report problem functionality would be implemented here")
+    // TODO: Implement proper report problem dialog
+    // For now, use a non-blocking notification
+    const problemAlert: ViolationAlertData = {
+      id: `report-${Date.now()}`,
+      message: "Report problem functionality would be implemented here. Your concern will be noted.",
+      violationCount: 0,
+      shouldTerminate: false,
+      timestamp: Date.now()
+    }
+    setCurrentViolation(problemAlert)
   }
 }
 

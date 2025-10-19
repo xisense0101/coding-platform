@@ -86,15 +86,46 @@ export async function POST(
       )
     }
 
-    // If submission exists and is in progress, return it
+    // If submission exists and is in progress, return it with time remaining
     if (existingSubmission) {
       logger.log('✅ Found existing submission:', existingSubmission.id)
+      
+      // Fetch exam details to get duration
+      const { data: examData, error: examError } = await supabase
+        .from('exams')
+        .select('duration_minutes, end_time')
+        .eq('id', params.examId)
+        .single()
+      
+      if (examError) {
+        logger.error('❌ Error fetching exam:', examError)
+        return NextResponse.json(
+          { error: 'Failed to fetch exam details', details: examError.message },
+          { status: 500 }
+        )
+      }
+      
+      // Calculate time remaining
+      const startedAt = new Date(existingSubmission.started_at)
+      const now = new Date()
+      const elapsedMinutes = (now.getTime() - startedAt.getTime()) / (1000 * 60)
+      const timeRemainingSeconds = Math.max(0, (examData.duration_minutes - elapsedMinutes) * 60)
+      
+      logger.log('⏱️ Time calculation:', {
+        startedAt: existingSubmission.started_at,
+        elapsedMinutes: Math.floor(elapsedMinutes),
+        durationMinutes: examData.duration_minutes,
+        timeRemainingSeconds: Math.floor(timeRemainingSeconds)
+      })
+      
       return NextResponse.json({
         success: true,
         submission: {
           id: existingSubmission.id,
           answers: existingSubmission.answers || {},
-          startedAt: existingSubmission.started_at
+          startedAt: existingSubmission.started_at,
+          timeRemainingSeconds: Math.floor(timeRemainingSeconds),
+          is_submitted: existingSubmission.is_submitted
         },
         isNew: false
       })
@@ -144,13 +175,24 @@ export async function POST(
     }
 
     logger.log('✅ Created new submission:', newSubmission.id)
+    
+    // Fetch exam details to get duration for new submission
+    const { data: examData, error: examError } = await supabase
+      .from('exams')
+      .select('duration_minutes')
+      .eq('id', params.examId)
+      .single()
+    
+    const timeRemainingSeconds = examError ? 0 : examData.duration_minutes * 60
 
     return NextResponse.json({
       success: true,
       submission: {
         id: newSubmission.id,
         answers: {},
-        startedAt: newSubmission.started_at
+        startedAt: newSubmission.started_at,
+        timeRemainingSeconds: timeRemainingSeconds,
+        is_submitted: false
       },
       isNew: true
     })

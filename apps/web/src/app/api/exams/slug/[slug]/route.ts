@@ -10,6 +10,45 @@ export async function GET(
   try {
     const supabase = createSupabaseServerClient()
 
+    // First, check if exam exists with this slug
+    const { data: examCheck, error: checkError } = await supabase
+      .from('exams')
+      .select('id, title, slug, is_published')
+      .eq('slug', params.slug)
+
+    logger.log('Exam check for slug:', params.slug, { examCheck, checkError })
+
+    if (checkError) {
+      logger.error('Error checking exam:', checkError)
+      return NextResponse.json(
+        { error: 'Error checking exam', details: checkError.message },
+        { status: 500 }
+      )
+    }
+
+    if (!examCheck || examCheck.length === 0) {
+      return NextResponse.json(
+        { error: 'Exam not found', details: `No exam found with slug: ${params.slug}` },
+        { status: 404 }
+      )
+    }
+
+    if (examCheck.length > 1) {
+      logger.error('Multiple exams with same slug:', examCheck)
+      return NextResponse.json(
+        { error: 'Multiple exams found', details: 'Database integrity issue - duplicate slugs' },
+        { status: 500 }
+      )
+    }
+
+    const examInfo = examCheck[0]
+    if (!examInfo.is_published) {
+      return NextResponse.json(
+        { error: 'Exam not published', details: 'This exam is not yet available' },
+        { status: 403 }
+      )
+    }
+
     // Fetch exam by slug with all related data
     const { data: exam, error: examError } = await supabase
       .from('exams')
@@ -24,6 +63,15 @@ export async function GET(
         duration_minutes,
         total_marks,
         is_published,
+        strict_level,
+        max_tab_switches,
+        max_screen_lock_duration,
+        auto_terminate_on_violations,
+        track_tab_switches,
+        track_screen_locks,
+        detect_vm,
+        require_single_monitor,
+        allow_zoom_changes,
         teacher:users!exams_teacher_id_fkey(full_name),
         exam_sections(
           id,
@@ -139,9 +187,9 @@ export async function GET(
               mcq_question: question.mcq_questions?.[0] ? {
                 question_text: question.mcq_questions[0].question_text,
                 options: question.mcq_questions[0].options.map((opt: any, index: number) => ({
-                  id: index.toString(),
-                  text: opt.text,
-                  isCorrect: question.mcq_questions[0].correct_answers.includes(index.toString())
+                  id: String.fromCharCode(97 + index), // 'a', 'b', 'c', 'd' instead of "0", "1", "2", "3"
+                  text: opt.text || opt,
+                  isCorrect: question.mcq_questions[0].correct_answers.includes(index)
                 })),
                 correct_answers: question.mcq_questions[0].correct_answers,
                 explanation: question.mcq_questions[0].explanation

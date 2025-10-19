@@ -74,6 +74,18 @@ function CreateExamPageContent() {
   const [testCodeType, setTestCodeType] = useState<"permanent" | "rotating">("permanent")
   const [testCodeRotationMinutes, setTestCodeRotationMinutes] = useState(60)
   const [isPublished, setIsPublished] = useState(false)
+  
+  // Monitoring settings
+  const [strictLevel, setStrictLevel] = useState(1)
+  const [maxTabSwitches, setMaxTabSwitches] = useState(3)
+  const [maxScreenLockDuration, setMaxScreenLockDuration] = useState(30)
+  const [autoTerminateOnViolations, setAutoTerminateOnViolations] = useState(false)
+  const [trackTabSwitches, setTrackTabSwitches] = useState(true)
+  const [trackScreenLocks, setTrackScreenLocks] = useState(true)
+  const [detectVm, setDetectVm] = useState(true)
+  const [requireSingleMonitor, setRequireSingleMonitor] = useState(false)
+  const [allowZoomChanges, setAllowZoomChanges] = useState(true)
+  
   const [sections, setSections] = useState<Section[]>([])
   const [activeSection, setActiveSection] = useState<number | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -109,6 +121,17 @@ function CreateExamPageContent() {
       setTestCode(exam.test_code || "")
       setTestCodeType(exam.test_code_type || "permanent")
       setTestCodeRotationMinutes(exam.test_code_rotation_minutes || 60)
+      
+      // Load monitoring settings
+      setStrictLevel(exam.strict_level || 1)
+      setMaxTabSwitches(exam.max_tab_switches || 3)
+      setMaxScreenLockDuration(exam.max_screen_lock_duration || 30)
+      setAutoTerminateOnViolations(exam.auto_terminate_on_violations || false)
+      setTrackTabSwitches(exam.track_tab_switches !== false)
+      setTrackScreenLocks(exam.track_screen_locks !== false)
+      setDetectVm(exam.detect_vm !== false)
+      setRequireSingleMonitor(exam.require_single_monitor || false)
+      setAllowZoomChanges(exam.allow_zoom_changes !== false)
       
       // Format dates for datetime-local inputs
       if (exam.start_time) {
@@ -204,7 +227,8 @@ function CreateExamPageContent() {
                                        id: index,
                                        input: tc.input || "",
                                        expectedOutput: tc.expected_output || "",
-                                       isHidden: tc.is_hidden || false
+                                       isHidden: tc.is_hidden || false,
+                                       weight: tc.weight || 1
                                      })) : []
             } else if (question.type === 'coding') {
               baseQuestion.code = "// Write your code here"
@@ -419,6 +443,15 @@ function CreateExamPageContent() {
           test_code_type: testCodeType,
           test_code_rotation_minutes: testCodeRotationMinutes,
           test_code_last_rotated: testCode ? new Date().toISOString() : null,
+          strict_level: strictLevel,
+          max_tab_switches: maxTabSwitches,
+          max_screen_lock_duration: maxScreenLockDuration,
+          auto_terminate_on_violations: autoTerminateOnViolations,
+          track_tab_switches: trackTabSwitches,
+          track_screen_locks: trackScreenLocks,
+          detect_vm: detectVm,
+          require_single_monitor: requireSingleMonitor,
+          allow_zoom_changes: allowZoomChanges,
           sections: sections.map(section => ({
             name: section.title,
             description: section.description,
@@ -485,6 +518,15 @@ function CreateExamPageContent() {
           test_code_type: testCodeType,
           test_code_rotation_minutes: testCodeRotationMinutes,
           test_code_last_rotated: testCode ? new Date().toISOString() : null,
+          strict_level: strictLevel,
+          max_tab_switches: maxTabSwitches,
+          max_screen_lock_duration: maxScreenLockDuration,
+          auto_terminate_on_violations: autoTerminateOnViolations,
+          track_tab_switches: trackTabSwitches,
+          track_screen_locks: trackScreenLocks,
+          detect_vm: detectVm,
+          require_single_monitor: requireSingleMonitor,
+          allow_zoom_changes: allowZoomChanges,
           sections: sections.map(section => ({
             name: section.title,
             questions: section.questions.map(question => ({
@@ -505,7 +547,8 @@ function CreateExamPageContent() {
                   id: tc.id,
                   input: tc.input,
                   expectedOutput: tc.expectedOutput,
-                  isHidden: tc.isHidden
+                  isHidden: tc.isHidden,
+                  weight: tc.weight || 1
                 }))
               })
             }))
@@ -709,6 +752,21 @@ function CreateExamPageContent() {
                 <div className="space-y-3 mt-2">
                   {(question.testCases || []).map((testCase, index) => (
                     <Card key={testCase.id} className="p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge variant="outline" className="text-xs">
+                          Test Case {index + 1}
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const newTestCases = (question.testCases || []).filter(tc => tc.id !== testCase.id)
+                            updateQuestion(section.id, question.id, { testCases: newTestCases })
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label className="text-xs">Input</Label>
@@ -739,29 +797,42 @@ function CreateExamPageContent() {
                           />
                         </div>
                       </div>
-                      <div className="flex justify-between items-center mt-2">
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            checked={testCase.isHidden}
-                            onCheckedChange={(checked) => {
-                              const newTestCases = (question.testCases || []).map(tc =>
-                                tc.id === testCase.id ? { ...tc, isHidden: checked } : tc
-                              )
-                              updateQuestion(section.id, question.id, { testCases: newTestCases })
-                            }}
-                          />
-                          <Label className="text-xs">Hidden from students</Label>
+                      <div className="flex justify-between items-center mt-3 pt-2 border-t">
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              checked={testCase.isHidden}
+                              onCheckedChange={(checked) => {
+                                const newTestCases = (question.testCases || []).map(tc =>
+                                  tc.id === testCase.id ? { ...tc, isHidden: checked } : tc
+                                )
+                                updateQuestion(section.id, question.id, { testCases: newTestCases })
+                              }}
+                            />
+                            <Label className="text-xs">Hidden</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Label className="text-xs font-medium text-gray-700">Marks if passed:</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={testCase.weight || 1}
+                              onChange={(e) => {
+                                const newTestCases = (question.testCases || []).map(tc =>
+                                  tc.id === testCase.id ? { ...tc, weight: parseInt(e.target.value) || 1 } : tc
+                                )
+                                updateQuestion(section.id, question.id, { testCases: newTestCases })
+                              }}
+                              className="w-16 h-7 text-xs font-semibold text-center"
+                              placeholder="1"
+                            />
+                            <span className="text-xs text-gray-600 font-medium">marks</span>
+                          </div>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            const newTestCases = (question.testCases || []).filter(tc => tc.id !== testCase.id)
-                            updateQuestion(section.id, question.id, { testCases: newTestCases })
-                          }}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
+                        <div className="text-xs text-blue-600 font-medium">
+                          ✓ Pass = +{testCase.weight || 1} marks  |  ✗ Fail = 0 marks
+                        </div>
                       </div>
                     </Card>
                   ))}
@@ -1016,6 +1087,146 @@ function CreateExamPageContent() {
                         </p>
                       </div>
                     </>
+                  )}
+                </div>
+
+                {/* Monitoring & Security Settings */}
+                <div className="space-y-3 pt-3 border-t">
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    <Settings className="w-4 h-4" />
+                    Monitoring & Security
+                  </Label>
+                  
+                  <div>
+                    <Label>Strict Level</Label>
+                    <div className="grid grid-cols-3 gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => setStrictLevel(1)}
+                        className={`p-2 text-xs rounded border ${
+                          strictLevel === 1 
+                            ? 'bg-green-100 border-green-500 text-green-800' 
+                            : 'bg-white border-gray-200'
+                        }`}
+                      >
+                        <div className="font-semibold">Level 1</div>
+                        <div className="text-[10px]">Relaxed</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStrictLevel(2)}
+                        className={`p-2 text-xs rounded border ${
+                          strictLevel === 2 
+                            ? 'bg-yellow-100 border-yellow-500 text-yellow-800' 
+                            : 'bg-white border-gray-200'
+                        }`}
+                      >
+                        <div className="font-semibold">Level 2</div>
+                        <div className="text-[10px]">Medium</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStrictLevel(3)}
+                        className={`p-2 text-xs rounded border ${
+                          strictLevel === 3 
+                            ? 'bg-red-100 border-red-500 text-red-800' 
+                            : 'bg-white border-gray-200'
+                        }`}
+                      >
+                        <div className="font-semibold">Level 3</div>
+                        <div className="text-[10px]">Strict</div>
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {strictLevel === 1 && "Basic monitoring only, no restrictions"}
+                      {strictLevel === 2 && "Active monitoring with warnings"}
+                      {strictLevel === 3 && "Full lockdown with auto-termination"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label>Max Tab Switches</Label>
+                    <Input
+                      type="number"
+                      value={maxTabSwitches}
+                      onChange={(e) => setMaxTabSwitches(parseInt(e.target.value) || 3)}
+                      min="1"
+                      max="10"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Maximum allowed before warnings/termination
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label>Max Screen Lock (seconds)</Label>
+                    <Input
+                      type="number"
+                      value={maxScreenLockDuration}
+                      onChange={(e) => setMaxScreenLockDuration(parseInt(e.target.value) || 30)}
+                      min="10"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Maximum duration before flagged as suspicious
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Track Tab Switches</Label>
+                      <Switch
+                        checked={trackTabSwitches}
+                        onCheckedChange={setTrackTabSwitches}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Track Screen Locks</Label>
+                      <Switch
+                        checked={trackScreenLocks}
+                        onCheckedChange={setTrackScreenLocks}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Detect Virtual Machine</Label>
+                      <Switch
+                        checked={detectVm}
+                        onCheckedChange={setDetectVm}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Require Single Monitor</Label>
+                      <Switch
+                        checked={requireSingleMonitor}
+                        onCheckedChange={setRequireSingleMonitor}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Allow Zoom Changes</Label>
+                      <Switch
+                        checked={allowZoomChanges}
+                        onCheckedChange={setAllowZoomChanges}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Auto-Terminate on Violations</Label>
+                      <Switch
+                        checked={autoTerminateOnViolations}
+                        onCheckedChange={setAutoTerminateOnViolations}
+                      />
+                    </div>
+                  </div>
+
+                  {strictLevel >= 2 && (
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-xs text-yellow-800">
+                        <strong>Monitoring Active:</strong> Students will be monitored for suspicious activity in the Electron app.
+                      </p>
+                    </div>
                   )}
                 </div>
 

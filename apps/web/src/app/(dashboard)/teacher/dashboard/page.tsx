@@ -24,7 +24,8 @@ import {
   Target,
   Activity,
   LogOut,
-  User
+  User,
+  Monitor
 } from 'lucide-react'
 import { StatCard, CourseCard, ActivityItem } from '@/components/common/UIComponents'
 import { useTeacherCourses, useTeacherStats, useTeacherExams, useTeacherActivity } from '@/hooks/useData'
@@ -481,7 +482,7 @@ export default function TeacherDashboard() {
                         <div className="text-sm text-gray-600">
                           Exam ID: {exam.id}
                         </div>
-                        <div className="flex space-x-2">
+                        <div className="flex flex-wrap gap-2">
                           <Button
                             size="sm"
                             variant="outline"
@@ -497,6 +498,15 @@ export default function TeacherDashboard() {
                           >
                             <Edit className="h-4 w-4 mr-2" />
                             Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => router.push(`/teacher/exams/${exam.originalId}/monitoring`)}
+                            className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                          >
+                            <Monitor className="h-4 w-4 mr-2" />
+                            Monitor
                           </Button>
                           <Button
                             size="sm"
