@@ -22,7 +22,8 @@ export default function LoginPage() {
         <LoginForm />
       </Suspense>
       
-      <div className="mt-6 text-center text-sm">
+      {/* Registration disabled - users are created by admin via bulk upload */}
+      {/* <div className="mt-6 text-center text-sm">
         <span className="text-muted-foreground">Don't have an account? </span>
         <Link 
           href="/auth/register" 
@@ -30,7 +31,7 @@ export default function LoginPage() {
         >
           Sign up
         </Link>
-      </div>
+      </div> */}
     </AuthPageLayout>
   )
 }

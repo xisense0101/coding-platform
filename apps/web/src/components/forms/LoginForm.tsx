@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
@@ -31,6 +31,7 @@ export function LoginForm() {
   const { signIn, userProfile } = useAuth()
   const searchParams = useSearchParams()
   const nextParam = searchParams?.get('next') || undefined
+  const errorParam = searchParams?.get('error')
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -40,6 +41,13 @@ export function LoginForm() {
       remember: false,
     },
   })
+
+  // Check for suspended account error
+  useEffect(() => {
+    if (errorParam === 'suspended') {
+      setError('⚠️ Your account has been suspended. Please contact your administrator for assistance.')
+    }
+  }, [errorParam])
 
   const onSubmit = async (values: LoginFormValues) => {
     try {

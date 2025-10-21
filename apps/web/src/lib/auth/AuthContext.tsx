@@ -60,6 +60,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadUserProfile = async (userId: string) => {
     const profile = await getUserProfile(userId)
+    
+    // Check if account is suspended
+    if (profile && !profile.is_active) {
+      logger.warn('Suspended account detected, signing out user')
+      await supabase.auth.signOut()
+      setSession(null)
+      setUser(null)
+      setUserProfile(null)
+      router.replace('/auth/login?error=suspended')
+      return
+    }
+    
     setUserProfile(profile)
   }
 
@@ -178,6 +190,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userProfile = await getUserProfile(data.user.id)
         
         if (userProfile) {
+          // Check if account is suspended
+          if (!userProfile.is_active) {
+            // Sign out the user immediately
+            await supabase.auth.signOut()
+            setSession(null)
+            setUser(null)
+            setUserProfile(null)
+            setIsLoading(false)
+            return { error: { message: 'Your account has been suspended. Please contact your administrator for assistance.' } as AuthError }
+          }
+
           setUserProfile(userProfile)
           
           // Update last login (don't wait for it)

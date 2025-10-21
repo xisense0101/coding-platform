@@ -79,8 +79,8 @@ export default function HomePage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
               <Button asChild size="lg" className="text-lg px-10 py-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transform hover:scale-105 transition-all duration-200 shadow-2xl">
-                <Link href="/auth/register">
-                  Start Free Trial
+                <Link href="/auth/login">
+                  Login to Platform
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
@@ -582,8 +582,8 @@ export default function HomePage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-6 justify-center mb-14">
               <Button size="lg" className="text-xl px-12 py-7 bg-white text-blue-600 hover:bg-gray-100 shadow-2xl transform hover:scale-105 transition-all" asChild>
-                <Link href="/auth/register">
-                  Get Started Now
+                <Link href="/auth/login">
+                  Login Now
                   <ArrowRight className="ml-3 h-6 w-6" />
                 </Link>
               </Button>
@@ -644,7 +644,7 @@ export default function HomePage() {
               <h4 className="font-bold text-lg mb-4 text-white">Product</h4>
               <ul className="space-y-3 text-gray-400">
                 <li><Link href="#features" className="hover:text-blue-400 transition-colors flex items-center gap-2"><ArrowRight className="w-4 h-4" /> Features</Link></li>
-                <li><Link href="/auth/register" className="hover:text-blue-400 transition-colors flex items-center gap-2"><ArrowRight className="w-4 h-4" /> Get Started</Link></li>
+                <li><Link href="/auth/login" className="hover:text-blue-400 transition-colors flex items-center gap-2"><ArrowRight className="w-4 h-4" /> Login</Link></li>
                 <li><Link href="https://github.com/xisense0101/exam-electron/releases" className="hover:text-blue-400 transition-colors flex items-center gap-2"><ArrowRight className="w-4 h-4" /> Download App</Link></li>
                 <li><Link href="#" className="hover:text-blue-400 transition-colors flex items-center gap-2"><ArrowRight className="w-4 h-4" /> Security</Link></li>
               </ul>

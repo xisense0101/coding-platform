@@ -46,7 +46,8 @@ export default function LoginPage() {
               <Suspense fallback={<div>Loading...</div>}>
                 <LoginForm />
               </Suspense>
-              <div className="mt-4 text-center">
+              {/* Registration disabled - users are created by admin via bulk upload */}
+              {/* <div className="mt-4 text-center">
                 <span className="text-muted-foreground">Don't have an account? </span>
                 <Link 
                   href="/auth/register" 
@@ -54,7 +55,7 @@ export default function LoginPage() {
                 >
                   Sign up
                 </Link>
-              </div>
+              </div> */}
               <div className="mt-4 text-center">
                 <Link 
                   href="/auth/forgot-password" 

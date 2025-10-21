@@ -17,7 +17,11 @@ import {
   Copy,
   X,
   Building2,
-  Trash2
+  Trash2,
+  Upload,
+  Download,
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-react'
 import { logger } from '@/lib/utils/logger'
 import Link from 'next/link'
@@ -72,6 +76,7 @@ export default function OrganizationUsersPage() {
   const [roleFilter, setRoleFilter] = useState<string>(roleFromQuery || 'all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const pageSize = 10
@@ -194,10 +199,16 @@ export default function OrganizationUsersPage() {
             </p>
           </div>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create User
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowBulkUploadModal(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Bulk Upload
+          </Button>
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create User
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -348,6 +359,19 @@ export default function OrganizationUsersPage() {
           onClose={() => setShowCreateModal(false)}
           onSuccess={() => {
             setShowCreateModal(false)
+            fetchUsers()
+          }}
+        />
+      )}
+
+      {/* Bulk Upload Modal */}
+      {showBulkUploadModal && (
+        <BulkUploadModal
+          organizationId={organizationId}
+          organizationName={organization.name}
+          onClose={() => setShowBulkUploadModal(false)}
+          onSuccess={() => {
+            setShowBulkUploadModal(false)
             fetchUsers()
           }}
         />
@@ -601,6 +625,383 @@ function CreateUserModal({
               </Button>
               <Button type="submit" disabled={loading}>
                 {loading ? 'Creating...' : 'Create User'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function BulkUploadModal({
+  organizationId,
+  organizationName,
+  onClose,
+  onSuccess
+}: {
+  organizationId: string
+  organizationName: string
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [file, setFile] = useState<File | null>(null)
+  const [sendEmails, setSendEmails] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [result, setResult] = useState<any>(null)
+  const [dragActive, setDragActive] = useState(false)
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true)
+    } else if (e.type === 'dragleave') {
+      setDragActive(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const droppedFile = e.dataTransfer.files[0]
+      if (droppedFile.name.endsWith('.csv')) {
+        setFile(droppedFile)
+      } else {
+        alert('Please upload a CSV file')
+      }
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0])
+    }
+  }
+
+  const downloadTemplate = () => {
+    const template = `full_name,email,role,student_id,employee_id,department,specialization
+John Doe,john@example.com,student,STU001,,Computer Science,Software Engineering
+Jane Smith,jane@example.com,teacher,,EMP001,Mathematics,"Algebra, Calculus"
+Admin User,admin@example.com,admin,,,,`
+
+    const blob = new Blob([template], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'bulk-users-template.csv'
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!file) {
+      alert('Please select a CSV file')
+      return
+    }
+
+    setUploading(true)
+    setResult(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('sendEmails', sendEmails.toString())
+
+      const response = await fetch(`/api/admin/organizations/${organizationId}/users/bulk`, {
+        method: 'POST',
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        // Show detailed validation errors if available
+        if (data.validationErrors && data.validationErrors.length > 0) {
+          const errorMessages = data.validationErrors.join('\n')
+          alert(`❌ CSV Validation Failed:\n\n${errorMessages}`)
+        } else {
+          alert('❌ ' + (data.error || 'Failed to upload users'))
+        }
+        setUploading(false)
+        return
+      }
+
+      setResult(data)
+    } catch (error: any) {
+      logger.error('Error uploading users:', error)
+      alert('❌ ' + (error.message || 'Failed to upload users'))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleFinish = () => {
+    setResult(null)
+    setFile(null)
+    onSuccess()
+  }
+
+  if (result) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  {result.success ? (
+                    <>
+                      <CheckCircle2 className="h-6 w-6 text-green-600" />
+                      <span className="text-green-600">Bulk Upload Complete</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="h-6 w-6 text-red-600" />
+                      <span className="text-red-600">Bulk Upload Failed</span>
+                    </>
+                  )}
+                </CardTitle>
+                <CardDescription>Results of the bulk user creation</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Summary */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 bg-blue-50 rounded-lg text-center">
+                <div className="text-2xl font-bold text-blue-600">{result.total}</div>
+                <div className="text-sm text-blue-800">Total Rows</div>
+              </div>
+              <div className="p-4 bg-green-50 rounded-lg text-center">
+                <div className="text-2xl font-bold text-green-600">{result.created}</div>
+                <div className="text-sm text-green-800">Created</div>
+              </div>
+              <div className="p-4 bg-red-50 rounded-lg text-center">
+                <div className="text-2xl font-bold text-red-600">{result.failed}</div>
+                <div className="text-sm text-red-800">Failed</div>
+              </div>
+              {sendEmails && (
+                <div className="p-4 bg-purple-50 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-purple-600">{result.emailsSent}</div>
+                  <div className="text-sm text-purple-800">Emails Sent</div>
+                </div>
+              )}
+            </div>
+
+            {/* Email status */}
+            {sendEmails && result.emailsSent > 0 && (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2 text-green-800">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <strong>Credentials sent via email</strong>
+                </div>
+                <p className="text-sm text-green-700 mt-1">
+                  {result.emailsSent} user(s) received their login credentials via email.
+                  {result.emailsFailed > 0 && ` ${result.emailsFailed} email(s) failed to send.`}
+                </p>
+              </div>
+            )}
+
+            {/* Errors */}
+            {result.errors && result.errors.length > 0 && (
+              <div>
+                <h3 className="font-medium text-red-600 mb-2">Errors ({result.errors.length})</h3>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {result.errors.map((error: any, index: number) => (
+                    <div key={index} className="p-3 bg-red-50 border border-red-200 rounded text-sm">
+                      <div className="font-medium text-red-800">Row {error.row}: {error.email}</div>
+                      <div className="text-red-600">{error.error}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Validation errors */}
+            {result.validationErrors && result.validationErrors.length > 0 && (
+              <div>
+                <h3 className="font-medium text-red-600 mb-2">Validation Errors</h3>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {result.validationErrors.map((error: string, index: number) => (
+                    <div key={index} className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                      {error}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Button onClick={handleFinish} className="w-full">
+              {result.success ? 'Done' : 'Close'}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Bulk Upload Users</CardTitle>
+              <CardDescription>Upload a CSV file to create multiple users at once</CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Instructions */}
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="font-medium text-blue-900 mb-2">📋 Instructions:</h3>
+              <ol className="list-decimal ml-4 space-y-1 text-sm text-blue-800">
+                <li>Download the CSV template below</li>
+                <li>Fill in user details following the format</li>
+                <li>Upload the completed CSV file</li>
+                <li>Choose whether to send email notifications</li>
+                <li>Click "Upload Users" to process</li>
+              </ol>
+            </div>
+
+            {/* CSV Format */}
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <h3 className="font-medium mb-2">CSV Format:</h3>
+              <div className="text-sm space-y-2">
+                <p><strong>Required columns:</strong> full_name, email, role</p>
+                <p><strong>Optional columns:</strong> student_id, employee_id, department, specialization</p>
+                <p><strong>Valid roles:</strong> student, teacher, admin</p>
+                <ul className="list-disc ml-5 mt-2 space-y-1 text-gray-600">
+                  <li><strong>Students:</strong> Can include student_id, department, specialization</li>
+                  <li><strong>Teachers:</strong> Can include employee_id, department, specialization</li>
+                  <li><strong>Admins:</strong> Only need full_name, email, and role</li>
+                  <li><strong>Specialization:</strong> For multiple values, separate with commas</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Download Template */}
+            <Button type="button" variant="outline" onClick={downloadTemplate} className="w-full">
+              <Download className="h-4 w-4 mr-2" />
+              Download CSV Template
+            </Button>
+
+            {/* File Upload */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Upload CSV File</label>
+              <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  dragActive 
+                    ? 'border-primary bg-primary/5' 
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+              >
+                <Upload className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+                {file ? (
+                  <div>
+                    <p className="font-medium text-green-600">✓ {file.name}</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {(file.size / 1024).toFixed(2)} KB
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setFile(null)}
+                      className="mt-2"
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-gray-600 mb-2">
+                      Drag and drop your CSV file here, or click to browse
+                    </p>
+                    <Input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      id="csv-upload"
+                    />
+                    <label htmlFor="csv-upload">
+                      <Button type="button" variant="secondary" size="sm" asChild>
+                        <span>Browse Files</span>
+                      </Button>
+                    </label>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Email Option */}
+            <div className="flex items-start gap-3 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="sendEmails"
+                checked={sendEmails}
+                onChange={(e) => setSendEmails(e.target.checked)}
+                className="mt-1"
+              />
+              <label htmlFor="sendEmails" className="text-sm flex-1 cursor-pointer">
+                <strong className="text-purple-900">Send credentials via email</strong>
+                <p className="text-purple-700 mt-1">
+                  If enabled, each user will receive an email with their login credentials and a temporary password.
+                  They will be prompted to change their password on first login.
+                </p>
+              </label>
+            </div>
+
+            {/* Important Note */}
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <strong className="text-yellow-900">Important:</strong>
+                  <p className="text-yellow-800 mt-1">
+                    Random passwords will be generated for all users. If you don't enable email notifications,
+                    you won't be able to see the passwords after creation. Make sure email notifications are
+                    enabled or have another way to communicate credentials to users.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Submit */}
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={onClose} disabled={uploading}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={uploading || !file}>
+                {uploading ? (
+                  <>
+                    <span className="animate-spin mr-2">⏳</span>
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Users
+                  </>
+                )}
               </Button>
             </div>
           </form>
