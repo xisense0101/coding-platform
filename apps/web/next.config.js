@@ -9,7 +9,8 @@ const nextConfig = {
   experimental: {
     // Disable typedRoutes temporarily to avoid build errors with missing routes
     // typedRoutes: true,
-    optimizeCss: true,
+    // Disabled optimizeCss for Vercel deployment (requires critters package)
+    // optimizeCss: true,
   },
   
   // Optimize module imports for better tree-shaking
