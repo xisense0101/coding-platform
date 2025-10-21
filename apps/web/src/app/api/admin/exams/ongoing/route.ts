@@ -23,7 +23,18 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (profileError || !userProfile || !['admin', 'super_admin'].includes(userProfile.role)) {
+      logger.error('Profile error or unauthorized:', profileError, userProfile)
       return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 })
+    }
+
+    // If user has no organization, return empty results
+    if (!userProfile.organization_id) {
+      logger.warn('User has no organization_id:', user.id)
+      return NextResponse.json({
+        exams: [],
+        total: 0,
+        message: 'No organization assigned to user'
+      }, { status: 200 })
     }
 
     const now = new Date().toISOString()

@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { LoadingSpinner } from '@/components/common/LoadingStates'
 import {
   Users,
   UserPlus,
@@ -22,6 +24,7 @@ import {
 } from 'lucide-react'
 import { logger } from '@/lib/utils/logger'
 import Link from 'next/link'
+import { supabase } from '@/lib/database/supabase'
 
 interface User {
   id: string
@@ -37,8 +40,10 @@ interface User {
 }
 
 export default function AdminUsersPage() {
+  const router = useRouter()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<'all' | 'student' | 'teacher'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
@@ -50,9 +55,46 @@ export default function AdminUsersPage() {
     totalPages: 0
   })
 
+  // Check if user is super_admin, redirect regular admins to their organization
   useEffect(() => {
-    fetchUsers()
-  }, [roleFilter, statusFilter, pagination.page])
+    const checkRole = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (user) {
+          const { data: profile } = await supabase
+            .from('users')
+            .select('role, organization_id')
+            .eq('id', user.id)
+            .single() as { data: { role: string; organization_id: string } | null }
+          
+          // Regular admins should use organization-scoped user management
+          if (profile?.role === 'admin' && profile?.organization_id) {
+            router.replace(`/admin/organizations/${profile.organization_id}/users`)
+            return
+          }
+          
+          // Only super_admin can access this page
+          if (profile?.role !== 'super_admin') {
+            router.replace('/admin/dashboard')
+            return
+          }
+        }
+      } catch (error) {
+        logger.error('Error checking role:', error)
+      } finally {
+        setCheckingAuth(false)
+      }
+    }
+    
+    checkRole()
+  }, [router])
+
+  useEffect(() => {
+    if (!checkingAuth) {
+      fetchUsers()
+    }
+  }, [roleFilter, statusFilter, pagination.page, checkingAuth])
 
   const fetchUsers = async () => {
     try {
@@ -122,6 +164,11 @@ export default function AdminUsersPage() {
       logger.error('Error deleting user:', error)
       alert('❌ ' + (error.message || 'Failed to delete user'))
     }
+  }
+
+  // Show loading while checking authorization
+  if (checkingAuth) {
+    return <LoadingSpinner message="Loading..." />
   }
 
   return (
@@ -350,16 +397,36 @@ function CreateUserModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   const [formData, setFormData] = useState({
     email: '',
     full_name: '',
-    role: 'student' as 'student' | 'teacher',
+    role: 'student' as 'student' | 'teacher' | 'admin',
     password: '',
     student_id: '',
     employee_id: '',
     department: '',
-    specialization: ''
+    specialization: '',
+    organization_id: ''
   })
   const [loading, setLoading] = useState(false)
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
+  const [organizations, setOrganizations] = useState<Array<{id: string, name: string}>>([])
+  const [currentUserRole, setCurrentUserRole] = useState<string>('')
+
+  useEffect(() => {
+    // Fetch organizations if super admin
+    fetchOrganizations()
+  }, [])
+
+  const fetchOrganizations = async () => {
+    try {
+      const response = await fetch('/api/admin/organizations')
+      if (response.ok) {
+        const data = await response.json()
+        setOrganizations(data.organizations || [])
+      }
+    } catch (error) {
+      logger.error('Error fetching organizations:', error)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -523,8 +590,29 @@ function CreateUserModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                 >
                   <option value="student">Student</option>
                   <option value="teacher">Teacher</option>
+                  <option value="admin">Admin</option>
                 </select>
               </div>
+              {organizations.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium">Organization</label>
+                  <select
+                    value={formData.organization_id}
+                    onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md bg-background"
+                  >
+                    <option value="">Use current organization</option>
+                    {organizations.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Super admins can assign users to any organization
+                  </p>
+                </div>
+              )}
               {formData.role === 'student' && (
                 <div>
                   <label className="text-sm font-medium">Student ID</label>

@@ -137,7 +137,8 @@ export async function POST(request: NextRequest) {
       employee_id,
       department,
       specialization,
-      password: providedPassword
+      password: providedPassword,
+      organization_id: providedOrgId
     } = body
 
     // Generate random password if not provided
@@ -151,10 +152,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!['student', 'teacher'].includes(role)) {
+    if (!['student', 'teacher', 'admin'].includes(role)) {
       return NextResponse.json(
-        { error: 'Invalid role. Must be student or teacher' },
+        { error: 'Invalid role. Must be student, teacher, or admin' },
         { status: 400 }
+      )
+    }
+
+    // Determine organization_id: use provided one if super_admin, otherwise use current user's org
+    let targetOrgId = userProfile.organization_id
+    if (userProfile.role === 'super_admin' && providedOrgId) {
+      // Super admin can create users in any organization
+      targetOrgId = providedOrgId
+    } else if (userProfile.role !== 'super_admin' && providedOrgId && providedOrgId !== userProfile.organization_id) {
+      // Regular admin can only create users in their own organization
+      return NextResponse.json(
+        { error: 'You can only create users in your own organization' },
+        { status: 403 }
       )
     }
 
@@ -181,7 +195,7 @@ export async function POST(request: NextRequest) {
     // Create user profile
     const userData: any = {
       id: authData.user.id,
-      organization_id: userProfile.organization_id,
+      organization_id: targetOrgId,
       email,
       full_name,
       role,

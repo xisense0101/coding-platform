@@ -17,7 +17,8 @@ import {
   UserCheck,
   FileText,
   TrendingUp,
-  Clock
+  Clock,
+  Building2
 } from 'lucide-react'
 import { logger } from '@/lib/utils/logger'
 
@@ -66,15 +67,15 @@ export default function AdminDashboard() {
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">System Administration</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Super Admin Dashboard</h2>
           <p className="text-muted-foreground">
-            Monitor platform health, manage users, and oversee system operations.
+            Manage organizations and monitor platform-wide metrics. Select an organization to manage users and resources.
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm">
-            <Activity className="h-4 w-4 mr-2" />
-            System Health
+          <Button variant="outline" size="sm" onClick={() => window.location.href = '/admin/organizations'}>
+            <Building2 className="h-4 w-4 mr-2" />
+            Manage Organizations
           </Button>
           <Button size="sm">
             <Settings className="h-4 w-4 mr-2" />
@@ -134,6 +135,31 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Organizations Quick Access */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Organizations</CardTitle>
+              <CardDescription>
+                Select an organization to manage users, courses, exams, and settings
+              </CardDescription>
+            </div>
+            <Button onClick={() => window.location.href = '/admin/organizations'}>
+              <Building2 className="h-4 w-4 mr-2" />
+              View All Organizations
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">
+            Click on any organization to access user management, exam monitoring, course administration, 
+            and organization-specific settings. All administrative tasks are performed within the context 
+            of a selected organization.
+          </p>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
         {/* Recent System Events */}
@@ -232,60 +258,16 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* User Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle>User Management</CardTitle>
-            <CardDescription>
-              Quick access to user administration tasks.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <Button 
-                variant="outline" 
-                className="justify-start h-auto p-3"
-                onClick={() => window.location.href = '/admin/users?role=student'}
-              >
-                <div className="text-left">
-                  <div className="font-medium">Students</div>
-                  <div className="text-sm text-muted-foreground">{stats.activeStudents} active</div>
-                </div>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="justify-start h-auto p-3"
-                onClick={() => window.location.href = '/admin/users?role=teacher'}
-              >
-                <div className="text-left">
-                  <div className="font-medium">Teachers</div>
-                  <div className="text-sm text-muted-foreground">{stats.activeTeachers} active</div>
-                </div>
-              </Button>
-            </div>
-            <Button 
-              variant="outline" 
-              className="w-full justify-start h-auto p-3"
-              onClick={() => window.location.href = '/admin/users'}
-            >
-              <div className="text-left">
-                <div className="font-medium">All Users</div>
-                <div className="text-sm text-muted-foreground">Manage all users in your organization</div>
-              </div>
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Platform Statistics */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Platform Statistics</CardTitle>
-            <CardDescription>
-              Key performance metrics for the platform.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      {/* Platform Statistics */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Platform-Wide Statistics</CardTitle>
+          <CardDescription>
+            Overview of all organizations and platform health
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <FileText className="h-4 w-4 text-blue-600" />
@@ -314,37 +296,7 @@ export default function AdminDashboard() {
               </div>
               <span className="text-sm font-medium">{loading ? '...' : stats.dailyActiveUsers.toLocaleString()}</span>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Exam Monitoring */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Exam Monitoring</CardTitle>
-          <CardDescription>
-            Monitor ongoing exams and student activities in real-time.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between p-4 bg-accent/50 rounded-lg mb-4">
-            <div className="flex items-center space-x-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-                <Activity className="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="font-semibold text-lg">{loading ? '...' : stats.ongoingExams} Ongoing Exams</p>
-                <p className="text-sm text-muted-foreground">Active exams requiring monitoring</p>
-              </div>
-            </div>
-            <Button onClick={() => window.location.href = '/admin/exams/ongoing'}>
-              View All
-            </Button>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Access real-time monitoring dashboards for each exam to track student progress, 
-            detect violations, and ensure exam integrity.
-          </p>
         </CardContent>
       </Card>
     </div>

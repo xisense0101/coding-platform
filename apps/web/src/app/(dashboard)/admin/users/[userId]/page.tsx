@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { LoadingSpinner } from '@/components/common/LoadingStates'
 import {
   ArrowLeft,
   Mail,
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react'
 import { logger } from '@/lib/utils/logger'
 import Link from 'next/link'
+import { supabase } from '@/lib/database/supabase'
 
 interface UserDetail {
   user: any
@@ -44,10 +46,48 @@ export default function AdminUserDetailPage() {
 
   const [userData, setUserData] = useState<UserDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [checkingAuth, setCheckingAuth] = useState(true)
+
+  // Check if user is super_admin, redirect regular admins
+  useEffect(() => {
+    const checkRole = async () => {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        
+        if (authUser) {
+          const { data: profile } = await supabase
+            .from('users')
+            .select('role, organization_id')
+            .eq('id', authUser.id)
+            .single() as { data: { role: string; organization_id: string } | null }
+          
+          // Regular admins should use organization-scoped user detail
+          if (profile?.role === 'admin' && profile?.organization_id) {
+            router.replace(`/admin/organizations/${profile.organization_id}/users/${userId}`)
+            return
+          }
+          
+          // Only super_admin can access this page
+          if (profile?.role !== 'super_admin') {
+            router.replace('/admin/dashboard')
+            return
+          }
+        }
+      } catch (error) {
+        logger.error('Error checking role:', error)
+      } finally {
+        setCheckingAuth(false)
+      }
+    }
+    
+    checkRole()
+  }, [router, userId])
 
   useEffect(() => {
-    fetchUserDetail()
-  }, [userId])
+    if (!checkingAuth) {
+      fetchUserDetail()
+    }
+  }, [userId, checkingAuth])
 
   const fetchUserDetail = async () => {
     try {
@@ -112,14 +152,8 @@ export default function AdminUserDetailPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex-1 space-y-6 p-8 pt-6">
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Loading user details...</p>
-        </div>
-      </div>
-    )
+  if (checkingAuth || loading) {
+    return <LoadingSpinner message="Loading user details..." />
   }
 
   if (!userData) {
