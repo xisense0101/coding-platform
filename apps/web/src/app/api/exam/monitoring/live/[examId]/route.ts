@@ -101,7 +101,12 @@ export async function GET(
         event_type,
         severity,
         event_message,
-        event_timestamp
+        event_timestamp,
+        app_version,
+        os_platform,
+        is_vm,
+        vm_details,
+        monitor_count
       `)
       .eq('exam_id', params.examId)
       .gte('event_timestamp', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // Last hour
@@ -114,6 +119,14 @@ export async function GET(
       const studentViolations = recentViolations?.filter(v => v.exam_submission_id === submission.id) || []
       const studentFlags = flags?.filter(f => f.exam_submission_id === submission.id) || []
       const studentEvents = recentEvents?.filter(e => e.exam_submission_id === submission.id) || []
+
+      // Get the most recent event to extract app version and OS platform
+      const mostRecentEvent = studentEvents[0]
+      const appVersion = mostRecentEvent?.app_version || null
+      const osPlatform = mostRecentEvent?.os_platform || null
+      const isVm = mostRecentEvent?.is_vm || false
+      const vmDetails = mostRecentEvent?.vm_details || null
+      const monitorCount = mostRecentEvent?.monitor_count || 1
 
       return {
         submission,
@@ -131,7 +144,15 @@ export async function GET(
         status: submission.is_submitted ? 'completed' : 'in_progress',
         riskLevel: studentMetrics?.risk_level || 'low',
         violationCount: studentViolations.length,
-        flagCount: studentFlags.length
+        flagCount: studentFlags.length,
+        // System information from Electron app
+        systemInfo: {
+          appVersion,
+          osPlatform,
+          isVm,
+          vmDetails,
+          monitorCount
+        }
       }
     })
 

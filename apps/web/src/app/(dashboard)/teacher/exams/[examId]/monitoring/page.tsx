@@ -49,6 +49,13 @@ interface StudentMonitoringData {
   riskLevel: string
   violationCount: number
   flagCount: number
+  systemInfo: {
+    appVersion: string | null
+    osPlatform: string | null
+    isVm: boolean
+    vmDetails: string | null
+    monitorCount: number
+  }
 }
 
 interface LiveMonitoringData {
@@ -120,6 +127,77 @@ export default function ExamMonitoringPage() {
 
   const getStatusColor = (status: string) => {
     return status === 'completed' ? 'text-blue-600' : 'text-green-600'
+  }
+
+  const getViolationTypeLabel = (violationType: string) => {
+    const labels: Record<string, string> = {
+      'forbidden_process_detected': 'Forbidden Process',
+      'multi_monitor_usage': 'Multiple Displays',
+      'prolonged_screen_lock': 'Screen Lock',
+      'excessive_tab_switching': 'Tab Switch / Window Blur',
+      'vm_usage_detected': 'Virtual Machine',
+      'recording_failure': 'Recording Failure',
+      'monitoring_app_failure': 'Monitoring App Failure',
+      'suspicious_behavior': 'Suspicious Behavior',
+      'copy_paste_detected': 'Copy/Paste Detected',
+      'unauthorized_application': 'Unauthorized App'
+    }
+    return labels[violationType] || violationType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  }
+
+  const getEventTypeLabel = (eventType: string) => {
+    const labels: Record<string, string> = {
+      'exam_started': 'Exam Started',
+      'exam_submitted': 'Exam Submitted',
+      'exam_terminated': 'Exam Terminated',
+      'tab_switched_out': 'Tab Switched Out',
+      'tab_switched_in': 'Tab Switched In',
+      'screen_locked': 'Screen Locked',
+      'screen_unlocked': 'Screen Unlocked',
+      'window_minimized': 'Window Minimized',
+      'window_restored': 'Window Restored',
+      'window_blur': 'Window Lost Focus',
+      'window_focus': 'Window Focused',
+      'multi_monitor_detected': 'Multiple Monitors Detected',
+      'vm_detected': 'Virtual Machine Detected',
+      'copy_attempt': 'Copy Attempt',
+      'paste_attempt': 'Paste Attempt',
+      'right_click': 'Right Click',
+      'keyboard_shortcut': 'Keyboard Shortcut',
+      'zoom_changed': 'Zoom Changed',
+      'network_disconnected': 'Network Disconnected',
+      'network_reconnected': 'Network Reconnected',
+      'page_reload': 'Page Reload',
+      'browser_devtools_opened': 'DevTools Opened',
+      'suspicious_activity': 'Suspicious Activity',
+      'violation_threshold_reached': 'Violation Threshold Reached',
+      'custom_event': 'Custom Event'
+    }
+    return labels[eventType] || eventType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  }
+
+  const getViolationIcon = (violationType: string) => {
+    switch (violationType) {
+      case 'forbidden_process_detected':
+      case 'unauthorized_application':
+        return '🚫'
+      case 'multi_monitor_usage':
+        return '🖥️'
+      case 'prolonged_screen_lock':
+        return '🔒'
+      case 'excessive_tab_switching':
+      case 'window_blur':
+        return '↔️'
+      case 'vm_usage_detected':
+        return '💻'
+      case 'recording_failure':
+      case 'monitoring_app_failure':
+        return '⚠️'
+      case 'copy_paste_detected':
+        return '📋'
+      default:
+        return '⚠️'
+    }
   }
 
   if (loading) {
@@ -345,9 +423,22 @@ export default function ExamMonitoringPage() {
                               )}
                             </div>
                             <p className="text-sm text-slate-600">{student.submission.student_email}</p>
-                            {student.submission.ip_address && (
-                              <p className="text-xs text-slate-500 mt-1">IP: {student.submission.ip_address}</p>
-                            )}
+                            <div className="flex gap-3 mt-1 text-xs text-slate-500">
+                              {student.submission.ip_address && (
+                                <span>IP: {student.submission.ip_address}</span>
+                              )}
+                              {student.systemInfo.appVersion && (
+                                <span>App: v{student.systemInfo.appVersion}</span>
+                              )}
+                              {student.systemInfo.osPlatform && (
+                                <span className="capitalize">
+                                  Device: {student.systemInfo.osPlatform === 'win32' ? 'Windows' : 
+                                          student.systemInfo.osPlatform === 'darwin' ? 'macOS' : 
+                                          student.systemInfo.osPlatform === 'linux' ? 'Linux' : 
+                                          student.systemInfo.osPlatform}
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           <div className="flex items-center gap-6">
@@ -467,6 +558,130 @@ export default function ExamMonitoringPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {/* System Information */}
+                <div>
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <Monitor className="h-4 w-4" />
+                    System Information
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <div>
+                      <p className="text-xs text-slate-600 mb-1">Email</p>
+                      <p className="text-sm font-medium text-slate-900">
+                        {selectedStudent.submission.student_email}
+                      </p>
+                    </div>
+                    {selectedStudent.submission.roll_number && (
+                      <div>
+                        <p className="text-xs text-slate-600 mb-1">Roll Number</p>
+                        <p className="text-sm font-medium text-slate-900">
+                          {selectedStudent.submission.roll_number}
+                        </p>
+                      </div>
+                    )}
+                    {selectedStudent.submission.student_section && (
+                      <div>
+                        <p className="text-xs text-slate-600 mb-1">Section</p>
+                        <p className="text-sm font-medium text-slate-900">
+                          {selectedStudent.submission.student_section}
+                        </p>
+                      </div>
+                    )}
+                    {selectedStudent.submission.ip_address && (
+                      <div>
+                        <p className="text-xs text-slate-600 mb-1">IP Address</p>
+                        <p className="text-sm font-medium text-slate-900 font-mono">
+                          {selectedStudent.submission.ip_address}
+                        </p>
+                      </div>
+                    )}
+                    {selectedStudent.systemInfo.appVersion && (
+                      <div>
+                        <p className="text-xs text-slate-600 mb-1">App Version</p>
+                        <p className="text-sm font-medium text-slate-900">
+                          v{selectedStudent.systemInfo.appVersion}
+                        </p>
+                      </div>
+                    )}
+                    {selectedStudent.systemInfo.osPlatform && (
+                      <div>
+                        <p className="text-xs text-slate-600 mb-1">Operating System</p>
+                        <p className="text-sm font-medium text-slate-900">
+                          {selectedStudent.systemInfo.osPlatform === 'win32' ? 'Windows' : 
+                           selectedStudent.systemInfo.osPlatform === 'darwin' ? 'macOS' : 
+                           selectedStudent.systemInfo.osPlatform === 'linux' ? 'Linux' : 
+                           selectedStudent.systemInfo.osPlatform}
+                        </p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-xs text-slate-600 mb-1">Monitor Count</p>
+                      <p className="text-sm font-medium text-slate-900">
+                        {selectedStudent.systemInfo.monitorCount} {selectedStudent.systemInfo.monitorCount === 1 ? 'Display' : 'Displays'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 mb-1">Virtual Machine</p>
+                      <p className={cn("text-sm font-medium", selectedStudent.systemInfo.isVm ? "text-red-600" : "text-green-600")}>
+                        {selectedStudent.systemInfo.isVm ? 'Detected' : 'Not Detected'}
+                      </p>
+                    </div>
+                    {selectedStudent.systemInfo.isVm && selectedStudent.systemInfo.vmDetails && (
+                      <div className="col-span-2 md:col-span-3">
+                        <p className="text-xs text-slate-600 mb-1">VM Details</p>
+                        <p className="text-sm font-medium text-red-600">
+                          {selectedStudent.systemInfo.vmDetails}
+                        </p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-xs text-slate-600 mb-1">Exam Started</p>
+                      <p className="text-sm font-medium text-slate-900">
+                        {selectedStudent.submission.started_at 
+                          ? new Date(selectedStudent.submission.started_at).toLocaleString()
+                          : 'N/A'}
+                      </p>
+                    </div>
+                    {selectedStudent.submission.submitted_at && (
+                      <div>
+                        <p className="text-xs text-slate-600 mb-1">Exam Submitted</p>
+                        <p className="text-sm font-medium text-slate-900">
+                          {new Date(selectedStudent.submission.submitted_at).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Violation Summary */}
+                {selectedStudent.violations.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-3 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                      Violation Summary
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {Object.entries(
+                        selectedStudent.violations.reduce((acc: any, violation: any) => {
+                          const type = violation.violation_type
+                          acc[type] = (acc[type] || 0) + 1
+                          return acc
+                        }, {})
+                      ).map(([type, count]) => (
+                        <div key={type} className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-base">{getViolationIcon(type)}</span>
+                            <p className="text-xs font-semibold text-red-800">
+                              {getViolationTypeLabel(type)}
+                            </p>
+                          </div>
+                          <p className="text-2xl font-bold text-red-600">{count as number}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <h4 className="font-semibold mb-2">Recent Events</h4>
                   <ScrollArea className="h-64">
@@ -483,7 +698,7 @@ export default function ExamMonitoringPage() {
                                 event.severity === 'warning' ? 'default' : 'secondary'
                               }
                             >
-                              {event.event_type}
+                              {getEventTypeLabel(event.event_type)}
                             </Badge>
                             <span className="text-xs text-slate-600">
                               {new Date(event.event_timestamp).toLocaleTimeString()}
@@ -501,22 +716,44 @@ export default function ExamMonitoringPage() {
 
                 {selectedStudent.violations.length > 0 && (
                   <div>
-                    <h4 className="font-semibold mb-2 text-red-600">Violations</h4>
+                    <h4 className="font-semibold mb-2 text-red-600 flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5" />
+                      Violations ({selectedStudent.violations.length})
+                    </h4>
                     <div className="space-y-2">
                       {selectedStudent.violations.map((violation: any) => (
                         <div
                           key={violation.id}
-                          className="p-3 border-2 border-red-200 bg-red-50 rounded-lg"
+                          className="p-4 border-2 border-red-200 bg-red-50 rounded-lg"
                         >
-                          <div className="flex items-center justify-between mb-1">
-                            <Badge variant="destructive">
-                              {violation.violation_type}
-                            </Badge>
-                            <span className="text-xs text-red-600">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{getViolationIcon(violation.violation_type)}</span>
+                              <Badge variant="destructive" className="text-sm">
+                                {getViolationTypeLabel(violation.violation_type)}
+                              </Badge>
+                              <Badge 
+                                variant="outline"
+                                className={cn(
+                                  "text-xs",
+                                  violation.violation_severity === 'critical' ? "border-red-600 text-red-600" :
+                                  violation.violation_severity === 'warning' ? "border-orange-600 text-orange-600" :
+                                  "border-yellow-600 text-yellow-600"
+                                )}
+                              >
+                                {violation.violation_severity.toUpperCase()}
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-red-600 font-medium">
                               {new Date(violation.violation_timestamp).toLocaleString()}
                             </span>
                           </div>
                           <p className="text-sm text-red-800 font-semibold">{violation.violation_message}</p>
+                          {violation.violation_details && (
+                            <div className="mt-2 text-xs text-red-700 bg-red-100 p-2 rounded">
+                              <strong>Details:</strong> {JSON.stringify(violation.violation_details, null, 2)}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
