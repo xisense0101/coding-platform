@@ -2,10 +2,19 @@
   "name": "coding-platform",
   "version": "1.0.0",
   "private": true,
-  "packageManager": "npm@9.0.0",
+  "engines": {
+    "node": ">=18.17.0",
+    "npm": ">=9.0.0"
+  },
   "workspaces": [
     "apps/*"
   ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check"
+  },
   "devDependencies": {
     "turbo": "^1.13.4"
   },
