@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle, Lock, User, Mail, Hash, Shield, Info } from 'lucide-react'
+import { AlertCircle, Lock, User, Mail, Hash, Shield, Info, GraduationCap, KeyRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import { logger } from '@/lib/utils/logger'
@@ -169,262 +169,261 @@ export default function StudentAuthModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-purple-900/95 via-purple-800/95 to-indigo-900/95 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
-      <Card className="w-full max-w-2xl shadow-2xl border-purple-200/20 bg-white/95 backdrop-blur">
-        <CardHeader className="space-y-3 pb-6">
-          <div className="flex items-center justify-center">
-            <div className="p-3 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl shadow-lg">
-              <Shield className="h-8 w-8 text-white" />
-            </div>
-          </div>
-          <CardTitle className="text-center text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-            Student Authentication Required
-          </CardTitle>
-          <CardDescription className="text-center text-base">
-            Please provide your details to access<br />
-            <strong className="text-purple-700 font-semibold">{examTitle}</strong>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-8 pb-8">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Roll Number */}
-            <div className="space-y-2">
-              <Label htmlFor="rollNumber" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <div className="p-1.5 bg-purple-100 rounded-lg">
-                  <Hash className="h-4 w-4 text-purple-600" />
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-6xl">
+        {/* Main Card with Two Columns */}
+        <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-xl overflow-hidden animate-in fade-in slide-in-from-bottom duration-500">
+          <div className="grid grid-cols-1 lg:grid-cols-2">
+            {/* Left Side - Login Form */}
+            <CardContent className="p-8 md:p-12">
+              <div className="mb-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl shadow-lg mb-4">
+                  <GraduationCap className="w-8 h-8 text-white" />
                 </div>
-                Roll Number
-                <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="rollNumber"
-                type="text"
-                placeholder="e.g., 2021CS001"
-                value={formData.rollNumber}
-                onChange={(e) => handleChange('rollNumber', e.target.value)}
-                className={cn(
-                  "h-12 text-base transition-all duration-200 border-2",
-                  errors.rollNumber 
-                    ? 'border-red-400 focus:border-red-500 focus:ring-red-200' 
-                    : 'border-gray-200 focus:border-purple-400 focus:ring-purple-100'
-                )}
-              />
-              {errors.rollNumber && (
-                <p className="text-sm text-red-600 mt-1.5 flex items-center gap-1.5 animate-in slide-in-from-top-1">
-                  <AlertCircle className="h-4 w-4" />
-                  {errors.rollNumber}
+                <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                  Student Login
+                </h2>
+                <p className="text-gray-600">
+                  Enter your details to access the exam
                 </p>
-              )}
-            </div>
-
-            {/* Student Name */}
-            <div className="space-y-2">
-              <Label htmlFor="studentName" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <div className="p-1.5 bg-purple-100 rounded-lg">
-                  <User className="h-4 w-4 text-purple-600" />
-                </div>
-                Full Name
-                <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="studentName"
-                type="text"
-                placeholder="Enter your full name"
-                value={formData.studentName}
-                onChange={(e) => handleChange('studentName', e.target.value)}
-                className={cn(
-                  "h-12 text-base transition-all duration-200 border-2",
-                  errors.studentName 
-                    ? 'border-red-400 focus:border-red-500 focus:ring-red-200' 
-                    : 'border-gray-200 focus:border-purple-400 focus:ring-purple-100'
-                )}
-              />
-              {errors.studentName && (
-                <p className="text-sm text-red-600 mt-1.5 flex items-center gap-1.5 animate-in slide-in-from-top-1">
-                  <AlertCircle className="h-4 w-4" />
-                  {errors.studentName}
-                </p>
-              )}
-            </div>
-
-            {/* Email and Section in a row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="studentEmail" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                  <div className="p-1.5 bg-purple-100 rounded-lg">
-                    <Mail className="h-4 w-4 text-purple-600" />
-                  </div>
-                  Email
-                  <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="studentEmail"
-                  type="email"
-                  placeholder="your.email@example.com"
-                  value={formData.studentEmail}
-                  onChange={(e) => handleChange('studentEmail', e.target.value)}
-                  className={cn(
-                    "h-12 text-base transition-all duration-200 border-2",
-                    errors.studentEmail 
-                      ? 'border-red-400 focus:border-red-500 focus:ring-red-200' 
-                      : 'border-gray-200 focus:border-purple-400 focus:ring-purple-100'
-                  )}
-                />
-                {errors.studentEmail && (
-                  <p className="text-sm text-red-600 mt-1.5 flex items-center gap-1.5 animate-in slide-in-from-top-1">
-                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                    <span className="line-clamp-2">{errors.studentEmail}</span>
-                  </p>
-                )}
               </div>
 
-              {/* Section */}
-              <div className="space-y-2">
-                <Label htmlFor="studentSection" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                  <div className="p-1.5 bg-purple-100 rounded-lg">
-                    <User className="h-4 w-4 text-purple-600" />
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Student Details Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Roll Number */}
+                  <div className="space-y-2">
+                    <Label htmlFor="rollNumber" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                      <Hash className="w-4 h-4 text-indigo-600" />
+                      Roll Number
+                    </Label>
+                    <Input
+                      id="rollNumber"
+                      type="text"
+                      value={formData.rollNumber}
+                      onChange={(e) => handleChange('rollNumber', e.target.value)}
+                      className={cn(
+                        "h-10 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500",
+                        errors.rollNumber && 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                      )}
+                    />
+                    {errors.rollNumber && (
+                      <p className="text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {errors.rollNumber}
+                      </p>
+                    )}
                   </div>
-                  Section
-                  <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="studentSection"
-                  type="text"
-                  placeholder="e.g., A, B, CS-01"
-                  value={formData.studentSection}
-                  onChange={(e) => handleChange('studentSection', e.target.value)}
-                  className={cn(
-                    "h-12 text-base transition-all duration-200 border-2",
-                    errors.studentSection 
-                      ? 'border-red-400 focus:border-red-500 focus:ring-red-200' 
-                      : 'border-gray-200 focus:border-purple-400 focus:ring-purple-100'
+
+                  {/* Section */}
+                  <div className="space-y-2">
+                    <Label htmlFor="studentSection" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                      <User className="w-4 h-4 text-indigo-600" />
+                      Section
+                    </Label>
+                    <Input
+                      id="studentSection"
+                      type="text"
+                      value={formData.studentSection}
+                      onChange={(e) => handleChange('studentSection', e.target.value)}
+                      className={cn(
+                        "h-10 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500",
+                        errors.studentSection && 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                      )}
+                    />
+                    {errors.studentSection && (
+                      <p className="text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {errors.studentSection}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Full Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="studentName" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <User className="w-4 h-4 text-indigo-600" />
+                    Full Name
+                  </Label>
+                  <Input
+                    id="studentName"
+                    type="text"
+                    value={formData.studentName}
+                    onChange={(e) => handleChange('studentName', e.target.value)}
+                    className={cn(
+                      "h-10 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500",
+                      errors.studentName && 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                    )}
+                  />
+                  {errors.studentName && (
+                    <p className="text-xs text-red-600 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {errors.studentName}
+                    </p>
                   )}
-                />
-                {errors.studentSection && (
-                  <p className="text-sm text-red-600 mt-1.5 flex items-center gap-1.5 animate-in slide-in-from-top-1">
-                    <AlertCircle className="h-4 w-4" />
-                    {errors.studentSection}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Test Code */}
-            <div className="space-y-2 pt-2">
-              <Label htmlFor="testCode" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <div className="p-1.5 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-lg">
-                  <Lock className="h-4 w-4 text-purple-600" />
                 </div>
-                Test Code
-                <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="testCode"
-                type="text"
-                placeholder="Enter the test code provided by your teacher"
-                value={formData.testCode}
-                onChange={(e) => handleChange('testCode', e.target.value.toUpperCase())}
-                className={cn(
-                  "h-12 text-base font-mono tracking-wider transition-all duration-200 border-2",
-                  errors.testCode 
-                    ? 'border-red-400 focus:border-red-500 focus:ring-red-200' 
-                    : 'border-gray-200 focus:border-purple-400 focus:ring-purple-100'
-                )}
-              />
-              {errors.testCode && (
-                <p className="text-sm text-red-600 mt-1.5 flex items-center gap-1.5 animate-in slide-in-from-top-1">
-                  <AlertCircle className="h-4 w-4" />
-                  {errors.testCode}
-                </p>
-              )}
-              <p className="text-xs text-gray-500 mt-2 flex items-start gap-1.5">
-                <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-                <span>Ask your teacher for the test code if you don't have it</span>
-              </p>
-            </div>
 
-            {/* Password */}
-            <div className="space-y-2">
-              <Label htmlFor="password" className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <div className="p-1.5 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-lg">
-                  <Lock className="h-4 w-4 text-purple-600" />
+                {/* Email */}
+                <div className="space-y-2">
+                  <Label htmlFor="studentEmail" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-indigo-600" />
+                    Email Address
+                  </Label>
+                  <Input
+                    id="studentEmail"
+                    type="email"
+                    value={formData.studentEmail}
+                    onChange={(e) => handleChange('studentEmail', e.target.value)}
+                    className={cn(
+                      "h-10 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500",
+                      errors.studentEmail && 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                    )}
+                  />
+                  {errors.studentEmail && (
+                    <p className="text-xs text-red-600 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {errors.studentEmail}
+                    </p>
+                  )}
                 </div>
-                Password
-                <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your account password"
-                value={formData.password}
-                onChange={(e) => handleChange('password', e.target.value)}
-                className={cn(
-                  "h-12 text-base transition-all duration-200 border-2",
-                  errors.password 
-                    ? 'border-red-400 focus:border-red-500 focus:ring-red-200' 
-                    : 'border-gray-200 focus:border-purple-400 focus:ring-purple-100'
-                )}
-              />
-              {errors.password && (
-                <p className="text-sm text-red-600 mt-1.5 flex items-center gap-1.5 animate-in slide-in-from-top-1">
-                  <AlertCircle className="h-4 w-4" />
-                  {errors.password}
-                </p>
-              )}
-            </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-6">
-              {onCancel && (
+                {/* Test Code & Password Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Password */}
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-purple-600" />
+                      Password
+                    </Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => handleChange('password', e.target.value)}
+                      className={cn(
+                        "h-10 border-gray-300 focus:border-purple-500 focus:ring-purple-500",
+                        errors.password && 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                      )}
+                    />
+                    {errors.password && (
+                      <p className="text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {errors.password}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Test Code */}
+                  <div className="space-y-2">
+                    <Label htmlFor="testCode" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                      <KeyRound className="w-4 h-4 text-purple-600" />
+                      Test Code
+                    </Label>
+                    <Input
+                      id="testCode"
+                      type="text"
+                      value={formData.testCode}
+                      onChange={(e) => handleChange('testCode', e.target.value.toUpperCase())}
+                      className={cn(
+                        "h-10 font-mono tracking-wider uppercase border-gray-300 focus:border-purple-500 focus:ring-purple-500",
+                        errors.testCode && 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                      )}
+                    />
+                    {errors.testCode && (
+                      <p className="text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {errors.testCode}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Submit Button */}
                 <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onCancel}
-                  className="flex-1 h-12 text-base border-2 hover:bg-gray-50 transition-all"
+                  type="submit"
+                  className="w-full h-11 text-base font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200"
                   disabled={isValidating}
                 >
-                  Cancel
+                  {isValidating ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Authenticating...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="w-5 h-5 mr-2" />
+                      Start Exam
+                    </>
+                  )}
                 </Button>
-              )}
-              <Button
-                type="submit"
-                className="flex-1 h-12 text-base bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-200"
-                disabled={isValidating}
-              >
-                {isValidating ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    Validating...
-                  </>
-                ) : (
-                  <>
-                    <Shield className="h-5 w-5 mr-2" />
-                    Start Exam
-                  </>
-                )}
-              </Button>
-            </div>
-          </form>
+              </form>
+            </CardContent>
 
-          {/* Info Message */}
-          <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200/50 rounded-xl">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-                <Info className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-blue-900 mb-1">
-                  Security Notice
-                </p>
-                <p className="text-xs text-blue-700 leading-relaxed">
-                  Your information and IP address will be recorded for security and verification purposes. This ensures exam integrity and prevents unauthorized access.
-                </p>
+            {/* Right Side - Exam Details */}
+            <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 p-8 md:p-12 text-white flex flex-col justify-center">
+              <div className="space-y-6">
+                <div>
+                  <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full mb-4">
+                    <Shield className="w-4 h-4" />
+                    <span className="text-sm font-medium">Secure Exam Portal</span>
+                  </div>
+                  <h2 className="text-3xl md:text-4xl font-bold mb-3 leading-tight">
+                    {examTitle}
+                  </h2>
+                  <p className="text-indigo-100 text-lg">
+                    Please authenticate to begin your examination
+                  </p>
+                </div>
+
+                <div className="space-y-4 pt-6">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                      <Lock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg mb-1">Secure Authentication</h3>
+                      <p className="text-indigo-100 text-sm">
+                        Your credentials are verified to ensure exam integrity
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                      <Shield className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg mb-1">Monitored Session</h3>
+                      <p className="text-indigo-100 text-sm">
+                        Activity is tracked to maintain academic honesty
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                      <Info className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg mb-1">IP Recording</h3>
+                      <p className="text-indigo-100 text-sm">
+                        Your IP address will be logged for security purposes
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-white/20">
+                  <p className="text-sm text-indigo-100">
+                    Need help? Contact your instructor for assistance with test codes or access issues.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   )
 }

@@ -345,6 +345,9 @@ export default function ExamMonitoringPage() {
                               )}
                             </div>
                             <p className="text-sm text-slate-600">{student.submission.student_email}</p>
+                            {student.submission.ip_address && (
+                              <p className="text-xs text-slate-500 mt-1">IP: {student.submission.ip_address}</p>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-6">

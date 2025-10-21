@@ -1,214 +1,162 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/database/supabase-server'
-
+import { withAuth } from '@/lib/auth/middleware'
+import { getCached, invalidateCache, CacheKeys, CacheTTL } from '@/lib/redis/client'
 import { logger } from '@/lib/utils/logger'
 
+// GET /api/exams/slug/[slug] - Get exam by slug with caching
 export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } }
 ) {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = require('@/lib/database/supabase-server').createSupabaseServerClient()
 
-    // First, check if exam exists with this slug
-    const { data: examCheck, error: checkError } = await supabase
-      .from('exams')
-      .select('id, title, slug, is_published')
-      .eq('slug', params.slug)
+    // Use cached exam data
+    const examData = await getCached(
+      CacheKeys.examBySlug(params.slug),
+      async () => {
+        // First, check if exam exists with this slug
+        const { data: examCheck, error: checkError } = await supabase
+          .from('exams')
+          .select('id, title, slug, is_published')
+          .eq('slug', params.slug)
 
-    logger.log('Exam check for slug:', params.slug, { examCheck, checkError })
+        logger.log('Exam check for slug:', params.slug, { examCheck, checkError })
 
-    if (checkError) {
-      logger.error('Error checking exam:', checkError)
-      return NextResponse.json(
-        { error: 'Error checking exam', details: checkError.message },
-        { status: 500 }
-      )
-    }
+        if (checkError) {
+          logger.error('Error checking exam:', checkError)
+          throw new Error('Error checking exam')
+        }
 
-    if (!examCheck || examCheck.length === 0) {
-      return NextResponse.json(
-        { error: 'Exam not found', details: `No exam found with slug: ${params.slug}` },
-        { status: 404 }
-      )
-    }
+        if (!examCheck || examCheck.length === 0) {
+          throw new Error('Exam not found')
+        }
 
-    if (examCheck.length > 1) {
-      logger.error('Multiple exams with same slug:', examCheck)
-      return NextResponse.json(
-        { error: 'Multiple exams found', details: 'Database integrity issue - duplicate slugs' },
-        { status: 500 }
-      )
-    }
+        const exam = examCheck[0]
 
-    const examInfo = examCheck[0]
-    if (!examInfo.is_published) {
-      return NextResponse.json(
-        { error: 'Exam not published', details: 'This exam is not yet available' },
-        { status: 403 }
-      )
-    }
-
-    // Fetch exam by slug with all related data
-    const { data: exam, error: examError } = await supabase
-      .from('exams')
-      .select(`
-        id,
-        title,
-        description,
-        slug,
-        instructions,
-        start_time,
-        end_time,
-        duration_minutes,
-        total_marks,
-        is_published,
-        strict_level,
-        max_tab_switches,
-        max_screen_lock_duration,
-        auto_terminate_on_violations,
-        track_tab_switches,
-        track_screen_locks,
-        detect_vm,
-        require_single_monitor,
-        allow_zoom_changes,
-        teacher:users!exams_teacher_id_fkey(full_name),
-        exam_sections(
-          id,
-          title,
-          description,
-          order_index,
-          time_limit,
-          exam_questions(
+        // Fetch full exam with all related data in a single query
+        const { data: fullExam, error: examError } = await supabase
+          .from('exams')
+          .select(`
             id,
-            points,
-            order_index,
-            is_required,
-            question:questions(
+            title,
+            description,
+            slug,
+            start_time,
+            end_time,
+            duration_minutes,
+            total_marks,
+            pass_percentage,
+            is_published,
+            require_invite_token,
+            organization_id,
+            proctoring_enabled,
+            strict_level,
+            max_tab_switches,
+            max_screen_lock_duration,
+            auto_terminate_on_violations,
+            track_tab_switches,
+            track_screen_locks,
+            detect_vm,
+            require_single_monitor,
+            allow_zoom_changes,
+            teacher:users!exams_teacher_id_fkey(full_name),
+            exam_sections(
               id,
               title,
               description,
-              type,
-              points,
-              difficulty,
-              mcq_questions(
+              order_index,
+              time_limit,
+              exam_questions(
                 id,
-                question_text,
-                options,
-                correct_answers,
-                is_multiple_choice,
-                explanation
-              ),
-              coding_questions(
-                id,
-                problem_statement,
-                boilerplate_code,
-                test_cases,
-                allowed_languages,
-                time_limit,
-                memory_limit,
-                head,
-                body_template,
-                tail
+                points,
+                order_index,
+                is_required,
+                question:questions(
+                  id,
+                  title,
+                  description,
+                  type,
+                  points,
+                  difficulty,
+                  mcq_questions(
+                    id,
+                    question_text,
+                    options,
+                    correct_answers,
+                    is_multiple_choice,
+                    explanation
+                  ),
+                  coding_questions(
+                    id,
+                    problem_statement,
+                    boilerplate_code,
+                    test_cases,
+                    allowed_languages,
+                    time_limit,
+                    memory_limit
+                  )
+                )
               )
             )
-          )
-        )
-      `)
-      .eq('slug', params.slug)
-      .eq('is_published', true)
-      .single()
+          `)
+          .eq('id', exam.id)
+          .single()
 
-    if (examError) {
-      logger.error('Error fetching exam:', examError)
-      return NextResponse.json(
-        { error: 'Exam not found', details: examError.message },
-        { status: 404 }
-      )
-    }
+        if (examError || !fullExam) {
+          logger.error('Error fetching full exam:', examError)
+          throw new Error('Failed to fetch exam details')
+        }
 
-    if (!exam) {
-      return NextResponse.json(
-        { error: 'Exam not found or not published' },
-        { status: 404 }
-      )
-    }
-
-    // Check if exam is currently active (with some leniency for testing)
-    const now = new Date()
-    const startTime = new Date(exam.start_time)
-    const endTime = new Date(exam.end_time)
-
-    logger.log('Exam time check:', {
-      now: now.toISOString(),
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
-      examTitle: exam.title,
-      slug: params.slug
-    })
-
-    // Allow access if within 5 minutes before start (for testing)
-    const earlyAccessMinutes = 5
-    const earlyStartTime = new Date(startTime.getTime() - earlyAccessMinutes * 60 * 1000)
-
-    if (now < earlyStartTime) {
-      return NextResponse.json(
-        { 
-          error: 'Exam has not started yet', 
-          start_time: exam.start_time,
-          current_time: now.toISOString()
-        },
-        { status: 403 }
-      )
-    }
-
-    if (now > endTime) {
-      return NextResponse.json(
-        { 
-          error: 'Exam has ended', 
-          end_time: exam.end_time,
-          current_time: now.toISOString()
-        },
-        { status: 403 }
-      )
-    }
+        return fullExam
+      },
+      CacheTTL.medium // 5 minutes cache for exams
+    )
 
     // Format the exam data for the frontend
     const formattedExam = {
-      ...exam,
-      sections: exam.exam_sections?.map(section => ({
+      ...examData,
+      sections: (examData.exam_sections || []).map((section: any) => ({
         ...section,
-        questions: section.exam_questions?.map(examQuestion => {
+        questions: (section.exam_questions || []).map((examQuestion: any) => {
           const question = examQuestion.question as any
+          
+          // Safely format MCQ options
+          let mcqQuestion = undefined
+          if (question?.mcq_questions?.[0]) {
+            const mcq = question.mcq_questions[0]
+            const options = Array.isArray(mcq.options) ? mcq.options : []
+            
+            mcqQuestion = {
+              question_text: mcq.question_text || '',
+              options: options.map((opt: any, index: number) => {
+                // Handle both string and object option formats
+                const optionText = typeof opt === 'string' ? opt : (opt?.text || opt?.value || '')
+                return {
+                  id: String.fromCharCode(97 + index), // 'a', 'b', 'c', 'd'
+                  text: optionText,
+                  isCorrect: Array.isArray(mcq.correct_answers) && mcq.correct_answers.includes(index)
+                }
+              }),
+              // Convert correct_answers from numeric indices to letter IDs
+              correct_answers: Array.isArray(mcq.correct_answers) 
+                ? mcq.correct_answers.map((idx: number) => String.fromCharCode(97 + idx))
+                : [],
+              is_multiple_choice: mcq.is_multiple_choice || false,
+              explanation: mcq.explanation || ''
+            }
+          }
+          
           return {
             ...examQuestion,
             question: {
               ...question,
-              mcq_question: question.mcq_questions?.[0] ? {
-                question_text: question.mcq_questions[0].question_text,
-                options: question.mcq_questions[0].options.map((opt: any, index: number) => ({
-                  id: String.fromCharCode(97 + index), // 'a', 'b', 'c', 'd' instead of "0", "1", "2", "3"
-                  text: opt.text || opt,
-                  isCorrect: question.mcq_questions[0].correct_answers.includes(index)
-                })),
-                correct_answers: question.mcq_questions[0].correct_answers,
-                explanation: question.mcq_questions[0].explanation
-              } : undefined,
-              coding_question: question.coding_questions?.[0] ? {
-                problem_statement: question.coding_questions[0].problem_statement,
-                boilerplate_code: question.coding_questions[0].boilerplate_code,
-                test_cases: question.coding_questions[0].test_cases,
-                allowed_languages: question.coding_questions[0].allowed_languages,
-                time_limit: question.coding_questions[0].time_limit,
-                memory_limit: question.coding_questions[0].memory_limit,
-                head: question.coding_questions[0].head,
-                body_template: question.coding_questions[0].body_template,
-                tail: question.coding_questions[0].tail
-              } : undefined
+              mcq_question: mcqQuestion,
+              coding_question: question?.coding_questions?.[0]
             }
           }
-        }).sort((a, b) => a.order_index - b.order_index)
-      })).sort((a, b) => a.order_index - b.order_index)
+        }).sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
+      })).sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
     }
 
     return NextResponse.json({
@@ -216,10 +164,23 @@ export async function GET(
       exam: formattedExam
     })
 
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error in exam fetch by slug:', error)
+    logger.error('Error stack:', error?.stack)
+    logger.error('Error message:', error?.message)
+    
+    if (error.message === 'Exam not found') {
+      return NextResponse.json(
+        { error: 'Exam not found', details: `No exam found with slug: ${params.slug}` },
+        { status: 404 }
+      )
+    }
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
       { status: 500 }
     )
   }

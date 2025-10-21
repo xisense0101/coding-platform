@@ -11,6 +11,14 @@ const nextConfig = {
     // typedRoutes: true,
     optimizeCss: true,
   },
+  
+  // Optimize module imports for better tree-shaking
+  modularizeImports: {
+    'lucide-react': {
+      transform: 'lucide-react/dist/esm/icons/{{kebabCase member}}',
+    },
+  },
+  
   images: {
     domains: [
       'localhost',
@@ -24,10 +32,13 @@ const nextConfig = {
         hostname: '**',
       },
     ],
+    formats: ['image/avif', 'image/webp'],
   },
+  
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
+  
   async headers() {
     return [
       {
@@ -49,6 +60,7 @@ const nextConfig = {
       },
     ]
   },
+  
   async rewrites() {
     return [
       {
@@ -60,9 +72,14 @@ const nextConfig = {
   
   // Configure webpack for better performance
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
-    // Important: return the modified config
+    // Next.js already handles optimization well, just return the config
+    // Adding custom optimization settings can conflict with Next.js cache
     return config
   },
+  
+  // Output configuration for better caching
+  compress: true,
+  poweredByHeader: false,
 }
 
 module.exports = nextConfig

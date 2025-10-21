@@ -1,12 +1,18 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
-import Editor from '@monaco-editor/react'
+import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Play, RotateCcw, Copy, Download, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+// Dynamically import Monaco Editor to reduce initial bundle size
+const Editor = dynamic(() => import('@monaco-editor/react'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-full">Loading editor...</div>
+})
 
 interface CodeEditorProps {
   value?: string

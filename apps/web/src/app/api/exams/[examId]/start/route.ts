@@ -134,14 +134,29 @@ export async function POST(
     // No existing submission, create a new one
     logger.log('📝 Creating new submission...')
 
-    // Get client IP (optional)
+    // Get client IP address
     let ipAddress = null
     try {
       const forwarded = request.headers.get('x-forwarded-for')
       const realIp = request.headers.get('x-real-ip')
-      ipAddress = forwarded?.split(',')[0] || realIp || null
+      const cfConnectingIp = request.headers.get('cf-connecting-ip') // Cloudflare
+      const socketIp = request.ip // Next.js direct IP
+      
+      ipAddress = forwarded?.split(',')[0]?.trim() || 
+                  cfConnectingIp || 
+                  realIp || 
+                  socketIp || 
+                  'unknown'
+      
+      // Convert IPv6 localhost to readable format
+      if (ipAddress === '::1' || ipAddress === '::ffff:127.0.0.1') {
+        ipAddress = '127.0.0.1 (localhost)'
+      }
+      
+      logger.log('📍 Client IP detected:', ipAddress)
     } catch (error) {
       logger.warn('⚠️ Could not determine IP address:', error)
+      ipAddress = 'unknown'
     }
 
     const { data: newSubmission, error: insertError } = await supabase

@@ -12,6 +12,7 @@ import { CodeEditor } from '@/components/editors/CodeEditor'
 import { Badge } from "@/components/ui/badge"
 import { RichTextPreview } from '@/components/editors/RichTextEditor'
 import { logger } from '@/lib/utils/logger'
+import { formatDateTime } from '@/lib/utils'
 import {
   Play,
   RotateCcw,
@@ -898,17 +899,6 @@ function ProblemDescription({
 }) {
   const [activeTab, setActiveTab] = useState("question")
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
   return (
     <div className="p-6 space-y-6">
       {/* Problem Header */}
@@ -1039,7 +1029,7 @@ function ProblemDescription({
                                 <div className="text-sm text-gray-600 space-y-1">
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium">Submitted:</span>
-                                    <span>{formatDate(attempt.submitted_at || attempt.created_at)}</span>
+                                    <span>{formatDateTime(attempt.submitted_at || attempt.created_at)}</span>
                                   </div>
                                   {hasTestResults && (
                                     <div className={`mt-1 font-medium ${

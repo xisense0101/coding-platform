@@ -35,6 +35,18 @@ interface QuestionAnswer {
   isCorrect?: boolean
   pointsEarned?: number
   maxPoints?: number
+  testCasesPassed?: number
+  totalTestCases?: number
+  testCaseResults?: Array<{
+    passed: boolean
+    input?: string
+    expectedOutput?: string
+    actualOutput?: string
+    isHidden?: boolean
+    error?: string
+    weight?: number
+    pointsEarned?: number
+  }>
 }
 
 export default function SubmissionPreviewPage() {
@@ -144,6 +156,10 @@ export default function SubmissionPreviewPage() {
               ? studentAnswer.points_earned
               : 0
             
+            const testCasesPassed = studentAnswer?.test_cases_passed || 0
+            const totalTestCases = studentAnswer?.total_test_cases || 0
+            const testCaseResults = studentAnswer?.test_case_results || []
+            
             allQuestions.push({
               questionId,
               questionTitle: question.title,
@@ -153,7 +169,10 @@ export default function SubmissionPreviewPage() {
               selectedLanguage: studentAnswer?.language || 'javascript',
               isCorrect: isCorrect,
               pointsEarned: pointsEarned,
-              maxPoints: studentAnswer?.max_points || examQuestion.points || question.points || 0
+              maxPoints: studentAnswer?.max_points || examQuestion.points || question.points || 0,
+              testCasesPassed: testCasesPassed,
+              totalTestCases: totalTestCases,
+              testCaseResults: testCaseResults
             })
           }
         })
@@ -271,7 +290,7 @@ export default function SubmissionPreviewPage() {
                             : "bg-white border-gray-200 hover:border-purple-300"
                         )}
                       >
-                        <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm">Q{index + 1}</span>
                             <Badge variant="outline" className="text-xs">
@@ -280,12 +299,21 @@ export default function SubmissionPreviewPage() {
                           </div>
                           {q.isCorrect ? (
                             <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : q.pointsEarned && q.pointsEarned > 0 ? (
+                            <div className="h-4 w-4 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold">
+                              ~
+                            </div>
                           ) : (
                             <XCircle className="h-4 w-4 text-red-600" />
                           )}
                         </div>
                         <div className="text-xs text-gray-600 mt-1">
-                          {q.pointsEarned}/{q.maxPoints} pts
+                          {q.pointsEarned?.toFixed(2) || 0}/{q.maxPoints} pts
+                          {q.questionType === 'coding' && q.totalTestCases !== undefined && q.totalTestCases > 0 && (
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {q.testCasesPassed}/{q.totalTestCases} tests
+                            </div>
+                          )}
                         </div>
                       </button>
                     ))}
@@ -311,6 +339,10 @@ export default function SubmissionPreviewPage() {
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Correct
                         </Badge>
+                      ) : currentQuestion.pointsEarned && currentQuestion.pointsEarned > 0 ? (
+                        <Badge variant="default" className="bg-orange-500">
+                          Partial Credit
+                        </Badge>
                       ) : (
                         <Badge variant="destructive">
                           <XCircle className="h-3 w-3 mr-1" />
@@ -318,7 +350,7 @@ export default function SubmissionPreviewPage() {
                         </Badge>
                       )}
                       <Badge variant="secondary">
-                        {currentQuestion.pointsEarned}/{currentQuestion.maxPoints} points
+                        {currentQuestion.pointsEarned?.toFixed(2) || 0}/{currentQuestion.maxPoints} points
                       </Badge>
                     </div>
                   </div>
@@ -393,22 +425,147 @@ export default function SubmissionPreviewPage() {
                     )}
 
                     {currentQuestion.questionType === 'coding' && (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <span className="font-medium">Language:</span>
-                          <Badge variant="outline">{currentQuestion.selectedLanguage}</Badge>
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-4 text-sm">
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <span className="font-medium">Language:</span>
+                            <Badge variant="outline">{currentQuestion.selectedLanguage}</Badge>
+                          </div>
+                          {currentQuestion.totalTestCases !== undefined && currentQuestion.totalTestCases > 0 && (
+                            <>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-600">Test Cases:</span>
+                                <Badge 
+                                  variant={currentQuestion.testCasesPassed === currentQuestion.totalTestCases ? "default" : "secondary"}
+                                  className={currentQuestion.testCasesPassed === currentQuestion.totalTestCases ? "bg-green-600" : "bg-orange-600 text-white"}
+                                >
+                                  {currentQuestion.testCasesPassed}/{currentQuestion.totalTestCases} Passed
+                                </Badge>
+                              </div>
+                              {currentQuestion.testCaseResults && currentQuestion.testCaseResults.length > 0 && (
+                                (() => {
+                                  const totalWeightedPoints = currentQuestion.testCaseResults.reduce(
+                                    (sum, tc) => sum + (tc.pointsEarned || 0), 
+                                    0
+                                  )
+                                  const totalPossibleWeightedPoints = currentQuestion.testCaseResults.reduce(
+                                    (sum, tc) => sum + (tc.weight || 0), 
+                                    0
+                                  )
+                                  return totalPossibleWeightedPoints > 0 ? (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-600">Test Case Points:</span>
+                                      <Badge variant="outline" className="text-xs">
+                                        {totalWeightedPoints.toFixed(1)}/{totalPossibleWeightedPoints.toFixed(1)}
+                                      </Badge>
+                                    </div>
+                                  ) : null
+                                })()
+                              )}
+                            </>
+                          )}
                         </div>
+                        
                         {currentQuestion.userCode ? (
-                          <Card className="bg-gray-900 text-gray-100">
-                            <CardContent className="p-4">
-                              <pre className="text-sm font-mono overflow-x-auto">
-                                <code>{currentQuestion.userCode}</code>
-                              </pre>
-                            </CardContent>
-                          </Card>
+                          <>
+                            <Card className="bg-gray-900 text-gray-100">
+                              <CardContent className="p-4">
+                                <pre className="text-sm font-mono overflow-x-auto">
+                                  <code>{currentQuestion.userCode}</code>
+                                </pre>
+                              </CardContent>
+                            </Card>
+                            
+                            {/* Test Case Results */}
+                            {currentQuestion.testCaseResults && currentQuestion.testCaseResults.length > 0 && (
+                              <div className="space-y-2">
+                                <h5 className="font-semibold text-sm text-gray-700">Test Case Results:</h5>
+                                {currentQuestion.testCaseResults.map((testCase, index) => (
+                                  <Card 
+                                    key={index}
+                                    className={`border-2 ${
+                                      testCase.passed 
+                                        ? 'border-green-300 bg-green-50' 
+                                        : 'border-red-300 bg-red-50'
+                                    }`}
+                                  >
+                                    <CardContent className="p-3">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-medium text-sm">
+                                            Test Case #{index + 1}
+                                          </span>
+                                          {testCase.weight !== undefined && testCase.weight > 0 && (
+                                            <Badge variant="secondary" className="text-xs">
+                                              {testCase.pointsEarned || 0}/{testCase.weight} pts
+                                            </Badge>
+                                          )}
+                                          {testCase.isHidden && (
+                                            <Badge variant="outline" className="ml-2 text-xs">
+                                              Hidden
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        {testCase.passed ? (
+                                          <Badge variant="default" className="bg-green-600 text-xs">
+                                            <CheckCircle className="h-3 w-3 mr-1" />
+                                            Passed
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="destructive" className="text-xs">
+                                            <XCircle className="h-3 w-3 mr-1" />
+                                            Failed
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      
+                                      {!testCase.isHidden && (
+                                        <div className="space-y-2 text-xs">
+                                          {testCase.input && (
+                                            <div>
+                                              <span className="font-medium text-gray-700">Input:</span>
+                                              <pre className="mt-1 p-2 bg-white rounded border text-gray-800 overflow-x-auto">
+                                                {testCase.input}
+                                              </pre>
+                                            </div>
+                                          )}
+                                          {testCase.expectedOutput && (
+                                            <div>
+                                              <span className="font-medium text-gray-700">Expected:</span>
+                                              <pre className="mt-1 p-2 bg-white rounded border text-gray-800 overflow-x-auto">
+                                                {testCase.expectedOutput}
+                                              </pre>
+                                            </div>
+                                          )}
+                                          {testCase.actualOutput && (
+                                            <div>
+                                              <span className="font-medium text-gray-700">Actual:</span>
+                                              <pre className={`mt-1 p-2 rounded border overflow-x-auto ${
+                                                testCase.passed ? 'bg-white text-gray-800' : 'bg-red-100 text-red-900'
+                                              }`}>
+                                                {testCase.actualOutput}
+                                              </pre>
+                                            </div>
+                                          )}
+                                          {testCase.error && (
+                                            <div>
+                                              <span className="font-medium text-red-700">Error:</span>
+                                              <pre className="mt-1 p-2 bg-red-100 rounded border border-red-300 text-red-900 overflow-x-auto">
+                                                {testCase.error}
+                                              </pre>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            )}
+                          </>
                         ) : (
-                          <p className="text-gray-500 italic p-4 bg-gray-50 rounded-lg">
-                            No code submitted
+                          <p className="text-gray-500 italic p-4 bg-gray-50 rounded-lg border-2 border-dashed">
+                            ⚠️ No code submitted
                           </p>
                         )}
                       </div>

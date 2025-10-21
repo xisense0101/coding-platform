@@ -114,12 +114,28 @@ type UIQuestion = {
     input: string
     expected_output: string
     is_hidden: boolean
+    weight?: number
   }>
 }
 
 type AnswerState = {
   userAnswer?: string | string[]
   userCode?: string
+  language?: string
+  testCaseResults?: Array<{
+    passed: boolean
+    input?: string
+    expectedOutput?: string
+    actualOutput?: string
+    isHidden?: boolean
+    error?: string
+    weight?: number
+    pointsEarned?: number
+  }>
+  testCasesPassed?: number
+  totalTestCases?: number
+  totalPointsEarned?: number
+  totalPossiblePoints?: number
   status: "unanswered" | "answered" | "submitted"
 }
 
@@ -197,7 +213,43 @@ export default function Component() {
   const sb: any = useMemo(() => createClient() as any, [])
   const { user, isLoading: authLoading } = useAuth()
 
-  // Electron monitoring integration
+  // Electron monitoring integration - Memoized callbacks to prevent re-initialization
+  const handleViolationCallback = useCallback((violation: any) => {
+    logger.warn('Violation detected:', violation)
+    
+    // Prevent duplicate violation alerts
+    const violationId = `${violation.type}-${violation.violationCount}`
+    if (lastViolationIdRef.current === violationId) {
+      logger.log('Skipping duplicate violation alert:', violationId)
+      return
+    }
+    lastViolationIdRef.current = violationId
+    
+    // Show in-app violation alert instead of system alert
+    const alertData: ViolationAlertData = {
+      id: `violation-${Date.now()}`,
+      message: violation.message,
+      violationCount: violation.violationCount,
+      shouldTerminate: violation.shouldTerminate,
+      timestamp: Date.now()
+    }
+    
+    setCurrentViolation(alertData)
+  }, [])
+
+  const handleMetricsUpdateCallback = useCallback((metrics: any) => {
+    // Metrics updated - can trigger UI updates if needed
+    logger.log('Monitoring metrics updated:', metrics)
+  }, [])
+
+  const electronMonitoring = useElectronMonitoring({
+    submissionId,
+    examId: exam?.id || null,
+    studentId: studentAuthData?.userId || user?.id || null,
+    onViolation: handleViolationCallback,
+    onMetricsUpdate: handleMetricsUpdateCallback
+  })
+
   const {
     isElectronApp,
     appVersion,
@@ -206,37 +258,15 @@ export default function Component() {
     notifyExamComplete,
     closeElectronApp,
     handleZoomChange
-  } = useElectronMonitoring({
-    submissionId,
-    examId: exam?.id || null,
-    studentId: studentAuthData?.userId || user?.id || null,
-    onViolation: useCallback((violation: any) => {
-      logger.warn('Violation detected:', violation)
-      
-      // Prevent duplicate violation alerts
-      const violationId = `${violation.type}-${violation.violationCount}`
-      if (lastViolationIdRef.current === violationId) {
-        logger.log('Skipping duplicate violation alert:', violationId)
-        return
-      }
-      lastViolationIdRef.current = violationId
-      
-      // Show in-app violation alert instead of system alert
-      const alertData: ViolationAlertData = {
-        id: `violation-${Date.now()}`,
-        message: violation.message,
-        violationCount: violation.violationCount,
-        shouldTerminate: violation.shouldTerminate,
-        timestamp: Date.now()
-      }
-      
-      setCurrentViolation(alertData)
-    }, []),
-    onMetricsUpdate: (metrics) => {
-      // Metrics updated - can trigger UI updates if needed
-      logger.log('Monitoring metrics updated:', metrics)
-    }
-  })
+  } = electronMonitoring || {
+    isElectronApp: false,
+    appVersion: null,
+    isVM: false,
+    metrics: null,
+    notifyExamComplete: () => {},
+    closeElectronApp: () => {},
+    handleZoomChange: () => {}
+  }
 
   // Fetch exam by slug
   useEffect(() => {
@@ -720,25 +750,15 @@ export default function Component() {
             answerObject: answer
           })
           
-          // Convert to numbers if they're strings
-          const correct: number[] = correctAnswers.map((ans: any) => 
-            typeof ans === 'number' ? ans : parseInt(ans, 10)
-          ).filter((n: number) => !isNaN(n))
-          
-          // Convert letter ID to index: 'a' -> 0, 'b' -> 1, 'c' -> 2, 'd' -> 3
-          let userAnswerIndex: number | undefined
-          if (userAns && userAns.length === 1) {
-            userAnswerIndex = userAns.charCodeAt(0) - 97  // 'a'.charCodeAt(0) = 97
-          }
-          
-          const isCorrect = userAnswerIndex !== undefined && correct.includes(userAnswerIndex)
+          // correctAnswers should now be letter IDs like ['a', 'b', 'c']
+          // userAns should also be a letter ID like 'a'
+          const isCorrect = userAns && correctAnswers.includes(userAns)
           const pointsEarned = isCorrect ? pts : 0
           total += pointsEarned
           
-          // Store graded answer with both letter and index for compatibility
+          // Store graded answer
           gradedAnswers[q.id] = {
             userAnswer: userAns,
-            userAnswerIndex: userAnswerIndex,
             status: answer?.status || "unanswered",
             is_correct: isCorrect,
             points_earned: pointsEarned,
@@ -746,14 +766,46 @@ export default function Component() {
           }
         } else if (q.type === "coding") {
           max += pts
-          // For coding questions, store the code but mark as requires manual grading
+          
+          // Calculate marks based on weighted test cases
+          // Each test case has a weight (marks), student gets those marks if they pass it
+          const testCasesPassed = answer?.testCasesPassed || 0
+          const totalTestCases = answer?.totalTestCases || 0
+          const testCaseResults = answer?.testCaseResults || []
+          const totalPointsEarned = answer?.totalPointsEarned || 0
+          const totalPossiblePoints = answer?.totalPossiblePoints || 0
+          
+          let pointsEarned = 0
+          let isCorrect = false
+          
+          // Direct weight-based scoring: sum of marks from passed test cases
+          if (totalPossiblePoints > 0) {
+            // Directly use the sum of weights (marks) from passed test cases
+            pointsEarned = totalPointsEarned
+            isCorrect = testCasesPassed === totalTestCases && totalPointsEarned === totalPossiblePoints
+          } else if (totalTestCases > 0 && testCasesPassed > 0) {
+            // Fallback: If no weights defined, divide marks equally among test cases
+            const marksPerTestCase = pts / totalTestCases
+            pointsEarned = Math.round(testCasesPassed * marksPerTestCase * 100) / 100
+            isCorrect = testCasesPassed === totalTestCases
+          }
+          
+          total += pointsEarned
+          
+          // Store graded answer with test case information
           gradedAnswers[q.id] = {
             userCode: answer?.userCode,
+            language: answer?.language,
             status: answer?.status || "unanswered",
-            is_correct: false, // To be graded manually
-            points_earned: 0,
+            is_correct: isCorrect,
+            points_earned: pointsEarned,
             max_points: pts,
-            requires_manual_grading: true
+            test_cases_passed: testCasesPassed,
+            total_test_cases: totalTestCases,
+            test_case_results: testCaseResults,
+            total_points_earned: totalPointsEarned,
+            total_possible_points: totalPossiblePoints,
+            requires_manual_grading: false // Auto-graded based on test cases
           }
         }
       })
@@ -1174,25 +1226,25 @@ export default function Component() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar - Sections/Questions */}
-        <div className={`${isSidebarOpen ? "w-80" : "w-0"} transition-all duration-300 border-r border-sky-200 bg-white shadow-sm overflow-hidden`}>
+        <div className={`${isSidebarOpen ? "w-16" : "w-0"} transition-all duration-300 border-r border-sky-200 bg-white shadow-sm overflow-hidden`}>
           <ScrollArea className="h-full">
-            <div className="p-2 space-y-4">
+            <div className="p-2 space-y-3">
               {uiSections.map((s, sIdx) => {
                 const locked = !unlockedSections[s.id]
                 const submitted = !!sectionSubmitted[s.id]
                 return (
-                  <div key={s.id} className="mb-2 relative">
-                    <div className="text-sm font-semibold text-sky-800 mb-2 px-2 py-1 bg-blue-100 rounded-lg inline-block">
+                  <div key={s.id} className="relative">
+                    <div className="text-xs font-semibold text-sky-800 mb-2 px-1 py-1 bg-blue-100 rounded text-center">
                       {s.title}
                     </div>
                     {(locked || submitted) && (
                       <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                        <div className="bg-sky-100 p-3 rounded-full flex items-center justify-center shadow-md">
-                          <Lock className="h-6 w-6 text-sky-600" />
+                        <div className="bg-sky-100 p-2 rounded-full flex items-center justify-center shadow-md">
+                          <Lock className="h-4 w-4 text-sky-600" />
                         </div>
                       </div>
                     )}
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-col gap-1.5 items-center">
                       {s.questions.map((q, qIdx) => {
                         const st = answers[q.id]?.status || "unanswered"
                         const isActive = currentSectionIdx === sIdx && currentQuestionIdx === qIdx
@@ -1202,7 +1254,7 @@ export default function Component() {
                             key={q.id}
                             onClick={() => navigateToQuestion(sIdx, qIdx)}
                             disabled={locked}
-                            className={cn("w-8 h-8 rounded-full text-xs font-semibold grid place-items-center border", color, isActive && "ring-2 ring-offset-1 ring-sky-500", locked && "opacity-60 cursor-not-allowed")}
+                            className={cn("w-10 h-7 rounded text-xs font-semibold grid place-items-center border", color, isActive && "ring-2 ring-offset-1 ring-sky-500", locked && "opacity-60 cursor-not-allowed")}
                             title={`${s.title} • Q${q.indexInSection}`}
                           >
                             {q.indexInSection}
@@ -1354,13 +1406,114 @@ export default function Component() {
                         }
                         
                         const data = await res.json()
+                        
+                        // Store test case results in answer state for later grading
+                        if (data.testCaseResults) {
+                          // Attach weights and calculate points earned for each test case
+                          const testCasesWithWeights = data.testCaseResults.map((result: any, index: number) => {
+                            const testCase = (currentQ.testCases || [])[index]
+                            const weight = testCase?.weight || 0
+                            const pointsEarned = result.passed ? weight : 0
+                            
+                            return {
+                              ...result,
+                              weight: weight,
+                              pointsEarned: pointsEarned
+                            }
+                          })
+                          
+                          // Calculate total points
+                          const totalPointsEarned = testCasesWithWeights.reduce(
+                            (sum: number, tc: any) => sum + (tc.pointsEarned || 0), 
+                            0
+                          )
+                          const totalPossiblePoints = (currentQ.testCases || []).reduce(
+                            (sum, tc) => sum + (tc.weight || 0), 
+                            0
+                          )
+                          
+                          updateAnswer(currentQ.id, { 
+                            testCaseResults: testCasesWithWeights,
+                            testCasesPassed: data.testCasesPassed,
+                            totalTestCases: data.totalTestCases,
+                            totalPointsEarned: totalPointsEarned,
+                            totalPossiblePoints: totalPossiblePoints,
+                            language: language
+                          })
+                        }
+                        
                         return data
                       } catch (err: any) {
                         return { error: err?.message || 'Failed to run test cases' }
                       }
                     }}
                     onSubmit={async (code, language) => {
-                      updateAnswer(currentQ.id, { userCode: code, status: "answered" })
+                      // First run test cases to get results
+                      try {
+                        const res = await fetch('/api/coding/run', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            code,
+                            language,
+                            testCases: currentQ.testCases || []
+                          })
+                        })
+                        
+                        if (res.ok) {
+                          const data = await res.json()
+                          
+                          // Attach weights and calculate points earned for each test case
+                          const testCasesWithWeights = (data.testCaseResults || []).map((result: any, index: number) => {
+                            const testCase = (currentQ.testCases || [])[index]
+                            const weight = testCase?.weight || 0
+                            const pointsEarned = result.passed ? weight : 0
+                            
+                            return {
+                              ...result,
+                              weight: weight,
+                              pointsEarned: pointsEarned
+                            }
+                          })
+                          
+                          // Calculate total points
+                          const totalPointsEarned = testCasesWithWeights.reduce(
+                            (sum: number, tc: any) => sum + (tc.pointsEarned || 0), 
+                            0
+                          )
+                          const totalPossiblePoints = (currentQ.testCases || []).reduce(
+                            (sum, tc) => sum + (tc.weight || 0), 
+                            0
+                          )
+                          
+                          // Store code, language, and test case results
+                          updateAnswer(currentQ.id, { 
+                            userCode: code,
+                            language: language,
+                            testCaseResults: testCasesWithWeights,
+                            testCasesPassed: data.testCasesPassed || 0,
+                            totalTestCases: data.totalTestCases || 0,
+                            totalPointsEarned: totalPointsEarned,
+                            totalPossiblePoints: totalPossiblePoints,
+                            status: "answered" 
+                          })
+                        } else {
+                          // If execution fails, still store the code
+                          updateAnswer(currentQ.id, { 
+                            userCode: code, 
+                            language: language,
+                            status: "answered" 
+                          })
+                        }
+                      } catch (err) {
+                        // If API call fails, still store the code
+                        updateAnswer(currentQ.id, { 
+                          userCode: code, 
+                          language: language,
+                          status: "answered" 
+                        })
+                      }
+                      
                       handleQuestionSubmit(currentQ)
                     }}
                     bottomPanelHeight={bottomPanelHeight}

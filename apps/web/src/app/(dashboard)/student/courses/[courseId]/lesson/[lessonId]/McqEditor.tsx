@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { ChevronLeft, Menu, X, Check, Info, Send, RotateCcw } from 'lucide-react'
 import { logger } from '@/lib/utils/logger'
+import { formatDateTime } from '@/lib/utils'
 
 interface McqQuestionProps {
   questionId: string
@@ -366,17 +367,6 @@ function QuestionPanel({
 }) {
   const [activeTab, setActiveTab] = useState("question")
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
   const getOptionLetter = (index: number) => String.fromCharCode(97 + index) // 0='a', 1='b', etc.
 
   return (
@@ -499,7 +489,7 @@ function QuestionPanel({
                                 <div className="text-sm text-gray-700 space-y-1">
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium">Submitted:</span>
-                                    <span>{formatDate(attempt.submitted_at || attempt.created_at)}</span>
+                                    <span>{formatDateTime(attempt.submitted_at || attempt.created_at)}</span>
                                   </div>
                                   {selectedOption !== undefined && mcq.options && (
                                     <div className="mt-2">

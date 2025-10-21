@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, memo } from "react"
 import { Card } from "@/components/ui/card"
 import { Lock, CheckCircle, XCircle, ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -11,6 +11,7 @@ export interface TestCase {
   expectedOutput?: string
   is_hidden?: boolean
   isHidden?: boolean
+  weight?: number // Marks/points for this specific test case
 }
 
 export interface TestCaseResult {
@@ -28,7 +29,7 @@ interface CodingTestCasePanelProps {
   fontSizeClass?: string
 }
 
-export function CodingTestCasePanel({
+export const CodingTestCasePanel = memo(function CodingTestCasePanel({
   testCases,
   testCaseResults = [],
   fontSizeClass = "text-sm"
@@ -100,6 +101,7 @@ export function CodingTestCasePanel({
                 >
                   Test Case #{i + 1}
                 </span>
+                {/* Weight/marks hidden from students during exam */}
                 {isHidden && <Lock className="h-4 w-4 text-gray-500" />}
               </div>
               <div className="flex items-center gap-2">
@@ -175,4 +177,4 @@ export function CodingTestCasePanel({
       })}
     </div>
   )
-}
+})

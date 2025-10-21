@@ -39,7 +39,8 @@ export async function GET(
         submission_status,
         is_submitted,
         total_score,
-        max_score
+        max_score,
+        ip_address
       `)
       .eq('exam_id', params.examId)
       .order('started_at', { ascending: false })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { logger } from '@/lib/utils/logger'
+import { formatRelativeTime } from '@/lib/utils'
 
 // GET /api/student/activity - Get student activity and upcoming deadlines
 export async function GET(request: NextRequest) {
@@ -173,19 +174,6 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-function formatRelativeTime(date: Date): string {
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / (1000 * 60))
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
-  if (diffMins < 60) return `${diffMins} minutes ago`
-  if (diffHours < 24) return `${diffHours} hours ago`
-  if (diffDays < 7) return `${diffDays} days ago`
-  return date.toLocaleDateString()
 }
 
 function calculateStreak(enrollments: any[]): number {

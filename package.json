@@ -8,5 +8,8 @@
   ],
   "devDependencies": {
     "turbo": "^1.13.4"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.35.6"
   }
 }
