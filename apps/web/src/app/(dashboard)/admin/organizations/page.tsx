@@ -48,44 +48,103 @@ export default function AdminOrganizationsPage() {
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [search, setSearch] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Check if user is super_admin, redirect regular admins to their organization
   useEffect(() => {
+    let isMounted = true
+    
     const checkRole = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        logger.log('🔍 Checking user role for organizations page...')
         
-        if (user) {
-          const { data: profile } = await supabase
-            .from('users')
-            .select('role, organization_id')
-            .eq('id', user.id)
-            .single() as { data: { role: string; organization_id: string } | null }
-          
-          // Regular admins should view their own organization
-          if (profile?.role === 'admin' && profile?.organization_id) {
-            router.replace(`/admin/organizations/${profile.organization_id}`)
-            return
-          }
-          
-          // Only super_admin can access organization list
-          if (profile?.role !== 'super_admin') {
-            router.replace('/admin/dashboard')
-            return
-          }
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        
+        if (!isMounted) return
+        
+        if (authError) {
+          logger.error('Auth error:', authError)
+          setError('Authentication failed: ' + authError.message)
+          setCheckingAuth(false)
+          return
+        }
+        
+        if (!user) {
+          logger.warn('No user found, redirecting to login')
+          setCheckingAuth(false)
+          router.replace('/auth/login')
+          return
+        }
+
+        logger.log('✓ User authenticated:', user.email)
+        
+        type UserProfile = {
+          role: string
+          organization_id: string | null
+        }
+        
+        const { data: profile, error: profileError } = await supabase
+          .from('users')
+          .select('role, organization_id')
+          .eq('id', user.id)
+          .single() as { data: UserProfile | null, error: any }
+        
+        if (!isMounted) return
+        
+        if (profileError) {
+          logger.error('Profile fetch error:', profileError)
+          setError('Failed to load user profile: ' + (profileError.message || 'Unknown error'))
+          setCheckingAuth(false)
+          return
+        }
+
+        if (!profile) {
+          logger.error('No profile data returned')
+          setError('User profile not found')
+          setCheckingAuth(false)
+          return
+        }
+
+        logger.log('✓ User role:', profile.role)
+        
+        // Regular admins should view their own organization
+        if (profile.role === 'admin' && profile.organization_id) {
+          logger.log('Regular admin detected, redirecting to organization page')
+          router.replace(`/admin/organizations/${profile.organization_id}`)
+          return
+        }
+        
+        // Only super_admin can access organization list
+        if (profile.role !== 'super_admin') {
+          logger.warn('User is not super_admin, redirecting to dashboard')
+          router.replace('/admin/dashboard')
+          return
+        }
+
+        logger.log('✅ Super admin verified, proceeding to load organizations')
+        if (isMounted) {
+          setCheckingAuth(false)
         }
       } catch (error) {
         logger.error('Error checking role:', error)
-      } finally {
-        setCheckingAuth(false)
+        if (isMounted) {
+          setError('An unexpected error occurred: ' + (error as Error).message)
+          setCheckingAuth(false)
+        }
       }
     }
     
     checkRole()
+    
+    // Cleanup
+    return () => {
+      isMounted = false
+    }
   }, [router])
 
   useEffect(() => {
     if (!checkingAuth) {
+      logger.log('Auth check complete, fetching organizations...')
       fetchOrganizations()
     }
   }, [checkingAuth])
@@ -93,13 +152,24 @@ export default function AdminOrganizationsPage() {
   const fetchOrganizations = async () => {
     try {
       setLoading(true)
+      setError(null)
+      logger.log('📡 Fetching organizations from API...')
+      
       const response = await fetch('/api/admin/organizations')
-      if (!response.ok) throw new Error('Failed to fetch organizations')
+      logger.log('API response status:', response.status)
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        logger.error('API error response:', errorData)
+        throw new Error(errorData.error || 'Failed to fetch organizations')
+      }
 
       const data = await response.json()
+      logger.log('✅ Organizations loaded:', data.organizations?.length || 0)
       setOrganizations(data.organizations || [])
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error fetching organizations:', error)
+      setError(error.message || 'Failed to load organizations')
     } finally {
       setLoading(false)
     }
@@ -112,7 +182,33 @@ export default function AdminOrganizationsPage() {
 
   // Show loading while checking authentication
   if (checkingAuth) {
-    return <LoadingSpinner message="Loading organizations..." />
+    return <LoadingSpinner message="Checking permissions..." />
+  }
+
+  // Show error if authentication or permissions failed
+  if (error && !loading) {
+    return (
+      <div className="flex-1 p-8 pt-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <p className="text-red-600 font-semibold mb-2">⚠️ Error</p>
+              <p className="text-muted-foreground">{error}</p>
+              <Button 
+                className="mt-4" 
+                onClick={() => {
+                  setError(null)
+                  setCheckingAuth(true)
+                  window.location.reload()
+                }}
+              >
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
