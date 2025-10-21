@@ -27,11 +27,13 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const router = useRouter()
   const { signIn, userProfile } = useAuth()
   const searchParams = useSearchParams()
   const nextParam = searchParams?.get('next') || undefined
   const errorParam = searchParams?.get('error')
+  const messageParam = searchParams?.get('message')
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -48,6 +50,13 @@ export function LoginForm() {
       setError('⚠️ Your account has been suspended. Please contact your administrator for assistance.')
     }
   }, [errorParam])
+
+  // Check for success message (e.g., after password reset)
+  useEffect(() => {
+    if (messageParam) {
+      setSuccessMessage(messageParam)
+    }
+  }, [messageParam])
 
   const onSubmit = async (values: LoginFormValues) => {
     try {
@@ -73,6 +82,12 @@ export function LoginForm() {
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      {successMessage && (
+        <Alert className="border-green-200 bg-green-50 text-green-800">
+          <AlertDescription>{successMessage}</AlertDescription>
+        </Alert>
+      )}
+      
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>

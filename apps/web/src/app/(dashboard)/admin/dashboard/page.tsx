@@ -18,9 +18,12 @@ import {
   FileText,
   TrendingUp,
   Clock,
-  Building2
+  Building2,
+  LogOut
 } from 'lucide-react'
 import { logger } from '@/lib/utils/logger'
+import { useAuth } from '@/lib/auth/AuthContext'
+import { useRouter } from 'next/navigation'
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -39,6 +42,8 @@ export default function AdminDashboard() {
     securityAlerts: 0
   })
   const [loading, setLoading] = useState(true)
+  const { signOut } = useAuth()
+  const router = useRouter()
 
   useEffect(() => {
     fetchStats()
@@ -63,6 +68,18 @@ export default function AdminDashboard() {
       setLoading(false)
     }
   }
+
+  const handleLogout = async () => {
+    try {
+      logger.log('Admin logout initiated')
+      await signOut()
+      router.push('/auth/login')
+    } catch (error) {
+      logger.error('Logout error:', error)
+      // Force navigation even if signOut fails
+      router.push('/auth/login')
+    }
+  }
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
@@ -77,9 +94,18 @@ export default function AdminDashboard() {
             <Building2 className="h-4 w-4 mr-2" />
             Manage Organizations
           </Button>
-          <Button size="sm">
+          <Button variant="outline" size="sm">
             <Settings className="h-4 w-4 mr-2" />
             System Settings
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleLogout}
+            data-logout-btn
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
           </Button>
         </div>
       </div>

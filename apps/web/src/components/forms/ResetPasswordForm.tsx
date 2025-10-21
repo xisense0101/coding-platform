@@ -19,7 +19,7 @@ import {
   AlertCircle,
   CheckCircle 
 } from 'lucide-react'
-import { useAuth } from '@/lib/auth/AuthContext'
+import { createClient } from '@/lib/database/client'
 
 import { logger } from '@/lib/utils/logger'
 
@@ -112,63 +112,243 @@ export function ResetPasswordForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [isValidSession, setIsValidSession] = useState(false)
+  const [isCheckingSession, setIsCheckingSession] = useState(true)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { updatePassword } = useAuth()
 
   const {
     register,
     handleSubmit,
     watch,
-    formState: { errors },
+    formState: { errors, isSubmitting, isValid },
   } = useForm<ResetPasswordFormData>({
     resolver: zodResolver(resetPasswordSchema),
+    mode: 'onChange',
   })
 
   const password = watch('password', '')
 
+  // Debug logging for form state
   useEffect(() => {
-    // Check if we have the necessary URL parameters for password reset
-    const code = searchParams.get('code')
-    if (!code) {
-      setError('Invalid password reset link. Please request a new one.')
+    console.log('📊 Component state:', { isLoading, isValidSession, isCheckingSession })
+  }, [isLoading, isValidSession, isCheckingSession])
+
+  // Debug logging for form validation
+  useEffect(() => {
+    console.log('📝 Form validation state:', { 
+      isValid, 
+      isSubmitting,
+      errors: Object.keys(errors),
+      hasPasswordError: !!errors.password,
+      hasConfirmError: !!errors.confirmPassword
+    })
+  }, [errors, isValid, isSubmitting])
+
+  useEffect(() => {
+    // When users click the reset link in their email, Supabase redirects with hash fragments
+    // The fragments are automatically processed by Supabase client to establish a recovery session
+    let mounted = true
+    let timeoutId: NodeJS.Timeout
+    
+    const checkSession = async () => {
+      if (!mounted) return
+      
+      setIsCheckingSession(true)
+      console.log('🔍 Checking password reset session...')
+      console.log('🌐 Current URL:', window.location.href)
+      console.log('🔗 Hash:', window.location.hash)
+      
+      try {
+        const supabase = createClient()
+        
+        // Listen for auth state changes - this is important for detecting the session from URL
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+          console.log('🔔 Auth state changed:', event, 'Session:', !!session)
+          
+          if (!mounted) return
+          
+          if (event === 'PASSWORD_RECOVERY' && session) {
+            console.log('✅ PASSWORD_RECOVERY event detected!')
+            setIsValidSession(true)
+            setIsCheckingSession(false)
+            if (timeoutId) clearTimeout(timeoutId)
+          } else if (event === 'SIGNED_IN' && session) {
+            console.log('✅ SIGNED_IN event with session')
+            setIsValidSession(true)
+            setIsCheckingSession(false)
+            if (timeoutId) clearTimeout(timeoutId)
+          }
+        })
+        
+        // Also do an immediate session check
+        // Add a small delay to allow URL hash processing
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        if (!mounted) return
+        
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        console.log('📧 Session check result:', { 
+          hasSession: !!session,
+          userId: session?.user?.id,
+          error: sessionError?.message 
+        })
+        
+        logger.info('Password reset session check:', { 
+          hasSession: !!session, 
+          sessionError: sessionError?.message 
+        })
+        
+        if (sessionError) {
+          console.error('❌ Session error:', sessionError)
+          logger.error('Session error:', sessionError)
+          if (mounted) {
+            setError('Failed to verify reset link. Please try again.')
+            setIsValidSession(false)
+            setIsCheckingSession(false)
+          }
+          subscription.unsubscribe()
+          return
+        }
+        
+        // For password reset, we need a valid session
+        if (!session) {
+          console.warn('⚠️ No session found after 1s - waiting for auth state change...')
+          // Set a timeout to show error if session doesn't arrive
+          timeoutId = setTimeout(() => {
+            if (mounted) {
+              console.error('❌ Timeout: No session established after 5 seconds')
+              setError('Your password reset link has expired or is invalid. Please request a new one.')
+              setIsValidSession(false)
+              setIsCheckingSession(false)
+            }
+            subscription.unsubscribe()
+          }, 5000) // Give 5 more seconds total
+        } else {
+          // Session exists, enable the form
+          console.log('✅ Valid session found - form enabled')
+          if (mounted) {
+            setIsValidSession(true)
+            setIsCheckingSession(false)
+          }
+          logger.info('Valid session found, form enabled')
+          subscription.unsubscribe()
+        }
+      } catch (err) {
+        console.error('💥 Session check error:', err)
+        logger.error('Session check error:', err)
+        if (mounted) {
+          setError('Failed to verify reset link. Please try again.')
+          setIsValidSession(false)
+          setIsCheckingSession(false)
+        }
+      }
     }
-  }, [searchParams])
+    
+    checkSession()
+    
+    return () => {
+      mounted = false
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }, [])
 
   const onSubmit = async (data: ResetPasswordFormData) => {
-    if (isLoading) return
+    console.log('═══════════════════════════════════════')
+    console.log('🚀 FORM SUBMITTED!')
+    console.log('═══════════════════════════════════════')
+    console.log('Current state:', { isLoading, isValidSession })
+    console.log('Form data:', { password: '***hidden***', confirmPassword: '***hidden***' })
+    
+    if (isLoading || !isValidSession) {
+      console.warn('⚠️⚠️⚠️ FORM SUBMISSION BLOCKED!')
+      console.warn('Reason:', { isLoading, isValidSession })
+      return
+    }
 
+    console.log('✅ Validation passed, setting isLoading to true...')
     setIsLoading(true)
     setError(null)
 
+    console.log('🔐 Starting password update...')
+
     try {
-      const code = searchParams.get('code')
-      if (!code) {
-        throw new Error('Invalid password reset link')
+      // Use Supabase client directly to update password
+      const supabase = createClient()
+      
+      // First, verify we have a valid session
+      console.log('🔍 Checking current session before update...')
+      const { data: { session: currentSession } } = await supabase.auth.getSession()
+      console.log('📋 Current session:', { 
+        hasSession: !!currentSession,
+        userId: currentSession?.user?.id,
+        accessToken: currentSession?.access_token ? 'present' : 'missing',
+        expiresAt: currentSession?.expires_at
+      })
+      
+      if (!currentSession) {
+        throw new Error('No active session found. Please click the reset link again.')
       }
-
-      const { error: resetError } = await updatePassword(data.password)
-
-      if (resetError) {
-        throw resetError
+      
+      console.log('📝 Attempting password update using Supabase REST API directly...')
+      
+      // Use fetch to call Supabase REST API directly with the access token
+      // This bypasses the JS client which might be having issues
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentSession.access_token}`,
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        },
+        body: JSON.stringify({
+          password: data.password
+        })
+      })
+      
+      console.log('📬 REST API response status:', response.status)
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error('❌ REST API error:', errorData)
+        throw new Error(errorData.message || 'Failed to update password')
       }
+      
+      const updateData = await response.json()
+      console.log('✅ REST API success:', { userId: updateData.id })
 
+      console.log('✅ Password updated successfully!')
       setSuccess(true)
       
-      // Redirect to login after a short delay
-      setTimeout(() => {
-        router.push('/auth/login?message=Password reset successfully. You can now sign in with your new password.')
-      }, 2000)
+      // Sign out the recovery session before redirecting to login
+      console.log('🚪 Signing out recovery session...')
+      try {
+        const signOutResult = await Promise.race([
+          supabase.auth.signOut(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Sign out timeout')), 3000))
+        ])
+        console.log('✅ Signed out successfully', signOutResult)
+      } catch (signOutError) {
+        console.warn('⚠️ Sign out error (continuing anyway):', signOutError)
+        // Continue with redirect even if sign out fails
+      }
+      
+      // Redirect to login
+      console.log('🔄 Redirecting to login...')
+      router.push('/auth/login?message=Password reset successfully. You can now sign in with your new password.')
 
     } catch (err) {
+      console.error('💥 Password reset submission error:', err)
       logger.error('Password reset error:', err)
       setError(
         err instanceof Error 
           ? err.message 
-          : 'Failed to reset password. Please try again.'
+          : 'Failed to reset password. Please try again or request a new reset link.'
       )
     } finally {
       setIsLoading(false)
+      console.log('🏁 Password update process complete')
     }
   }
 
@@ -180,15 +360,21 @@ export function ResetPasswordForm() {
           <AlertDescription>
             <strong>Password reset successful!</strong>
             <br />
-            Your password has been updated. You'll be redirected to the login page shortly.
+            Your password has been updated. Redirecting to login page...
           </AlertDescription>
         </Alert>
       </div>
     )
   }
 
+  const handleFormSubmit = (e: React.FormEvent) => {
+    console.log('🎯 Form onSubmit event triggered!')
+    console.log('Event:', e)
+    handleSubmit(onSubmit)(e)
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleFormSubmit} className="space-y-6">
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -261,15 +447,52 @@ export function ResetPasswordForm() {
         )}
       </div>
 
+      {isCheckingSession && (
+        <Alert className="border-blue-200 bg-blue-50 text-blue-800">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <AlertDescription>
+            Verifying your reset link...
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!isCheckingSession && !isValidSession && !error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Unable to verify reset link. Please request a new password reset.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Button
         type="submit"
         className="w-full"
-        disabled={isLoading || !searchParams.get('code')}
+        disabled={isLoading || !isValidSession || isCheckingSession}
+        onClick={(e) => {
+          console.log('═══════════════════════════════════════')
+          console.log('🖱️ BUTTON CLICKED!')
+          console.log('═══════════════════════════════════════')
+          console.log('Button state:', { 
+            isLoading, 
+            isValidSession, 
+            isCheckingSession,
+            disabled: isLoading || !isValidSession || isCheckingSession,
+            buttonType: e.currentTarget.type
+          })
+          console.log('Form errors:', errors)
+          console.log('Form values:', { password: password ? '***' : 'empty' })
+        }}
       >
         {isLoading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Updating password...
+          </>
+        ) : isCheckingSession ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Verifying...
           </>
         ) : (
           <>

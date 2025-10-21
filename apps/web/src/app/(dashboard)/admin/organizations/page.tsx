@@ -15,11 +15,13 @@ import {
   BookOpen,
   Home,
   Edit,
-  Trash2
+  Trash2,
+  LogOut
 } from 'lucide-react'
 import { logger } from '@/lib/utils/logger'
 import Link from 'next/link'
 import { supabase } from '@/lib/database/supabase'
+import { useAuth } from '@/lib/auth/AuthContext'
 
 interface Organization {
   id: string
@@ -40,6 +42,7 @@ interface Organization {
 
 export default function AdminOrganizationsPage() {
   const router = useRouter()
+  const { signOut } = useAuth()
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
   const [checkingAuth, setCheckingAuth] = useState(true)
@@ -130,10 +133,22 @@ export default function AdminOrganizationsPage() {
             </p>
           </div>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Organization
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Organization
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={async () => {
+              await signOut()
+              router.push('/auth/login')
+            }}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </div>
       </div>
 
       {/* Search */}

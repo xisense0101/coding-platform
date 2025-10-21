@@ -14,9 +14,7 @@ export default function LoginPage() {
     <AuthPageLayout
       title="Welcome back"
       description="Sign in to your account to continue your learning journey"
-      showSocialAuth={true}
-      footerHelpText="Forgot your password?"
-      footerHelpLink="/auth/forgot-password"
+      showSocialAuth={false}
     >
       <Suspense fallback={<div>Loading...</div>}>
         <LoginForm />
