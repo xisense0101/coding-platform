@@ -148,9 +148,9 @@ export async function POST(
                   socketIp || 
                   'unknown'
       
-      // Convert IPv6 localhost to readable format
+      // Convert IPv6 localhost to IPv4
       if (ipAddress === '::1' || ipAddress === '::ffff:127.0.0.1') {
-        ipAddress = '127.0.0.1 (localhost)'
+        ipAddress = '127.0.0.1'
       }
       
       logger.log('📍 Client IP detected:', ipAddress)
@@ -173,7 +173,7 @@ export async function POST(
         answers: {},
         is_submitted: false,
         submission_status: 'in_progress',
-        ip_address: ipAddress,
+        ip_address: ipAddress === 'unknown' ? null : ipAddress,
       })
       .select('id, started_at')
       .single()

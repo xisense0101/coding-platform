@@ -631,7 +631,9 @@ export default function Component() {
   const navigateToQuestion = (sectionIdx: number, questionIdx: number) => {
     const s = uiSections[sectionIdx]
     if (!s) return
+    // Block navigation to locked sections OR submitted sections
     if (!unlockedSections[s.id]) return
+    if (sectionSubmitted[s.id]) return
     setCurrentSectionIdx(sectionIdx)
     setCurrentQuestionIdx(questionIdx)
   }
@@ -642,7 +644,14 @@ export default function Component() {
     logger.log('✅ Current answer state:', answers[question.id])
     updateAnswer(question.id, { status: "answered" })
     const nextIdx = currentQuestionIdx + 1
-    if (currentSection && nextIdx < currentSection.questions.length) {
+    
+    // Check if this is the last question in the section
+    if (currentSection && nextIdx >= currentSection.questions.length) {
+      // Last question - show section submit dialog
+      logger.log('📋 Last question in section - showing section submit dialog')
+      handleSectionSubmitClick()
+    } else if (currentSection && nextIdx < currentSection.questions.length) {
+      // Not the last question - navigate to next question
       setCurrentQuestionIdx(nextIdx)
     }
   }
@@ -1128,9 +1137,10 @@ export default function Component() {
                 if (currentQuestionIdx > 0) setCurrentQuestionIdx(currentQuestionIdx - 1)
                 else if (currentSectionIdx > 0) {
                   const prevSectionIdx = currentSectionIdx - 1
-                  if (unlockedSections[uiSections[prevSectionIdx].id]) {
+                  const prevSection = uiSections[prevSectionIdx]
+                  if (prevSection && unlockedSections[prevSection.id] && !sectionSubmitted[prevSection.id]) {
                     setCurrentSectionIdx(prevSectionIdx)
-                    setCurrentQuestionIdx(uiSections[prevSectionIdx].questions.length - 1)
+                    setCurrentQuestionIdx(prevSection.questions.length - 1)
                   }
                 }
               }}
@@ -1145,9 +1155,13 @@ export default function Component() {
               onClick={() => {
                 if (!currentSection) return
                 if (currentQuestionIdx < currentSection.questions.length - 1) setCurrentQuestionIdx(currentQuestionIdx + 1)
-                else if (uiSections[currentSectionIdx + 1] && unlockedSections[uiSections[currentSectionIdx + 1].id]) {
-                  setCurrentSectionIdx(currentSectionIdx + 1)
-                  setCurrentQuestionIdx(0)
+                else {
+                  const nextSectionIdx = currentSectionIdx + 1
+                  const nextSection = uiSections[nextSectionIdx]
+                  if (nextSection && unlockedSections[nextSection.id] && !sectionSubmitted[nextSection.id]) {
+                    setCurrentSectionIdx(nextSectionIdx)
+                    setCurrentQuestionIdx(0)
+                  }
                 }
               }}
             >
@@ -1249,12 +1263,13 @@ export default function Component() {
                         const st = answers[q.id]?.status || "unanswered"
                         const isActive = currentSectionIdx === sIdx && currentQuestionIdx === qIdx
                         const color = st === "submitted" ? "bg-green-600 text-white" : st === "answered" ? "bg-sky-600 text-white" : "bg-slate-200 text-slate-700"
+                        const isDisabled = locked || submitted
                         return (
                           <button
                             key={q.id}
                             onClick={() => navigateToQuestion(sIdx, qIdx)}
-                            disabled={locked}
-                            className={cn("w-10 h-7 rounded text-xs font-semibold grid place-items-center border", color, isActive && "ring-2 ring-offset-1 ring-sky-500", locked && "opacity-60 cursor-not-allowed")}
+                            disabled={isDisabled}
+                            className={cn("w-10 h-7 rounded text-xs font-semibold grid place-items-center border", color, isActive && "ring-2 ring-offset-1 ring-sky-500", isDisabled && "opacity-60 cursor-not-allowed")}
                             title={`${s.title} • Q${q.indexInSection}`}
                           >
                             {q.indexInSection}
@@ -1271,7 +1286,31 @@ export default function Component() {
 
         {/* Main Content Area */}
         <div ref={containerRef} className="flex-1 flex relative overflow-hidden">
-          {currentQ?.type === "mcq" ? (
+          {currentSection && sectionSubmitted[currentSection.id] ? (
+            <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-sky-50 to-white p-8">
+              <div className="text-center space-y-4 max-w-md">
+                <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
+                  <Lock className="h-10 w-10 text-green-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-sky-900">Section Submitted</h2>
+                <p className="text-sky-700">
+                  You have already submitted this section. Your answers are locked and cannot be changed.
+                </p>
+                {uiSections[currentSectionIdx + 1] && unlockedSections[uiSections[currentSectionIdx + 1].id] && (
+                  <Button 
+                    onClick={() => {
+                      setCurrentSectionIdx(currentSectionIdx + 1)
+                      setCurrentQuestionIdx(0)
+                    }}
+                    className="mt-4 bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800"
+                  >
+                    Go to Next Section
+                    <ChevronRight className="h-4 w-4 ml-2" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : currentQ?.type === "mcq" ? (
             <>
               {/* MCQ: Left Panel - Question */}
               <div className="overflow-auto border-r border-sky-200 bg-white shadow-sm" style={{ width: `${leftPanelWidth}%` }}>
@@ -1605,12 +1644,16 @@ function MCQAnswerPanel({ question, onAnswerChange, onClearSelection, fontSizeCl
       <div className="flex-1 p-6 overflow-auto">
         <RadioGroup value={question.userAnswer || ""} onValueChange={onAnswerChange} className="space-y-4" disabled={isQuestionLocked}>
           {question.options?.map((option) => (
-            <div key={option.id} className={`flex items-center space-x-3 p-4 rounded-lg border-2 border-sky-200 transition-all duration-200 cursor-pointer ${isQuestionLocked ? "opacity-70 cursor-not-allowed" : "hover:bg-sky-50 hover:border-sky-300"}`}>
+            <Label 
+              key={option.id} 
+              htmlFor={option.id} 
+              className={`flex items-center space-x-3 p-4 rounded-lg border-2 border-sky-200 transition-all duration-200 ${isQuestionLocked ? "opacity-70 cursor-not-allowed" : "cursor-pointer hover:bg-sky-50 hover:border-sky-300"}`}
+            >
               <RadioGroupItem value={option.id} id={option.id} className="text-sky-600" disabled={isQuestionLocked} />
-              <Label htmlFor={option.id} className={cn("flex-1 cursor-pointer font-mono text-base text-black", fontSizeClass)}>
+              <span className={cn("flex-1 font-mono text-base text-black", fontSizeClass)}>
                 {option.text}
-              </Label>
-            </div>
+              </span>
+            </Label>
           ))}
         </RadioGroup>
       </div>
