@@ -3,6 +3,9 @@ import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { logger } from '@/lib/utils/logger'
 import { formatRelativeTime } from '@/lib/utils'
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic'
+
 // GET /api/student/activity - Get student activity and upcoming deadlines
 export async function GET(request: NextRequest) {
   try {

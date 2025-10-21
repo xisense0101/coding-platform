@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { logger } from '@/lib/utils/logger'
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/exam/getCurrentTypeOfExecution?quizId=:examId
  * 

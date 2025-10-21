@@ -3,6 +3,9 @@ import { withAuth } from '@/lib/auth/middleware'
 import { getCached, invalidateCache, CacheKeys, CacheTTL } from '@/lib/redis/client'
 import { logger } from '@/lib/utils/logger'
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic'
+
 // GET /api/teacher/stats - Get comprehensive teacher statistics (OPTIMIZED with caching)
 export const GET = withAuth(
   async (request: NextRequest, { user, userProfile, supabase }) => {
