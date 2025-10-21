@@ -97,6 +97,31 @@ export async function GET(request: NextRequest) {
       avgSessionDuration = Math.round(totalMinutes / enrollmentData.length)
     }
 
+    // Get ongoing exams count
+    const currentTime = new Date().toISOString()
+    const { count: ongoingExams } = await supabase
+      .from('exams')
+      .select('*', { count: 'exact', head: true })
+      .eq('organization_id', userProfile.organization_id)
+      .eq('is_published', true)
+      .lte('start_time', currentTime)
+      .gte('end_time', currentTime)
+
+    // Get user counts by role
+    const { count: studentCount } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .eq('organization_id', userProfile.organization_id)
+      .eq('role', 'student')
+      .eq('is_active', true)
+
+    const { count: teacherCount } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .eq('organization_id', userProfile.organization_id)
+      .eq('role', 'teacher')
+      .eq('is_active', true)
+
     const stats = {
       totalUsers: totalUsers || 0,
       newUsersThisMonth: newUsersThisMonth || 0,
@@ -106,6 +131,9 @@ export async function GET(request: NextRequest) {
       completedCourses: completedCourses || 0,
       dailyActiveUsers: dailyActiveUsers || 0,
       avgSessionDuration: avgSessionDuration,
+      ongoingExams: ongoingExams || 0,
+      activeStudents: studentCount || 0,
+      activeTeachers: teacherCount || 0,
       systemUptime: 99.9, // This would come from monitoring service
       securityAlerts: 0 // This would come from security monitoring
     }

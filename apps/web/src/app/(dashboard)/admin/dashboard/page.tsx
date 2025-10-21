@@ -31,6 +31,9 @@ export default function AdminDashboard() {
     completedCourses: 0,
     dailyActiveUsers: 0,
     avgSessionDuration: 0,
+    ongoingExams: 0,
+    activeStudents: 0,
+    activeTeachers: 0,
     systemUptime: 99.9,
     securityAlerts: 0
   })
@@ -240,33 +243,37 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" className="justify-start h-auto p-3">
+              <Button 
+                variant="outline" 
+                className="justify-start h-auto p-3"
+                onClick={() => window.location.href = '/admin/users?role=student'}
+              >
                 <div className="text-left">
                   <div className="font-medium">Students</div>
-                  <div className="text-sm text-muted-foreground">2,234 active</div>
+                  <div className="text-sm text-muted-foreground">{stats.activeStudents} active</div>
                 </div>
               </Button>
-              <Button variant="outline" className="justify-start h-auto p-3">
+              <Button 
+                variant="outline" 
+                className="justify-start h-auto p-3"
+                onClick={() => window.location.href = '/admin/users?role=teacher'}
+              >
                 <div className="text-left">
                   <div className="font-medium">Teachers</div>
-                  <div className="text-sm text-muted-foreground">89 active</div>
+                  <div className="text-sm text-muted-foreground">{stats.activeTeachers} active</div>
                 </div>
               </Button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" className="justify-start h-auto p-3">
-                <div className="text-left">
-                  <div className="font-medium">Admins</div>
-                  <div className="text-sm text-muted-foreground">12 active</div>
-                </div>
-              </Button>
-              <Button variant="outline" className="justify-start h-auto p-3">
-                <div className="text-left">
-                  <div className="font-medium">Organizations</div>
-                  <div className="text-sm text-muted-foreground">47 active</div>
-                </div>
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start h-auto p-3"
+              onClick={() => window.location.href = '/admin/users'}
+            >
+              <div className="text-left">
+                <div className="font-medium">All Users</div>
+                <div className="text-sm text-muted-foreground">Manage all users in your organization</div>
+              </div>
+            </Button>
           </CardContent>
         </Card>
 
@@ -310,6 +317,36 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Exam Monitoring */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Exam Monitoring</CardTitle>
+          <CardDescription>
+            Monitor ongoing exams and student activities in real-time.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between p-4 bg-accent/50 rounded-lg mb-4">
+            <div className="flex items-center space-x-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+                <Activity className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-lg">{loading ? '...' : stats.ongoingExams} Ongoing Exams</p>
+                <p className="text-sm text-muted-foreground">Active exams requiring monitoring</p>
+              </div>
+            </div>
+            <Button onClick={() => window.location.href = '/admin/exams/ongoing'}>
+              View All
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Access real-time monitoring dashboards for each exam to track student progress, 
+            detect violations, and ensure exam integrity.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   )
 }
