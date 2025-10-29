@@ -172,7 +172,7 @@ export default function StudentAuthModal({
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
       <div className="w-full max-w-6xl">
         {/* Main Card with Two Columns */}
-        <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-xl overflow-hidden animate-in fade-in slide-in-from-bottom duration-500">
+        <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-xl overflow-hidden">
           <div className="grid grid-cols-1 lg:grid-cols-2">
             {/* Left Side - Login Form */}
             <CardContent className="p-8 md:p-12">
