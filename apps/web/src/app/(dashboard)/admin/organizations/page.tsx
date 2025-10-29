@@ -42,7 +42,7 @@ interface Organization {
 
 export default function AdminOrganizationsPage() {
   const router = useRouter()
-  const { signOut } = useAuth()
+  const { signOut, user, userProfile, isLoading: authLoading } = useAuth()
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
   const [checkingAuth, setCheckingAuth] = useState(true)
@@ -56,68 +56,51 @@ export default function AdminOrganizationsPage() {
     
     const checkRole = async () => {
       try {
-        logger.log('🔍 Checking user role for organizations page...')
-        
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
-        
-        if (!isMounted) return
-        
-        if (authError) {
-          logger.error('Auth error:', authError)
-          setError('Authentication failed: ' + authError.message)
-          setCheckingAuth(false)
+        // Wait for auth to finish loading
+        if (authLoading) {
+          logger.log('🔍 Waiting for auth to load...')
           return
         }
         
+        logger.log('🔍 Checking user role for organizations page...')
+        
         if (!user) {
           logger.warn('No user found, redirecting to login')
-          setCheckingAuth(false)
-          router.replace('/auth/login')
+          if (isMounted) {
+            setCheckingAuth(false)
+            router.replace('/auth/login')
+          }
           return
         }
 
         logger.log('✓ User authenticated:', user.email)
         
-        type UserProfile = {
-          role: string
-          organization_id: string | null
-        }
-        
-        const { data: profile, error: profileError } = await supabase
-          .from('users')
-          .select('role, organization_id')
-          .eq('id', user.id)
-          .single() as { data: UserProfile | null, error: any }
-        
-        if (!isMounted) return
-        
-        if (profileError) {
-          logger.error('Profile fetch error:', profileError)
-          setError('Failed to load user profile: ' + (profileError.message || 'Unknown error'))
-          setCheckingAuth(false)
+        if (!userProfile) {
+          logger.error('No user profile found')
+          if (isMounted) {
+            setError('User profile not found. Please try logging in again.')
+            setCheckingAuth(false)
+          }
           return
         }
 
-        if (!profile) {
-          logger.error('No profile data returned')
-          setError('User profile not found')
-          setCheckingAuth(false)
-          return
-        }
-
-        logger.log('✓ User role:', profile.role)
+        logger.log('✓ User role:', userProfile.role)
         
         // Regular admins should view their own organization
-        if (profile.role === 'admin' && profile.organization_id) {
+        if (userProfile.role === 'admin' && userProfile.organization_id) {
           logger.log('Regular admin detected, redirecting to organization page')
-          router.replace(`/admin/organizations/${profile.organization_id}`)
+          if (isMounted) {
+            router.replace(`/admin/organizations/${userProfile.organization_id}`)
+          }
           return
         }
         
         // Only super_admin can access organization list
-        if (profile.role !== 'super_admin') {
+        if (userProfile.role !== 'super_admin') {
           logger.warn('User is not super_admin, redirecting to dashboard')
-          router.replace('/admin/dashboard')
+          if (isMounted) {
+            router.replace('/admin/dashboard')
+          }
           return
         }
 
@@ -140,7 +123,7 @@ export default function AdminOrganizationsPage() {
     return () => {
       isMounted = false
     }
-  }, [router])
+  }, [router, user, userProfile, authLoading])
 
   useEffect(() => {
     if (!checkingAuth) {

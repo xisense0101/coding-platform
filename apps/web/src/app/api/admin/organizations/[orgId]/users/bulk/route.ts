@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient, createAdminClient } from '@/lib/database/supabase-server'
 import { logger } from '@/lib/utils/logger'
-import { sendBulkCredentialsEmails } from '@/lib/email/resend'
+import { sendBulkCredentialsEmails } from '@/lib/email/mailjet'
 
 export const dynamic = 'force-dynamic'
 

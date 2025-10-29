@@ -25,6 +25,7 @@ import {
 import { logger } from '@/lib/utils/logger'
 import Link from 'next/link'
 import { supabase } from '@/lib/database/supabase'
+import { useAuth } from '@/lib/auth/AuthContext'
 
 interface User {
   id: string
@@ -41,6 +42,7 @@ interface User {
 
 export default function AdminUsersPage() {
   const router = useRouter()
+  const { user, userProfile, isLoading: authLoading } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [checkingAuth, setCheckingAuth] = useState(true)
@@ -59,36 +61,37 @@ export default function AdminUsersPage() {
   useEffect(() => {
     const checkRole = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        
-        if (user) {
-          const { data: profile } = await supabase
-            .from('users')
-            .select('role, organization_id')
-            .eq('id', user.id)
-            .single() as { data: { role: string; organization_id: string } | null }
-          
-          // Regular admins should use organization-scoped user management
-          if (profile?.role === 'admin' && profile?.organization_id) {
-            router.replace(`/admin/organizations/${profile.organization_id}/users`)
-            return
-          }
-          
-          // Only super_admin can access this page
-          if (profile?.role !== 'super_admin') {
-            router.replace('/admin/dashboard')
-            return
-          }
+        // Wait for auth to finish loading
+        if (authLoading) {
+          return
         }
+        
+        if (!user || !userProfile) {
+          router.replace('/auth/login')
+          return
+        }
+        
+        // Regular admins should use organization-scoped user management
+        if (userProfile.role === 'admin' && userProfile.organization_id) {
+          router.replace(`/admin/organizations/${userProfile.organization_id}/users`)
+          return
+        }
+        
+        // Only super_admin can access this page
+        if (userProfile.role !== 'super_admin') {
+          router.replace('/admin/dashboard')
+          return
+        }
+        
+        setCheckingAuth(false)
       } catch (error) {
         logger.error('Error checking role:', error)
-      } finally {
         setCheckingAuth(false)
       }
     }
     
     checkRole()
-  }, [router])
+  }, [router, user, userProfile, authLoading])
 
   useEffect(() => {
     if (!checkingAuth) {

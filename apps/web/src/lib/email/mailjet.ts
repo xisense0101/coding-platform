@@ -1,7 +1,11 @@
-import { Resend } from 'resend'
+import Mailjet from 'node-mailjet'
 import { logger } from '@/lib/utils/logger'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Initialize Mailjet client
+const mailjet = Mailjet.apiConnect(
+  process.env.MAILJET_API_KEY || '',
+  process.env.MAILJET_API_SECRET || ''
+)
 
 export interface SendCredentialsEmailParams {
   to: string
@@ -21,34 +25,59 @@ export async function sendCredentialsEmail({
   organizationName
 }: SendCredentialsEmailParams) {
   try {
-    // Use Resend test domain if no custom domain is configured
-    // For production, replace with your verified domain
-    const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev'
+    // Get sender information from environment variables
+    const fromEmail = process.env.FROM_EMAIL || 'noreply@yourdomain.com'
+    const fromName = process.env.FROM_NAME || organizationName
     
     logger.info(`Attempting to send email to ${to} from ${fromEmail}`)
     
-    const { data, error } = await resend.emails.send({
-      from: fromEmail,
-      to: [to],
-      subject: `Welcome to ${organizationName} - Your Account Credentials`,
-      html: getCredentialsEmailTemplate({
-        fullName,
-        email,
-        password,
-        role,
-        organizationName
+    const request = mailjet
+      .post('send', { version: 'v3.1' })
+      .request({
+        Messages: [
+          {
+            From: {
+              Email: fromEmail,
+              Name: fromName
+            },
+            To: [
+              {
+                Email: to,
+                Name: fullName
+              }
+            ],
+            Subject: `Welcome to ${organizationName} - Your Account Credentials`,
+            HTMLPart: getCredentialsEmailTemplate({
+              fullName,
+              email,
+              password,
+              role,
+              organizationName
+            })
+          }
+        ]
       })
-    })
 
-    if (error) {
-      logger.error('Error sending email via Resend:', { error, to, from: fromEmail })
-      return { success: false, error }
+    const result = await request
+    
+    if (result.body) {
+      const responseBody = result.body as any
+      const messageInfo = responseBody.Messages?.[0]
+      logger.info(`Credentials email sent successfully to ${to}`, { 
+        messageId: messageInfo?.To?.[0]?.MessageID,
+        status: messageInfo?.Status 
+      })
+      return { success: true, data: result.body }
     }
 
-    logger.info(`Credentials email sent successfully to ${to}`, { messageId: data?.id })
-    return { success: true, data }
-  } catch (error) {
-    logger.error('Exception sending email:', { error, to })
+    return { success: false, error: 'No response from Mailjet' }
+  } catch (error: any) {
+    logger.error('Error sending email via Mailjet:', { 
+      error: error.message || error, 
+      statusCode: error.statusCode,
+      to, 
+      from: process.env.FROM_EMAIL 
+    })
     return { success: false, error }
   }
 }
@@ -253,7 +282,7 @@ export async function sendBulkCredentialsEmails(
       failed++
       errors.push({ email: user.to, error: result.error })
     }
-    // Small delay to avoid rate limiting
+    // Small delay to avoid rate limiting (Mailjet free tier: 200 emails/day, 6000/month)
     await new Promise(resolve => setTimeout(resolve, 100))
   }
 
