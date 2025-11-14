@@ -54,41 +54,31 @@ export default function AdminOrganizationsPage() {
   useEffect(() => {
     let isMounted = true
     
-    const checkRole = async () => {
+    const checkRoleAndFetch = async () => {
       try {
         // Wait for auth to finish loading
         if (authLoading) {
-          logger.log('🔍 Waiting for auth to load...')
           return
         }
         
-        logger.log('🔍 Checking user role for organizations page...')
-        
         if (!user) {
-          logger.warn('No user found, redirecting to login')
           if (isMounted) {
             setCheckingAuth(false)
             router.replace('/auth/login')
           }
           return
         }
-
-        logger.log('✓ User authenticated:', user.email)
         
         if (!userProfile) {
-          logger.error('No user profile found')
           if (isMounted) {
             setError('User profile not found. Please try logging in again.')
             setCheckingAuth(false)
           }
           return
         }
-
-        logger.log('✓ User role:', userProfile.role)
         
         // Regular admins should view their own organization
         if (userProfile.role === 'admin' && userProfile.organization_id) {
-          logger.log('Regular admin detected, redirecting to organization page')
           if (isMounted) {
             router.replace(`/admin/organizations/${userProfile.organization_id}`)
           }
@@ -97,16 +87,16 @@ export default function AdminOrganizationsPage() {
         
         // Only super_admin can access organization list
         if (userProfile.role !== 'super_admin') {
-          logger.warn('User is not super_admin, redirecting to dashboard')
           if (isMounted) {
             router.replace('/admin/dashboard')
           }
           return
         }
 
-        logger.log('✅ Super admin verified, proceeding to load organizations')
+        // Auth verified, fetch organizations immediately
         if (isMounted) {
           setCheckingAuth(false)
+          fetchOrganizations()
         }
       } catch (error) {
         logger.error('Error checking role:', error)
@@ -117,20 +107,13 @@ export default function AdminOrganizationsPage() {
       }
     }
     
-    checkRole()
+    checkRoleAndFetch()
     
     // Cleanup
     return () => {
       isMounted = false
     }
   }, [router, user, userProfile, authLoading])
-
-  useEffect(() => {
-    if (!checkingAuth) {
-      logger.log('Auth check complete, fetching organizations...')
-      fetchOrganizations()
-    }
-  }, [checkingAuth])
 
   const fetchOrganizations = async () => {
     try {

@@ -1,12 +1,16 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { User, Session, AuthError } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/database/client'
 import type { User as DatabaseUser } from '@/lib/database/types'
 
 import { logger } from '@/lib/utils/logger'
+
+// Client-side cache for user profiles
+const profileCache = new Map<string, { profile: DatabaseUser; expiresAt: number }>()
+const PROFILE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 interface AuthContextType {
   user: User | null
@@ -32,9 +36,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
   const supabase = createClient()
 
-  // Get user profile from database
-  const getUserProfile = async (userId: string): Promise<DatabaseUser | null> => {
+  // Get user profile from database with caching
+  const getUserProfile = async (userId: string, forceRefresh = false): Promise<DatabaseUser | null> => {
     try {
+      // Check cache first
+      if (!forceRefresh) {
+        const cached = profileCache.get(userId)
+        if (cached && cached.expiresAt > Date.now()) {
+          logger.log('✅ Using cached profile for user:', userId)
+          return cached.profile
+        }
+      }
+
+      logger.log('📡 Fetching fresh profile from database for user:', userId)
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -49,6 +63,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         logger.error('Error fetching user profile:', error)
         return null
+      }
+      
+      // Cache the profile
+      if (data) {
+        profileCache.set(userId, {
+          profile: data,
+          expiresAt: Date.now() + PROFILE_CACHE_TTL
+        })
+        logger.log('💾 Cached profile for user:', userId)
       }
       
       return data
@@ -77,6 +100,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = async () => {
     if (user) {
+      // Clear cache and force refresh
+      profileCache.delete(user.id)
       await loadUserProfile(user.id)
     }
   }
@@ -121,11 +146,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Handle different auth events
         if (event === 'SIGNED_IN') {
-          setSession(session)
-          setUser(session?.user ?? null)
-          if (session?.user) {
-            await loadUserProfile(session.user.id)
-          }
+          // Don't process SIGNED_IN here if we're in the middle of our own signIn
+          // This prevents double-loading the profile
           return
         }
         
@@ -133,6 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(null)
           setUser(null)
           setUserProfile(null)
+          profileCache.clear()
           router.replace('/auth/login')
           return
         }
@@ -164,6 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string, nextPath?: string) => {
     try {
+      logger.log('🔐 Starting sign in process...')
       setIsLoading(true)
       
       // Clear any existing state first
@@ -177,11 +201,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
 
       if (error) {
+        logger.error('❌ Sign in error:', error)
         setIsLoading(false)
         return { error }
       }
 
       if (data.user && data.session) {
+        logger.log('✅ Authentication successful, setting session...')
+        
         // Set session and user immediately
         setSession(data.session)
         setUser(data.user)
@@ -192,6 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (userProfile) {
           // Check if account is suspended
           if (!userProfile.is_active) {
+            logger.warn('⚠️ Account is suspended')
             // Sign out the user immediately
             await supabase.auth.signOut()
             setSession(null)
@@ -202,6 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
 
           setUserProfile(userProfile)
+          logger.log('✅ User profile set:', userProfile.role)
           
           // Update last login (don't wait for it)
           supabase
@@ -210,35 +239,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .eq('id', data.user.id)
             .then(() => logger.log('Last login updated'))
 
+          // Determine redirect path
+          let redirectPath: string
+          
           // If a nextPath was provided and is a safe internal path, prefer it
           const isSafeNext = !!nextPath && nextPath.startsWith('/') && !nextPath.startsWith('//')
           if (isSafeNext) {
-            setTimeout(() => {
-              router.push(nextPath!)
-              setIsLoading(false)
-            }, 100)
-            return { data }
+            redirectPath = nextPath!
+          } else {
+            // Otherwise redirect based on user role
+            const roleRedirects = {
+              'teacher': '/teacher/dashboard',
+              'admin': '/admin/dashboard', 
+              'student': '/student/dashboard',
+              'super_admin': '/admin/dashboard'
+            } as const
+            
+            redirectPath = roleRedirects[userProfile.role] || '/student/dashboard'
           }
-
-          // Otherwise redirect based on user role
-          const roleRedirects = {
-            'teacher': '/teacher/dashboard',
-            'admin': '/admin/dashboard', 
-            'student': '/student/dashboard',
-            'super_admin': '/admin/dashboard'
-          } as const
           
-          const redirectPath = roleRedirects[userProfile.role] || '/student/dashboard'
+          logger.log('🚀 Redirecting to:', redirectPath)
           
-          // Use setTimeout to ensure state is set before navigation
-          setTimeout(() => {
-            router.push(redirectPath)
-            setIsLoading(false)
-          }, 100)
+          // Stop loading BEFORE navigation
+          setIsLoading(false)
+          
+          // Small delay to ensure state is propagated
+          await new Promise(resolve => setTimeout(resolve, 50))
+          
+          // Use replace to avoid back button issues
+          router.replace(redirectPath)
           
           return { data }
         } else {
           // Profile not found, redirect to login
+          logger.error('❌ User profile not found')
           setIsLoading(false)
           return { error: { message: 'User profile not found' } as AuthError }
         }
@@ -247,7 +281,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false)
       return { data }
     } catch (error) {
-      logger.error('Sign in error:', error)
+      logger.error('❌ Sign in error:', error)
       setIsLoading(false)
       return { error: error as AuthError }
     }
@@ -343,23 +377,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
-      logger.log('Starting logout process...')
+      logger.log('🚪 Starting logout process...')
       setIsLoading(true)
       
-      // Sign out from Supabase FIRST (before clearing state)
-      const { error } = await supabase.auth.signOut()
+      const currentUserId = user?.id
       
-      if (error) {
-        logger.error('Sign out error:', error)
-        // Continue with logout even if there's an error
-      } else {
-        logger.log('Successfully signed out from Supabase')
+      // Clear client-side cache FIRST
+      if (currentUserId) {
+        profileCache.delete(currentUserId)
+        logger.log('🗑️ Cleared profile cache')
       }
       
-      // Clear local state
+      // Clear local state immediately to prevent UI flickering
       setUser(null)
       setUserProfile(null)
       setSession(null)
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut({ scope: 'local' })
+      
+      if (error) {
+        logger.error('⚠️ Supabase sign out error:', error)
+        // Continue with logout even if there's an error
+      } else {
+        logger.log('✅ Successfully signed out from Supabase')
+      }
       
       // Clear localStorage session data
       try {
@@ -368,23 +410,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             key.startsWith('sb-') || key.includes('supabase')
           )
           supabaseKeys.forEach(key => localStorage.removeItem(key))
-          logger.log('Cleared localStorage session data')
+          logger.log('🗑️ Cleared localStorage session data')
         }
       } catch (storageError) {
-        logger.error('Error clearing localStorage:', storageError)
+        logger.error('⚠️ Error clearing localStorage:', storageError)
       }
       
-      // Force immediate navigation
-      logger.log('Redirecting to login page...')
-      router.replace('/auth/login')
+      // Force navigation with a small delay to ensure state is cleared
+      logger.log('↪️ Redirecting to login page...')
+      await new Promise(resolve => setTimeout(resolve, 100))
+      router.push('/auth/login')
       
     } catch (error) {
-      logger.error('Sign out error:', error)
-      // Even if there's an error, clear state and redirect
+      logger.error('❌ Sign out error:', error)
+      // Even if there's an error, ensure state is cleared
       setUser(null)
       setUserProfile(null)
       setSession(null)
-      router.replace('/auth/login')
+      if (user?.id) profileCache.delete(user.id)
+      router.push('/auth/login')
     } finally {
       setIsLoading(false)
     }

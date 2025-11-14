@@ -41,46 +41,36 @@ export function withAuth(
       let userProfile = null
       
       if (user) {
-        // Fetch user profile with optional caching
-        if (options.cacheProfile) {
-          userProfile = await getCached(
-            CacheKeys.userProfile(user.id),
-            async () => {
-              const { data, error } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', user.id)
-                .single()
-              
-              if (error) throw error
-              return data
-            },
-            CacheTTL.medium
-          )
-        } else {
-          const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', user.id)
-            .single()
-          
-          if (error || !data) {
-            return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
-          }
-          
-          userProfile = data
+        // Fetch user profile with caching enabled by default
+        userProfile = await getCached(
+          CacheKeys.userProfile(user.id),
+          async () => {
+            const { data, error } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', user.id)
+              .single()
+            
+            if (error) throw error
+            return data
+          },
+          CacheTTL.medium // 5 minutes cache
+        )
+
+        if (!userProfile && options.requireAuth) {
+          return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
         }
 
         // Check role requirements
-        if (options.requireRole) {
+        if (options.requireRole && userProfile) {
           if (options.requireRole === 'admin-or-teacher') {
-            if (userProfile.role !== 'admin' && userProfile.role !== 'teacher') {
+            if (userProfile.role !== 'admin' && userProfile.role !== 'teacher' && userProfile.role !== 'super_admin') {
               return NextResponse.json(
                 { error: 'Forbidden - Admin or Teacher access required' },
                 { status: 403 }
               )
             }
-          } else if (userProfile.role !== options.requireRole) {
+          } else if (userProfile.role !== options.requireRole && userProfile.role !== 'super_admin') {
             return NextResponse.json(
               { error: `Forbidden - ${options.requireRole} access required` },
               { status: 403 }

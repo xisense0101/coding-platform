@@ -63,10 +63,11 @@ export function LoginForm() {
       setIsLoading(true)
       setError(null)
 
-  const { error } = await signIn(values.email, values.password, nextParam)
+      const { error } = await signIn(values.email, values.password, nextParam)
 
       if (error) {
         setError(error.message)
+        setIsLoading(false)
         return
       }
 
@@ -75,7 +76,6 @@ export function LoginForm() {
     } catch (error) {
       logger.error('Login error:', error)
       setError('An unexpected error occurred. Please try again.')
-    } finally {
       setIsLoading(false)
     }
   }

@@ -2,8 +2,27 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
+// Simple in-memory cache for middleware (resets on server restart)
+const sessionCache = new Map<string, { session: any; userRole: string; expiresAt: number }>()
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+// Clean cache periodically
+setInterval(() => {
+  const now = Date.now()
+  for (const [key, value] of sessionCache.entries()) {
+    if (value.expiresAt < now) {
+      sessionCache.delete(key)
+    }
+  }
+}, 60 * 1000) // Clean every minute
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  
+  // Skip middleware for static files and API routes
+  if (pathname.startsWith('/_next') || pathname.startsWith('/api') || pathname.startsWith('/favicon')) {
+    return NextResponse.next()
+  }
   
   // Create a response object that we can modify
   let response = NextResponse.next({
@@ -31,9 +50,13 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session if expired - this is crucial for maintaining auth on page refresh
-  const { data: { session } } = await supabase.auth.getSession()
-
+  // Try to get session token from various Supabase cookie names
+  const allCookies = request.cookies.getAll()
+  const supabaseCookie = allCookies.find(cookie => 
+    cookie.name.includes('sb-') && cookie.name.includes('auth-token')
+  )
+  const sessionToken = supabaseCookie?.value
+  
   // Protected routes that require authentication
   const protectedPaths = ['/admin', '/teacher', '/student']
   const isProtectedRoute = protectedPaths.some(path => pathname.startsWith(path))
@@ -41,6 +64,44 @@ export async function middleware(request: NextRequest) {
   // Auth routes that authenticated users shouldn't access
   const authPaths = ['/auth/login', '/auth/register', '/auth/forgot-password']
   const isAuthRoute = authPaths.some(path => pathname.startsWith(path))
+
+  // Check cache first
+  let session: any = null
+  let userRole: string | null = null
+  
+  if (sessionToken) {
+    const cached = sessionCache.get(sessionToken)
+    if (cached && cached.expiresAt > Date.now()) {
+      session = cached.session
+      userRole = cached.userRole
+    }
+  }
+
+  // If not in cache or no session token, fetch from Supabase
+  if (!session) {
+    const { data: { session: freshSession } } = await supabase.auth.getSession()
+    session = freshSession
+
+    // Fetch user role if session exists
+    if (session && sessionToken) {
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', session.user.id)
+        .single()
+      
+      userRole = userProfile?.role || null
+      
+      // Cache the session and role
+      if (userRole) {
+        sessionCache.set(sessionToken, {
+          session,
+          userRole,
+          expiresAt: Date.now() + CACHE_TTL
+        })
+      }
+    }
+  }
 
   // If trying to access protected route without session, redirect to login
   if (isProtectedRoute && !session) {
@@ -50,14 +111,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // If logged in user tries to access auth routes, redirect to appropriate dashboard
-  if (isAuthRoute && session) {
-    // Get user profile to determine role
-    const { data: userProfile } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', session.user.id)
-      .single()
-
+  if (isAuthRoute && session && userRole) {
     const roleRedirects: Record<string, string> = {
       'teacher': '/teacher/dashboard',
       'admin': '/admin/dashboard',
@@ -65,7 +119,7 @@ export async function middleware(request: NextRequest) {
       'super_admin': '/admin/dashboard'
     }
 
-    const redirectPath = roleRedirects[userProfile?.role || 'student'] || '/student/dashboard'
+    const redirectPath = roleRedirects[userRole] || '/student/dashboard'
     return NextResponse.redirect(new URL(redirectPath, request.url))
   }
 

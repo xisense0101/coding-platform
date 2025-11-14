@@ -1,84 +1,83 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { logger } from '@/lib/utils/logger'
+import { getCached, CacheKeys, CacheTTL, invalidateCache } from '@/lib/redis/client'
 
 export const dynamic = 'force-dynamic'
 
 // GET /api/admin/organizations - Get all organizations
 export async function GET(request: NextRequest) {
   try {
-    logger.log('🔍 Admin organizations API - Starting request')
     const supabase = createSupabaseServerClient()
     
-    // Get current user
+    // Get current user (cached by middleware)
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      logger.error('Auth error:', authError)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    logger.log('User authenticated:', user.id)
-
-    // Get user profile and check super_admin role
-    const { data: userProfile, error: profileError } = await supabase
-      .from('users')
-      .select('organization_id, role')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError) {
-      logger.error('Profile fetch error:', profileError)
-      return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 500 })
-    }
+    // Get user profile with caching
+    const userProfile = await getCached(
+      CacheKeys.userProfile(user.id),
+      async () => {
+        const { data, error } = await supabase
+          .from('users')
+          .select('organization_id, role')
+          .eq('id', user.id)
+          .single()
+        
+        if (error) throw error
+        return data
+      },
+      CacheTTL.medium
+    )
 
     if (!userProfile) {
-      logger.error('No user profile found for:', user.id)
       return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
     }
 
-    logger.log('User profile role:', userProfile.role)
-
     if (userProfile.role !== 'super_admin') {
-      logger.warn('Non-super_admin attempted access:', userProfile.role)
       return NextResponse.json({ error: 'Forbidden - Super Admin access required' }, { status: 403 })
     }
 
-    // Get all organizations
-    logger.log('Fetching organizations from database...')
-    const { data: organizations, error: orgsError } = await supabase
-      .from('organizations')
-      .select('*')
-      .order('created_at', { ascending: false })
+    // Cache organizations list for super admins
+    const orgsWithCounts = await getCached(
+      'admin:organizations:list',
+      async () => {
+        // Get all organizations
+        const { data: organizations, error: orgsError } = await supabase
+          .from('organizations')
+          .select('*')
+          .order('created_at', { ascending: false })
 
-    if (orgsError) {
-      logger.error('Error fetching organizations:', orgsError)
-      return NextResponse.json({ error: 'Failed to fetch organizations' }, { status: 500 })
-    }
+        if (orgsError) throw orgsError
 
-    logger.log('Organizations fetched:', organizations?.length || 0)
+        // Get user counts for each organization in parallel
+        const orgsWithCounts = await Promise.all(
+          (organizations || []).map(async (org) => {
+            const [userCountResult, courseCountResult] = await Promise.all([
+              supabase
+                .from('users')
+                .select('*', { count: 'exact', head: true })
+                .eq('organization_id', org.id),
+              supabase
+                .from('courses')
+                .select('*', { count: 'exact', head: true })
+                .eq('organization_id', org.id)
+            ])
 
-    // Get user counts for each organization
-    const orgsWithCounts = await Promise.all(
-      (organizations || []).map(async (org) => {
-        const { count: userCount } = await supabase
-          .from('users')
-          .select('*', { count: 'exact', head: true })
-          .eq('organization_id', org.id)
+            return {
+              ...org,
+              userCount: userCountResult.count || 0,
+              courseCount: courseCountResult.count || 0
+            }
+          })
+        )
 
-        const { count: courseCount } = await supabase
-          .from('courses')
-          .select('*', { count: 'exact', head: true })
-          .eq('organization_id', org.id)
-
-        return {
-          ...org,
-          userCount: userCount || 0,
-          courseCount: courseCount || 0
-        }
-      })
+        return orgsWithCounts
+      },
+      CacheTTL.short // 1 minute cache for organizations list
     )
-
-    logger.log('✅ Returning organizations with counts')
 
     return NextResponse.json({
       organizations: orgsWithCounts
@@ -101,14 +100,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile and check super_admin role
-    const { data: userProfile, error: profileError } = await supabase
-      .from('users')
-      .select('organization_id, role')
-      .eq('id', user.id)
-      .single()
+    // Get user profile with caching
+    const userProfile = await getCached(
+      CacheKeys.userProfile(user.id),
+      async () => {
+        const { data, error } = await supabase
+          .from('users')
+          .select('organization_id, role')
+          .eq('id', user.id)
+          .single()
+        
+        if (error) throw error
+        return data
+      },
+      CacheTTL.medium
+    )
 
-    if (profileError || !userProfile || userProfile.role !== 'super_admin') {
+    if (!userProfile || userProfile.role !== 'super_admin') {
       return NextResponse.json({ error: 'Forbidden - Super Admin access required' }, { status: 403 })
     }
 
@@ -158,6 +166,9 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    // Invalidate organizations list cache
+    await invalidateCache('admin:organizations:list')
 
     return NextResponse.json({
       message: 'Organization created successfully',
