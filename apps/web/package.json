@@ -39,6 +39,7 @@
     "@supabase/ssr": "^0.4.1",
     "@supabase/supabase-js": "^2.43.4",
     "@tailwindcss/typography": "^0.5.13",
+    "@tanstack/react-query": "^5.90.10",
     "@types/uuid": "^10.0.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
@@ -59,9 +60,11 @@
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^11.1.0",
     "winston": "^3.18.3",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@tanstack/react-query-devtools": "^5.90.2",
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^14.1.2",
     "@testing-library/user-event": "^14.5.1",
