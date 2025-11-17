@@ -143,7 +143,9 @@ Thumbs.db
 logs
 *.log
 
-# Database
+# Testing
+coverage/
+.nyc_output/
 *.sqlite
 *.sqlite3
 *.db
