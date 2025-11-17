@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ChevronLeft, BookOpen, Play, CheckCircle2, Clock, FileText, Code, Video, PenTool, Lock, Star, TrendingUp, Users, Calendar, BarChart3 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { ResponsiveContainer } from '@/components/shared'
 
 interface Lesson {
   id: string
@@ -139,83 +140,86 @@ export default function CourseSections({ courseData, userId }: CourseSectionsPro
     <div className="min-h-screen bg-gradient-to-br from-sky-50 to-white">
       {/* Header */}
       <div className="border-b border-sky-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 shadow-sm">
-        <div className="flex items-center justify-between p-4 max-w-7xl mx-auto">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={handleBackClick}
-              className="border-sky-300 text-sky-700 hover:bg-sky-50"
-            >
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-sky-900">{processedCourse.title}</h1>
-              <p className="text-sky-600 text-sm">
-                {processedCourse.teacher?.full_name && `Instructor: ${processedCourse.teacher.full_name}`}
-              </p>
+        <ResponsiveContainer>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={handleBackClick}
+                className="border-sky-300 text-sky-700 hover:bg-sky-50 text-xs sm:text-sm"
+              >
+                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Back
+              </Button>
+              <div className="flex-1">
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-sky-900">{processedCourse.title}</h1>
+                <p className="text-sky-600 text-xs sm:text-sm">
+                  {processedCourse.teacher?.full_name && `Instructor: ${processedCourse.teacher.full_name}`}
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <div className="text-right text-sm">
-              <div className="font-medium text-sky-900">Progress</div>
-              <div className="text-sky-600">{Math.round(processedCourse.totalProgress || 0)}% Complete</div>
+            <div className="flex items-center gap-3 self-end sm:self-auto">
+              <div className="text-right text-xs sm:text-sm">
+                <div className="font-medium text-sky-900">Progress</div>
+                <div className="text-sky-600">{Math.round(processedCourse.totalProgress || 0)}% Complete</div>
+              </div>
+              <Avatar className="h-7 w-7 sm:h-8 sm:w-8 border border-sky-200">
+                <AvatarFallback className="bg-sky-100 text-sky-700 text-xs sm:text-sm">
+                  {processedCourse.teacher?.full_name?.charAt(0) || 'T'}
+                </AvatarFallback>
+              </Avatar>
             </div>
-            <Avatar className="h-8 w-8 border border-sky-200">
-              <AvatarFallback className="bg-sky-100 text-sky-700">
-                {processedCourse.teacher?.full_name?.charAt(0) || 'T'}
-              </AvatarFallback>
-            </Avatar>
           </div>
-        </div>
+        </ResponsiveContainer>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto p-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-2 bg-sky-100">
-            <TabsTrigger
-              value="content"
-              className="data-[state=active]:bg-white data-[state=active]:text-sky-900"
-            >
-              <BookOpen className="h-4 w-4 mr-2" />
-              Course Content
-            </TabsTrigger>
-            <TabsTrigger
-              value="scores"
-              className="data-[state=active]:bg-white data-[state=active]:text-sky-900"
-            >
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Progress & Scores
-            </TabsTrigger>
-          </TabsList>
+      <ResponsiveContainer>
+        <div className="py-4 sm:py-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+            <TabsList className="grid w-full max-w-full sm:max-w-2xl grid-cols-2 bg-sky-100">
+              <TabsTrigger
+                value="content"
+                className="data-[state=active]:bg-white data-[state=active]:text-sky-900 text-xs sm:text-sm"
+              >
+                <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Content
+              </TabsTrigger>
+              <TabsTrigger
+                value="scores"
+                className="data-[state=active]:bg-white data-[state=active]:text-sky-900 text-xs sm:text-sm"
+              >
+                <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Progress
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="content" className="space-y-6">
+          <TabsContent value="content" className="space-y-4 sm:space-y-6">
             {/* Course Progress */}
             <Card className="border-sky-200 bg-gradient-to-r from-sky-50 to-blue-50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-sky-900">Course Progress</h3>
-                    <p className="text-sky-600">
+                    <h3 className="text-base sm:text-lg font-semibold text-sky-900">Course Progress</h3>
+                    <p className="text-sky-600 text-xs sm:text-sm">
                       {processedCourse.sections.filter(s => s.isCompleted).length} of {processedCourse.sections.length} sections completed
                     </p>
                   </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold text-sky-900">{Math.round(processedCourse.totalProgress || 0)}%</div>
-                    <div className="text-sm text-sky-600">Overall Progress</div>
+                  <div className="text-left sm:text-right">
+                    <div className="text-2xl sm:text-3xl font-bold text-sky-900">{Math.round(processedCourse.totalProgress || 0)}%</div>
+                    <div className="text-xs sm:text-sm text-sky-600">Overall Progress</div>
                   </div>
                 </div>
                 <Progress
                   value={processedCourse.totalProgress || 0}
-                  className="h-3 bg-sky-100"
+                  className="h-2 sm:h-3 bg-sky-100"
                 />
               </CardContent>
             </Card>
 
             {/* Sections Overview */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {processedCourse.sections.map((section) => (
                 <Card
                   key={section.id}
@@ -226,26 +230,26 @@ export default function CourseSections({ courseData, userId }: CourseSectionsPro
                   }`}
                   onClick={() => setSelectedSection(section)}
                 >
-                  <CardContent className="p-4">
+                  <CardContent className="p-3 sm:p-4">
                     <div className="flex items-center justify-between mb-2">
                       <Badge
                         variant={section.isCompleted ? "default" : "secondary"}
-                        className={section.isCompleted ? "bg-green-500" : ""}
+                        className={`${section.isCompleted ? "bg-green-500" : ""} text-xs`}
                       >
-                        {section.isCompleted ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <Clock className="h-3 w-3 mr-1" />}
+                        {section.isCompleted ? <CheckCircle2 className="h-2 w-2 sm:h-3 sm:w-3 mr-1" /> : <Clock className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />}
                         {section.isCompleted ? 'Completed' : 'In Progress'}
                       </Badge>
                     </div>
-                    <h4 className="font-semibold text-sky-900 mb-1">{section.title}</h4>
+                    <h4 className="font-semibold text-sky-900 mb-1 text-sm sm:text-base">{section.title}</h4>
                     {section.description && (
-                      <p className="text-sm text-sky-600 mb-3">{section.description}</p>
+                      <p className="text-xs sm:text-sm text-sky-600 mb-3 line-clamp-2">{section.description}</p>
                     )}
                     <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
+                      <div className="flex justify-between text-xs sm:text-sm">
                         <span className="text-sky-600">{section.lessons.length} lessons</span>
                         <span className="font-medium text-sky-900">{Math.round(section.progress)}%</span>
                       </div>
-                      <Progress value={section.progress} className="h-2" />
+                      <Progress value={section.progress} className="h-1.5 sm:h-2" />
                     </div>
                   </CardContent>
                 </Card>
@@ -255,23 +259,23 @@ export default function CourseSections({ courseData, userId }: CourseSectionsPro
             {/* Section Details */}
             {selectedSection && (
               <Card className="border-sky-200">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-sky-900">{selectedSection.title}</h3>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4">
+                    <div className="flex-1">
+                      <h3 className="text-lg sm:text-xl font-bold text-sky-900">{selectedSection.title}</h3>
                       {selectedSection.description && (
-                        <p className="text-sky-600 mt-1">{selectedSection.description}</p>
+                        <p className="text-sky-600 mt-1 text-xs sm:text-sm">{selectedSection.description}</p>
                       )}
                     </div>
                     <Badge
                       variant={selectedSection.isCompleted ? "default" : "secondary"}
-                      className={selectedSection.isCompleted ? "bg-green-500" : ""}
+                      className={`${selectedSection.isCompleted ? "bg-green-500" : ""} text-xs sm:text-sm whitespace-nowrap`}
                     >
                       {selectedSection.lessons.filter(l => l.isCompleted).length} / {selectedSection.lessons.length} Complete
                     </Badge>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {selectedSection.lessons.map((lesson, index) => (
                       <Card
                         key={lesson.id}
@@ -280,26 +284,26 @@ export default function CourseSections({ courseData, userId }: CourseSectionsPro
                         }`}
                         onClick={() => handleLessonClick(lesson)}
                       >
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <div className={`p-2 rounded-full border ${getTypeColor(lesson.type)}`}>
+                        <CardContent className="p-3 sm:p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                              <div className={`p-1.5 sm:p-2 rounded-full border ${getTypeColor(lesson.type)} flex-shrink-0`}>
                                 {getTypeIcon(lesson.type)}
                               </div>
-                              <div>
-                                <h5 className="font-medium text-sky-900">{lesson.title}</h5>
-                                <p className="text-sm text-sky-600">
+                              <div className="flex-1 min-w-0">
+                                <h5 className="font-medium text-sky-900 text-sm sm:text-base truncate">{lesson.title}</h5>
+                                <p className="text-xs sm:text-sm text-sky-600">
                                   {lesson.duration} • {lesson.points} points
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 flex-shrink-0">
                               {lesson.isLocked ? (
-                                <Lock className="h-5 w-5 text-gray-400" />
+                                <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
                               ) : lesson.isCompleted ? (
-                                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
                               ) : (
-                                <Play className="h-5 w-5 text-sky-500" />
+                                <Play className="h-4 w-4 sm:h-5 sm:w-5 text-sky-500" />
                               )}
                             </div>
                           </div>
@@ -312,22 +316,22 @@ export default function CourseSections({ courseData, userId }: CourseSectionsPro
             )}
           </TabsContent>
 
-          <TabsContent value="scores" className="space-y-6">
+          <TabsContent value="scores" className="space-y-4 sm:space-y-6">
             <Card className="border-sky-200">
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold text-sky-900 mb-4">Progress & Scores</h3>
-                <div className="grid md:grid-cols-2 gap-6">
+              <CardContent className="p-4 sm:p-6">
+                <h3 className="text-lg sm:text-xl font-bold text-sky-900 mb-4">Progress & Scores</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   {processedCourse.sections.map((section) => (
                     <Card key={section.id} className="border-sky-100">
-                      <CardContent className="p-4">
-                        <h4 className="font-semibold text-sky-900 mb-2">{section.title}</h4>
+                      <CardContent className="p-3 sm:p-4">
+                        <h4 className="font-semibold text-sky-900 mb-2 text-sm sm:text-base">{section.title}</h4>
                         <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
+                          <div className="flex justify-between text-xs sm:text-sm">
                             <span className="text-sky-600">Progress</span>
                             <span className="font-medium">{Math.round(section.progress)}%</span>
                           </div>
-                          <Progress value={section.progress} className="h-2" />
-                          <div className="flex justify-between text-sm">
+                          <Progress value={section.progress} className="h-1.5 sm:h-2" />
+                          <div className="flex justify-between text-xs sm:text-sm">
                             <span className="text-sky-600">Completed Lessons</span>
                             <span className="font-medium">
                               {section.lessons.filter(l => l.isCompleted).length} / {section.lessons.length}

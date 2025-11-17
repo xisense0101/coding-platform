@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { courseService } from '@/lib/database/service'
 import { useAuth } from '@/lib/auth/AuthContext'
 import CourseSections from './CourseSections'
-import { Loader2 } from 'lucide-react'
+import { LoadingPage, ErrorMessage } from '@/components/shared'
 
 import { logger } from '@/lib/utils/logger'
 
@@ -50,25 +50,17 @@ export default function CoursePage({ params }: Props) {
   }, [params.courseId, user, router])
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    )
+    return <LoadingPage message="Loading course..." />
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-red-600">{error}</p>
-          <button 
-            onClick={() => router.push('/student/dashboard')}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Back to Dashboard
-          </button>
-        </div>
+      <div className="flex items-center justify-center min-h-screen p-4">
+        <ErrorMessage
+          message={error}
+          onRetry={() => router.push('/student/dashboard')}
+          retryLabel="Back to Dashboard"
+        />
       </div>
     )
   }
