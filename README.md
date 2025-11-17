@@ -11,6 +11,7 @@ A production-ready, enterprise-grade online coding platform built with Next.js 1
 - **Real-time Code Execution**: Powered by Judge0 API
 - **Organization Management**: Multi-tenancy support for educational institutions
 - **Monitoring & Observability**: Health checks, structured logging, and error tracking
+- **Modern State Management**: React Query for server state, Zustand for client state
 
 ## 📋 Prerequisites
 
@@ -104,8 +105,14 @@ apps/web/
 │   │   ├── auth/             # Authentication utilities
 │   │   ├── database/         # Database clients and services
 │   │   ├── email/            # Email service integration
-│   │   └── redis/            # Redis client
-│   ├── hooks/                 # Custom React hooks
+│   │   ├── redis/            # Redis client
+│   │   ├── providers/        # React providers (Query, etc.)
+│   │   ├── stores/           # Zustand stores
+│   │   └── hooks/            # Custom React hooks & queries
+│   ├── components/
+│   │   ├── shared/           # Reusable shared components
+│   │   └── ...               # Feature-specific components
+│   ├── hooks/                 # Legacy custom React hooks
 │   └── __tests__/            # Test files
 ├── .eslintrc.json            # ESLint configuration
 ├── .prettierrc.json          # Prettier configuration
@@ -167,6 +174,57 @@ The application follows a clean, layered architecture:
 - **Type safety**: Comprehensive TypeScript types throughout
 - **Validation**: Zod schemas for runtime validation
 - **Security**: Rate limiting, input sanitization, and authentication middleware
+- **State Management**: React Query for server state, Zustand for client state
+
+### State Management
+
+The platform uses a modern, scalable state management approach:
+
+#### Server State (React Query)
+React Query manages all server-side data with automatic caching, background refetching, and optimistic updates:
+
+```typescript
+import { usePublishedCourses } from '@/lib/hooks/queries'
+
+function CoursesPage() {
+  const { data: courses, isLoading, error } = usePublishedCourses()
+  
+  if (isLoading) return <LoadingSpinner />
+  if (error) return <ErrorMessage message={error.message} />
+  
+  return <CourseList courses={courses} />
+}
+```
+
+Available query hooks:
+- `usePublishedCourses()` - Fetch all published courses
+- `useTeacherCourses(teacherId)` - Fetch courses by teacher
+- `useCourse(courseId)` - Fetch single course with sections
+- `useStudentEnrollments(studentId)` - Fetch student enrollments
+- `useCurrentUser()` - Fetch current authenticated user
+
+#### Client State (Zustand)
+Zustand manages UI and application state with minimal boilerplate:
+
+```typescript
+import { useUserStore, useUIStore } from '@/lib/stores'
+
+function Navigation() {
+  const { user, isAuthenticated } = useUserStore()
+  const { isSidebarOpen, toggleSidebar } = useUIStore()
+  
+  return (
+    <nav>
+      <button onClick={toggleSidebar}>Toggle Sidebar</button>
+      {isAuthenticated && <UserMenu user={user} />}
+    </nav>
+  )
+}
+```
+
+Available stores:
+- `useUserStore` - User authentication state (persisted)
+- `useUIStore` - UI state (sidebar, mobile menu, theme)
 
 ## 🔒 Security
 
