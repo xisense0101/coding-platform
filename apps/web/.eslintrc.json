@@ -22,8 +22,11 @@
     ],
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/no-var-requires": "warn",
+    "prefer-const": "warn",
     "no-console": ["warn", { "allow": ["warn", "error"] }],
-    "react/react-in-jsx-scope": "off"
+    "react/react-in-jsx-scope": "off",
+    "react/no-unescaped-entities": "warn"
   },
   "settings": {
     "react": {
