@@ -99,14 +99,38 @@ export async function POST(
 
 ### Input Sanitization
 
+⚠️ **Important**: The built-in `sanitizeString` function is designed for **plain text only**. For rich text or HTML content, you must use a dedicated library like DOMPurify.
+
 ```typescript
 import { sanitizeString, sanitizeObject } from '@/server/utils/validation'
 
-// Sanitize individual string (removes HTML, XSS vectors)
+// Sanitize individual string (plain text only)
 const clean = sanitizeString(userInput)
 
-// Sanitize all strings in an object recursively
+// Sanitize all strings in an object recursively (plain text only)
 const cleanData = sanitizeObject(requestData)
+```
+
+**Sanitization Best Practices:**
+
+1. **Primary Defense**: Use Zod schemas for validation (type, format, length constraints)
+2. **Plain Text**: Use `sanitizeString` for plain text fields (names, titles, descriptions)
+3. **Rich Text/HTML**: Use DOMPurify or similar libraries for HTML content
+4. **Output Encoding**: React automatically escapes output (don't disable)
+5. **CSP Headers**: Already implemented in middleware for additional protection
+6. **Database**: Use parameterized queries (Supabase does this automatically)
+
+**Example with Zod + Sanitization:**
+
+```typescript
+import { z } from 'zod'
+import { sanitizeString } from '@/server/utils/validation'
+
+const userSchema = z.object({
+  name: z.string().min(1).max(255).transform(sanitizeString),
+  email: z.string().email(),
+  bio: z.string().max(1000).transform(sanitizeString), // Plain text bio
+})
 ```
 
 ### Predefined Schemas

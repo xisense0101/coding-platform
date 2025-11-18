@@ -76,20 +76,47 @@ export function validateParams<T>(
 }
 
 /**
- * Sanitize string to prevent XSS attacks
- * Removes potentially dangerous characters and HTML tags
+ * Basic sanitization helper for plain text input
+ * 
+ * ⚠️ WARNING: This is a basic sanitization function suitable only for plain text.
+ * For rich text or HTML content, you MUST use a dedicated library like DOMPurify.
+ * 
+ * This function performs basic cleanup for plain text inputs to remove common
+ * XSS vectors, but should NOT be relied upon as the sole defense against XSS.
+ * 
+ * Best practices:
+ * 1. Validate input with Zod schemas (type, format, length)
+ * 2. Use this sanitization for plain text only
+ * 3. For HTML/rich text, use DOMPurify or similar
+ * 4. Always escape output in templates (React does this by default)
+ * 5. Use Content Security Policy headers (already implemented in middleware)
  */
 export function sanitizeString(input: string): string {
   if (typeof input !== 'string') return ''
   
-  // Remove HTML tags
-  let sanitized = input.replace(/<[^>]*>/g, '')
+  let sanitized = input
   
-  // Remove potentially dangerous characters
-  sanitized = sanitized
-    .replace(/[<>]/g, '') // Remove angle brackets
-    .replace(/javascript:/gi, '') // Remove javascript: protocol
-    .replace(/on\w+=/gi, '') // Remove event handlers
+  // For plain text, simply encode/remove HTML entities and dangerous patterns
+  // This is NOT sufficient for rich text/HTML content
+  
+  // Remove dangerous URL schemes
+  const dangerousSchemes = ['javascript:', 'data:', 'vbscript:', 'file:', 'about:']
+  for (const scheme of dangerousSchemes) {
+    const regex = new RegExp(scheme, 'gi')
+    // Apply multiple times to prevent bypasses like "javajavascript:script:"
+    let prevLength = 0
+    while (sanitized.length !== prevLength && regex.test(sanitized)) {
+      prevLength = sanitized.length
+      sanitized = sanitized.replace(regex, '')
+    }
+  }
+  
+  // Remove HTML tags and scripts (basic approach - use DOMPurify for production rich text)
+  // Remove angle brackets entirely for plain text
+  sanitized = sanitized.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  
+  // Remove null bytes
+  sanitized = sanitized.replace(/\0/g, '')
   
   return sanitized.trim()
 }
