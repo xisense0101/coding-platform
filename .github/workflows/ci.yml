@@ -16,6 +16,10 @@ jobs:
     name: Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     
+    # Explicitly set minimal permissions for security
+    permissions:
+      contents: read
+    
     strategy:
       matrix:
         node-version: [18.x, 20.x]
@@ -55,6 +59,10 @@ jobs:
   lint-check:
     name: Lint and Format Check
     runs-on: ubuntu-latest
+    
+    # Explicitly set minimal permissions for security
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout code
