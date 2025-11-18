@@ -6,10 +6,20 @@ import 'react-quill/dist/quill.snow.css'
 import { cn } from '@/lib/utils'
 
 // Dynamically import ReactQuill to avoid SSR issues
-const ReactQuill = dynamic(() => import('react-quill'), { 
-  ssr: false,
-  loading: () => <div className="h-40 bg-gray-50 animate-pulse rounded-md" />
-})
+const ReactQuill = dynamic(
+  () => import('react-quill'),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="h-40 bg-gray-50 animate-pulse rounded-md flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mb-2"></div>
+          <div className="text-xs text-gray-600">Loading text editor...</div>
+        </div>
+      </div>
+    )
+  }
+)
 
 interface RichTextEditorProps {
   value?: string
