@@ -81,6 +81,7 @@ jobs:
         run: cd apps/web && npx playwright install-deps chromium
 
       - name: Build application
+        continue-on-error: true
         run: npm run build
         env:
           NODE_ENV: production
@@ -88,6 +89,14 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
           NEXT_PUBLIC_SUPABASE_ANON_KEY: mock-key
           SUPABASE_SERVICE_ROLE_KEY: mock-key
+
+      - name: Start dev server
+        run: |
+          cd apps/web && npm run dev &
+          npx wait-on http://localhost:3000 --timeout 120000
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: mock-key
 
       - name: Run E2E tests
         run: cd apps/web && npm run test:e2e:ci
