@@ -131,6 +131,44 @@ modularizeImports: {
 
 **Impact**: Imports only the icons used, not the entire library (~500KB savings).
 
+### 5. Performance Utilities
+
+**Locations**: 
+- `src/lib/utils/performance.ts` - Utility functions for measuring performance
+- `src/components/common/PerformanceProfiler.tsx` - React Profiler wrapper component
+
+#### Measuring Function Performance
+
+```tsx
+import { measurePerformance, measurePerformanceAsync } from '@/lib/utils/performance'
+
+// Synchronous functions
+const result = measurePerformance('expensive-calculation', () => {
+  return calculateSomething()
+}, 10) // threshold in ms
+
+// Async functions
+const data = await measurePerformanceAsync('api-call', async () => {
+  return await fetchData()
+}, 100) // threshold in ms
+```
+
+#### Profiling Component Renders
+
+```tsx
+import { PerformanceProfiler } from '@/components/common/PerformanceProfiler'
+
+export function MyPage() {
+  return (
+    <PerformanceProfiler id="MyPage">
+      <ExpensiveComponent />
+    </PerformanceProfiler>
+  )
+}
+```
+
+**Note**: Performance utilities only run in development mode and are automatically disabled in production.
+
 ## Bundle Analysis
 
 ### Running Bundle Analyzer
