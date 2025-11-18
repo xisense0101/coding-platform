@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/lib/auth/AuthContext'
+import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
   title: 'Enterprise Educational Platform',
@@ -53,6 +54,7 @@ export default function RootLayout({
           <div className="min-h-screen bg-background text-foreground">
             {children}
           </div>
+          <Toaster />
         </AuthProvider>
       </body>
     </html>
