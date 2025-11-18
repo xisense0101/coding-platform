@@ -3,7 +3,7 @@
 
 import { RichTextPreview } from '@/features/coding/RichTextEditor'
 import { CodeEditor } from '@/features/coding/CodeEditor'
-import { CodeTemplateRow } from '@/components/coding'
+import { CodeTemplateRow } from '@/features/coding'
 import { ExamPreview } from '@/features/exam/ExamPreview'
 
 import { useState, useEffect, Suspense } from "react"

@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { RichTextPreview } from "@/features/coding/RichTextEditor"
-import { CodingQuestionInterface } from "@/components/coding"
+import { CodingQuestionInterface } from "@/features/coding"
 
 interface PreviewQuestion {
   id: number

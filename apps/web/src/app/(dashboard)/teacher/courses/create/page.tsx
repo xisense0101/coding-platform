@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RichTextEditor } from '@/features/coding/RichTextEditor'
 import { CodeEditor } from '@/features/coding/CodeEditor'
-import { CodeTemplateRow } from '@/components/coding'
+import { CodeTemplateRow } from '@/features/coding'
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -17,7 +17,7 @@ import { ArrowLeft, Plus, Save, Eye, EyeOff, Code, FileText, Trash2, Settings, U
 
 import { logger } from '@/lib/utils/logger'
 
-// Using shared CodeTemplateRow from @/components/coding
+// Using shared CodeTemplateRow from @/features/coding
 
 interface Question {
   id: number;

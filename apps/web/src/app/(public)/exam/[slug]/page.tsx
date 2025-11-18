@@ -1,7 +1,7 @@
 
 "use client"
 import { RichTextPreview } from '@/features/coding/RichTextEditor'
-import { CodingQuestionInterface } from '@/components/coding'
+import { CodingQuestionInterface } from '@/features/coding'
 import StudentAuthModal, { StudentAuthData } from '@/features/exam/StudentAuthModal'
 import { MonitoringStatus } from '@/features/exam/MonitoringStatus'
 import { ViolationAlert, ViolationAlertData } from '@/features/exam/ViolationAlert'
