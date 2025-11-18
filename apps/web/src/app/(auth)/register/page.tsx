@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { RegisterForm } from '@/components/forms/RegisterForm'
-import { AuthPageLayout } from '@/components/layouts'
+import { RegisterForm } from '@/features/auth/RegisterForm'
+import { AuthPageLayout } from '@/components/layout'
 
 import { logger } from '@/lib/utils/logger'
 

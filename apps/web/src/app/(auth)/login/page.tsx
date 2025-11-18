@@ -1,8 +1,8 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { LoginForm } from '@/components/forms/LoginForm'
-import { AuthPageLayout } from '@/components/layouts'
+import { LoginForm } from '@/features/auth/LoginForm'
+import { AuthPageLayout } from '@/components/layout'
 
 export const metadata: Metadata = {
   title: 'Login - Enterprise Educational Platform',

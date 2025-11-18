@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import dynamic from 'next/dynamic'
-import { RichTextPreview } from '@/components/editors/RichTextEditor'
+import { RichTextPreview } from '@/features/coding/RichTextEditor'
 import { ChevronLeft, ChevronRight, Code, FileText, CheckCircle2, PenTool, Send } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { logger } from '@/lib/utils/logger'

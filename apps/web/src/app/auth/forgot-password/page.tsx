@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { ForgotPasswordForm } from '@/components/forms/ForgotPasswordForm'
+import { ForgotPasswordForm } from '@/features/auth/ForgotPasswordForm'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, GraduationCap } from 'lucide-react'

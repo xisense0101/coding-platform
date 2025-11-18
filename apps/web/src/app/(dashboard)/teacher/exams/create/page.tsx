@@ -1,10 +1,10 @@
 
 "use client"
 
-import { RichTextPreview } from '@/components/editors/RichTextEditor'
-import { CodeEditor } from '@/components/editors/CodeEditor'
+import { RichTextPreview } from '@/features/coding/RichTextEditor'
+import { CodeEditor } from '@/features/coding/CodeEditor'
 import { CodeTemplateRow } from '@/components/coding'
-import { ExamPreview } from '@/components/exam/ExamPreview'
+import { ExamPreview } from '@/features/exam/ExamPreview'
 
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { RichTextEditor } from '@/components/editors/RichTextEditor'
+import { RichTextEditor } from '@/features/coding/RichTextEditor'
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { ArrowLeft, Plus, Save, Eye, EyeOff, Code, CheckCircle, Trash2, Settings } from 'lucide-react'

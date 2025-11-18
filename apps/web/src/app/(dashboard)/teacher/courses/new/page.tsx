@@ -26,7 +26,7 @@ import {
   Settings,
   Upload
 } from 'lucide-react'
-import { RichTextEditor } from '@/components/editors/RichTextEditor'
+import { RichTextEditor } from '@/features/coding/RichTextEditor'
 
 import { logger } from '@/lib/utils/logger'
 

@@ -25,8 +25,8 @@ import {
   Star,
   Tag
 } from 'lucide-react'
-import { RichTextEditor } from '@/components/editors/RichTextEditor'
-import { CodeEditor } from '@/components/editors/CodeEditor'
+import { RichTextEditor } from '@/features/coding/RichTextEditor'
+import { CodeEditor } from '@/features/coding/CodeEditor'
 
 interface Question {
   id: string

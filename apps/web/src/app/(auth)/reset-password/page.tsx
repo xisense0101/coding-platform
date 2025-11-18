@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { ResetPasswordForm } from '@/components/forms/ResetPasswordForm'
+import { ResetPasswordForm } from '@/features/auth/ResetPasswordForm'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, GraduationCap, Loader2 } from 'lucide-react'

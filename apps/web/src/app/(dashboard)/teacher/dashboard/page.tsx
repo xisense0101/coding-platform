@@ -27,7 +27,7 @@ import {
   User,
   Monitor
 } from 'lucide-react'
-import { StatCard, CourseCard, ActivityItem } from '@/components/common/UIComponents'
+import { StatCard, CourseCard, ActivityItem } from '@/components/data/UIComponents'
 import { useTeacherCourses, useTeacherStats, useTeacherExams, useTeacherActivity } from '@/hooks/useData'
 import { useAuth } from '@/lib/auth/AuthContext'
 

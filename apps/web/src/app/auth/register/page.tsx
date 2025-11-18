@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { RegisterForm } from '@/components/forms/RegisterForm'
+import { RegisterForm } from '@/features/auth/RegisterForm'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, GraduationCap } from 'lucide-react'

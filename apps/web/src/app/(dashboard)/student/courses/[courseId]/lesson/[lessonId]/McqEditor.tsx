@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { RichTextPreview } from '@/components/editors/RichTextEditor'
+import { RichTextPreview } from '@/features/coding/RichTextEditor'
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { ChevronLeft, Menu, X, Check, Info, Send, RotateCcw } from 'lucide-react'

@@ -8,9 +8,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { CodeEditor } from '@/components/editors/CodeEditor'
+import { CodeEditor } from '@/features/coding/CodeEditor'
 import { Badge } from "@/components/ui/badge"
-import { RichTextPreview } from '@/components/editors/RichTextEditor'
+import { RichTextPreview } from '@/features/coding/RichTextEditor'
 import { logger } from '@/lib/utils/logger'
 import { formatDateTime } from '@/lib/utils'
 import {

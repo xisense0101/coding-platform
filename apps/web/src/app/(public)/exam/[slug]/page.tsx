@@ -1,10 +1,10 @@
 
 "use client"
-import { RichTextPreview } from '@/components/editors/RichTextEditor'
+import { RichTextPreview } from '@/features/coding/RichTextEditor'
 import { CodingQuestionInterface } from '@/components/coding'
-import StudentAuthModal, { StudentAuthData } from '@/components/exam/StudentAuthModal'
-import { MonitoringStatus } from '@/components/exam/MonitoringStatus'
-import { ViolationAlert, ViolationAlertData } from '@/components/exam/ViolationAlert'
+import StudentAuthModal, { StudentAuthData } from '@/features/exam/StudentAuthModal'
+import { MonitoringStatus } from '@/features/exam/MonitoringStatus'
+import { ViolationAlert, ViolationAlertData } from '@/features/exam/ViolationAlert'
 
 import type React from "react"
 

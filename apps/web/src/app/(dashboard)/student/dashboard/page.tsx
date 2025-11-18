@@ -27,7 +27,7 @@ import {
   ChevronRight,
   Bell
 } from 'lucide-react'
-import { StatCard, CourseCard, ActivityItem } from '@/components/common/UIComponents'
+import { StatCard, CourseCard, ActivityItem } from '@/components/data/UIComponents'
 import { useUser, useStudentCourses, useStudentActivity } from "@/hooks/useData"
 import { useAuth } from '@/lib/auth/AuthContext'
 import Link from 'next/link'

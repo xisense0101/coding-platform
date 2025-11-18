@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { DashboardPageWrapper } from '@/components/layouts'
-import { LoadingSpinner } from '@/components/common/LoadingStates'
+import { DashboardPageWrapper } from '@/components/layout'
+import { LoadingSpinner } from '@/components/feedback/LoadingStates'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

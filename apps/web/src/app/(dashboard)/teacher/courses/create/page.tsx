@@ -7,8 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { RichTextEditor } from '@/components/editors/RichTextEditor'
-import { CodeEditor } from '@/components/editors/CodeEditor'
+import { RichTextEditor } from '@/features/coding/RichTextEditor'
+import { CodeEditor } from '@/features/coding/CodeEditor'
 import { CodeTemplateRow } from '@/components/coding'
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
