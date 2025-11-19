@@ -9,20 +9,10 @@ import { Play, RotateCcw, Copy, Download, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // Dynamically import Monaco Editor to reduce initial bundle size
-const Editor = dynamic(
-  () => import('@monaco-editor/react'),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
-          <div className="text-sm text-gray-600">Loading code editor...</div>
-        </div>
-      </div>
-    )
-  }
-)
+const Editor = dynamic(() => import('@monaco-editor/react'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-full">Loading editor...</div>
+})
 
 interface CodeEditorProps {
   value?: string

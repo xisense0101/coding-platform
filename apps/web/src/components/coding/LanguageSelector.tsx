@@ -1,6 +1,5 @@
 "use client"
 
-import { memo } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface LanguageSelectorProps {
@@ -11,7 +10,7 @@ interface LanguageSelectorProps {
   className?: string
 }
 
-export const LanguageSelector = memo(function LanguageSelector({
+export function LanguageSelector({
   selectedLanguage,
   allowedLanguages,
   onLanguageChange,
@@ -32,4 +31,4 @@ export const LanguageSelector = memo(function LanguageSelector({
       </SelectContent>
     </Select>
   )
-})
+}
