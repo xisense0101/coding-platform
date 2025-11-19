@@ -53,7 +53,6 @@ export default function RootLayout({
           <div className="min-h-screen bg-background text-foreground">
             {children}
           </div>
-          <Toaster />
         </AuthProvider>
       </body>
     </html>

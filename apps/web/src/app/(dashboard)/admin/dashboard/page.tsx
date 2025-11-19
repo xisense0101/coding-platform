@@ -3,9 +3,6 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Container } from '@/components/ui/container'
-import { PageHeader } from '@/components/ui/page-header'
-import { Skeleton } from '@/components/ui/skeleton'
 import { 
   Users, 
   BookOpen, 
@@ -84,103 +81,91 @@ export default function AdminDashboard() {
     }
   }
   return (
-    <Container size="xl" className="py-6">
-      <PageHeader
-        heading="Super Admin Dashboard"
-        description="Manage organizations and monitor platform-wide metrics. Select an organization to manage users and resources."
-        actions={
-          <>
-            <Button variant="outline" size="sm" onClick={() => window.location.href = '/admin/organizations'}>
-              <Building2 className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Manage Organizations</span>
-              <span className="sm:hidden">Organizations</span>
-            </Button>
-            <Button variant="outline" size="sm">
-              <Settings className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">System Settings</span>
-              <span className="sm:hidden">Settings</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleLogout}
-              data-logout-btn
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Logout</span>
-              <span className="sm:hidden">Exit</span>
-            </Button>
-          </>
-        }
-      />
+    <div className="flex-1 space-y-6 p-8 pt-6">
+      <div className="flex items-center justify-between space-y-2">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Super Admin Dashboard</h2>
+          <p className="text-muted-foreground">
+            Manage organizations and monitor platform-wide metrics. Select an organization to manage users and resources.
+          </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" size="sm" onClick={() => window.location.href = '/admin/organizations'}>
+            <Building2 className="h-4 w-4 mr-2" />
+            Manage Organizations
+          </Button>
+          <Button variant="outline" size="sm">
+            <Settings className="h-4 w-4 mr-2" />
+            System Settings
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleLogout}
+            data-logout-btn
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </div>
+      </div>
 
       {/* System Overview */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {loading ? (
-          <>
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-          </>
-        ) : (
-          <>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalUsers.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  +{stats.newUsersThisMonth} new this month
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Courses</CardTitle>
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.activeCourses}</div>
-                <p className="text-xs text-muted-foreground">
-                  +{stats.coursesThisWeek} published this week
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">System Uptime</CardTitle>
-                <Server className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.systemUptime}%</div>
-                <p className="text-xs text-muted-foreground">
-                  Last 30 days
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Security Alerts</CardTitle>
-                <Shield className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.securityAlerts}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.securityAlerts > 0 ? 'Require attention' : 'All clear'}
-                </p>
-              </CardContent>
-            </Card>
-          </>
-        )}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{loading ? '...' : stats.totalUsers.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">
+              +{stats.newUsersThisMonth} new this month
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Courses</CardTitle>
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{loading ? '...' : stats.activeCourses}</div>
+            <p className="text-xs text-muted-foreground">
+              +{stats.coursesThisWeek} published this week
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">System Uptime</CardTitle>
+            <Server className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.systemUptime}%</div>
+            <p className="text-xs text-muted-foreground">
+              Last 30 days
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Security Alerts</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.securityAlerts}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.securityAlerts > 0 ? 'Require attention' : 'All clear'}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Organizations Quick Access */}
-      <Card className="mt-6">
+      <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center justify-between">
             <div>
               <CardTitle>Organizations</CardTitle>
               <CardDescription>
@@ -194,7 +179,7 @@ export default function AdminDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground">
             Click on any organization to access user management, exam monitoring, course administration, 
             and organization-specific settings. All administrative tasks are performed within the context 
             of a selected organization.
@@ -202,9 +187,9 @@ export default function AdminDashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-7 mt-6">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
         {/* Recent System Events */}
-        <Card className="lg:col-span-4">
+        <Card className="col-span-4">
           <CardHeader>
             <CardTitle>Recent System Events</CardTitle>
             <CardDescription>
@@ -212,38 +197,38 @@ export default function AdminDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-start sm:items-center space-x-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20">
-                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <div className="flex items-center space-x-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
               </div>
-              <div className="space-y-1 min-w-0 flex-1">
+              <div className="space-y-1">
                 <p className="text-sm font-medium">Security alert: Multiple failed login attempts</p>
                 <p className="text-sm text-muted-foreground">IP: 192.168.1.100 - 15 minutes ago</p>
               </div>
             </div>
-            <div className="flex items-start sm:items-center space-x-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/20">
-                <UserCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <div className="flex items-center space-x-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+                <UserCheck className="h-4 w-4 text-blue-600" />
               </div>
-              <div className="space-y-1 min-w-0 flex-1">
-                <p className="text-sm font-medium">New organization registered: &ldquo;TechCorp University&rdquo;</p>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">New organization registered: "TechCorp University"</p>
                 <p className="text-sm text-muted-foreground">1 hour ago</p>
               </div>
             </div>
-            <div className="flex items-start sm:items-center space-x-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20">
-                <Database className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <div className="flex items-center space-x-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+                <Database className="h-4 w-4 text-green-600" />
               </div>
-              <div className="space-y-1 min-w-0 flex-1">
+              <div className="space-y-1">
                 <p className="text-sm font-medium">Database backup completed successfully</p>
                 <p className="text-sm text-muted-foreground">2 hours ago</p>
               </div>
             </div>
-            <div className="flex items-start sm:items-center space-x-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/20">
-                <Globe className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            <div className="flex items-center space-x-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100">
+                <Globe className="h-4 w-4 text-orange-600" />
               </div>
-              <div className="space-y-1 min-w-0 flex-1">
+              <div className="space-y-1">
                 <p className="text-sm font-medium">CDN cache cleared for all regions</p>
                 <p className="text-sm text-muted-foreground">4 hours ago</p>
               </div>
@@ -252,7 +237,7 @@ export default function AdminDashboard() {
         </Card>
 
         {/* System Status */}
-        <Card className="lg:col-span-3">
+        <Card className="col-span-3">
           <CardHeader>
             <CardTitle>System Status</CardTitle>
             <CardDescription>
@@ -300,7 +285,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Platform Statistics */}
-      <Card className="mt-6">
+      <Card>
         <CardHeader>
           <CardTitle>Platform-Wide Statistics</CardTitle>
           <CardDescription>
@@ -308,38 +293,38 @@ export default function AdminDashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2 min-w-0 flex-1">
-                <FileText className="h-4 w-4 text-blue-600 shrink-0" />
-                <span className="text-sm truncate">Exams Completed</span>
+              <div className="flex items-center space-x-2">
+                <FileText className="h-4 w-4 text-blue-600" />
+                <span className="text-sm">Exams Completed</span>
               </div>
-              <span className="text-sm font-medium ml-2">{loading ? '...' : stats.completedExams.toLocaleString()}</span>
+              <span className="text-sm font-medium">{loading ? '...' : stats.completedExams.toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2 min-w-0 flex-1">
-                <TrendingUp className="h-4 w-4 text-green-600 shrink-0" />
-                <span className="text-sm truncate">Course Completions</span>
+              <div className="flex items-center space-x-2">
+                <TrendingUp className="h-4 w-4 text-green-600" />
+                <span className="text-sm">Course Completions</span>
               </div>
-              <span className="text-sm font-medium ml-2">{loading ? '...' : stats.completedCourses.toLocaleString()}</span>
+              <span className="text-sm font-medium">{loading ? '...' : stats.completedCourses.toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2 min-w-0 flex-1">
-                <Clock className="h-4 w-4 text-orange-600 shrink-0" />
-                <span className="text-sm truncate">Avg. Session Duration</span>
+              <div className="flex items-center space-x-2">
+                <Clock className="h-4 w-4 text-orange-600" />
+                <span className="text-sm">Avg. Session Duration</span>
               </div>
-              <span className="text-sm font-medium ml-2">{loading ? '...' : `${stats.avgSessionDuration} min`}</span>
+              <span className="text-sm font-medium">{loading ? '...' : `${stats.avgSessionDuration} min`}</span>
             </div>
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2 min-w-0 flex-1">
-                <BarChart3 className="h-4 w-4 text-purple-600 shrink-0" />
-                <span className="text-sm truncate">Daily Active Users</span>
+              <div className="flex items-center space-x-2">
+                <BarChart3 className="h-4 w-4 text-purple-600" />
+                <span className="text-sm">Daily Active Users</span>
               </div>
-              <span className="text-sm font-medium ml-2">{loading ? '...' : stats.dailyActiveUsers.toLocaleString()}</span>
+              <span className="text-sm font-medium">{loading ? '...' : stats.dailyActiveUsers.toLocaleString()}</span>
             </div>
           </div>
         </CardContent>
       </Card>
-    </Container>
+    </div>
   )
 }
