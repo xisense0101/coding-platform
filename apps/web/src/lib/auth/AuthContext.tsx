@@ -5,6 +5,7 @@ import { User, Session, AuthError } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/database/client'
 import type { User as DatabaseUser } from '@/lib/database/types'
+import { AuthStoreSync } from './AuthStoreSync'
 
 import { logger } from '@/lib/utils/logger'
 
@@ -480,6 +481,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={value}>
+      <AuthStoreSync />
       {children}
     </AuthContext.Provider>
   )
