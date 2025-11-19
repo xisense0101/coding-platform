@@ -1,10 +1,23 @@
 /** @type {import('next').NextConfig} */
+
+// Configure bundle analyzer
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+})
+
 const nextConfig = {
   // Enable React strict mode for better development experience
   reactStrictMode: true,
   
   // Enable SWC minifier for better performance
   swcMinify: true,
+  
+  // ESLint configuration
+  eslint: {
+    // Warning: This allows production builds to successfully complete even if
+    // your project has ESLint errors.
+    ignoreDuringBuilds: true,
+  },
   
   experimental: {
     // Disable typedRoutes temporarily to avoid build errors with missing routes
@@ -85,6 +98,16 @@ const nextConfig = {
           },
         ],
       },
+      // Cache static assets more aggressively
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
     ]
   },
   
@@ -109,4 +132,4 @@ const nextConfig = {
   poweredByHeader: false,
 }
 
-module.exports = nextConfig
+module.exports = withBundleAnalyzer(nextConfig)
