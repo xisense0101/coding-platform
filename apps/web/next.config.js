@@ -1,4 +1,10 @@
 /** @type {import('next').NextConfig} */
+
+// Configure bundle analyzer
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+})
+
 const nextConfig = {
   // Enable React strict mode for better development experience
   reactStrictMode: true,
@@ -92,6 +98,16 @@ const nextConfig = {
           },
         ],
       },
+      // Cache static assets more aggressively
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
     ]
   },
   
@@ -116,4 +132,4 @@ const nextConfig = {
   poweredByHeader: false,
 }
 
-module.exports = nextConfig
+module.exports = withBundleAnalyzer(nextConfig)

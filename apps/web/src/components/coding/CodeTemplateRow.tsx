@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import React, { memo, useCallback, useMemo } from "react"
 import { CodeEditor } from "@/components/editors/CodeEditor"
 import { Label } from "@/components/ui/label"
 
@@ -25,7 +25,7 @@ interface CodeTemplateRowProps {
   programmingLanguages: string[]
 }
 
-export function CodeTemplateRow({
+export const CodeTemplateRow = memo(function CodeTemplateRow({
   question,
   sectionId,
   updateQuestion,
@@ -35,15 +35,41 @@ export function CodeTemplateRow({
     (question.languages && question.languages[0])?.toLowerCase() || "javascript"
   )
 
-  // Ensure head/body_template/tail are objects
-  const headObj =
-    typeof question.head === "object" && question.head !== null ? question.head : {}
-  const bodyTemplateObj =
+  // Memoize objects to ensure stable references for useCallback
+  const headObj = useMemo(() => 
+    typeof question.head === "object" && question.head !== null ? question.head : {},
+    [question.head]
+  )
+  
+  const bodyTemplateObj = useMemo(() =>
     typeof question.body_template === "object" && question.body_template !== null
       ? question.body_template
-      : {}
-  const tailObj =
-    typeof question.tail === "object" && question.tail !== null ? question.tail : {}
+      : {},
+    [question.body_template]
+  )
+  
+  const tailObj = useMemo(() =>
+    typeof question.tail === "object" && question.tail !== null ? question.tail : {},
+    [question.tail]
+  )
+
+  const handleHeadChange = useCallback((val: string) => {
+    updateQuestion(sectionId, question.id, {
+      head: { ...headObj, [editLanguage]: val }
+    })
+  }, [sectionId, question.id, headObj, editLanguage, updateQuestion])
+
+  const handleBodyChange = useCallback((val: string) => {
+    updateQuestion(sectionId, question.id, {
+      body_template: { ...bodyTemplateObj, [editLanguage]: val }
+    })
+  }, [sectionId, question.id, bodyTemplateObj, editLanguage, updateQuestion])
+
+  const handleTailChange = useCallback((val: string) => {
+    updateQuestion(sectionId, question.id, {
+      tail: { ...tailObj, [editLanguage]: val }
+    })
+  }, [sectionId, question.id, tailObj, editLanguage, updateQuestion])
 
   return (
     <div className="space-y-4">
@@ -68,11 +94,7 @@ export function CodeTemplateRow({
           </Label>
           <CodeEditor
             value={headObj[editLanguage] || ""}
-            onChange={(val) => {
-              updateQuestion(sectionId, question.id, {
-                head: { ...headObj, [editLanguage]: val }
-              })
-            }}
+            onChange={handleHeadChange}
             language={editLanguage}
             placeholder="// Setup code (e.g. imports, function signature)"
             height={100}
@@ -83,11 +105,7 @@ export function CodeTemplateRow({
           <Label className="mb-1">Body Template</Label>
           <CodeEditor
             value={bodyTemplateObj[editLanguage] || ""}
-            onChange={(val) => {
-              updateQuestion(sectionId, question.id, {
-                body_template: { ...bodyTemplateObj, [editLanguage]: val }
-              })
-            }}
+            onChange={handleBodyChange}
             language={editLanguage}
             placeholder="// Main code area for student"
             height={140}
@@ -100,11 +118,7 @@ export function CodeTemplateRow({
           </Label>
           <CodeEditor
             value={tailObj[editLanguage] || ""}
-            onChange={(val) => {
-              updateQuestion(sectionId, question.id, {
-                tail: { ...tailObj, [editLanguage]: val }
-              })
-            }}
+            onChange={handleTailChange}
             language={editLanguage}
             placeholder="// Code to run after student code (e.g. output checks)"
             height={100}
@@ -114,4 +128,4 @@ export function CodeTemplateRow({
       </div>
     </div>
   )
-}
+})
