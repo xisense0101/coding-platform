@@ -1,11 +1,16 @@
 import Mailjet from 'node-mailjet'
 import { logger } from '@/lib/utils/logger'
 
-// Initialize Mailjet client
-const mailjet = Mailjet.apiConnect(
-  process.env.MAILJET_API_KEY || '',
-  process.env.MAILJET_API_SECRET || ''
-)
+// Initialize Mailjet client only if credentials are available
+const getMailjetClient = () => {
+  if (!process.env.MAILJET_API_KEY || !process.env.MAILJET_API_SECRET) {
+    return null
+  }
+  return Mailjet.apiConnect(
+    process.env.MAILJET_API_KEY,
+    process.env.MAILJET_API_SECRET
+  )
+}
 
 export interface SendCredentialsEmailParams {
   to: string
@@ -25,6 +30,13 @@ export async function sendCredentialsEmail({
   organizationName
 }: SendCredentialsEmailParams) {
   try {
+    const mailjet = getMailjetClient()
+    
+    if (!mailjet) {
+      logger.warn('Mailjet client not initialized - email not sent', { to })
+      return { success: false, error: 'Mailjet credentials not configured' }
+    }
+    
     // Get sender information from environment variables
     const fromEmail = process.env.FROM_EMAIL || 'noreply@yourdomain.com'
     const fromName = process.env.FROM_NAME || organizationName
