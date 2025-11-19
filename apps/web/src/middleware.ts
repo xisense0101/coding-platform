@@ -31,6 +31,31 @@ export async function middleware(request: NextRequest) {
     },
   })
 
+  // Add security headers (Helmet-style)
+  // These headers help protect against common web vulnerabilities
+  response.headers.set('X-Frame-Options', 'DENY')
+  response.headers.set('X-Content-Type-Options', 'nosniff')
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  response.headers.set('X-XSS-Protection', '1; mode=block')
+  
+  // Content Security Policy (report-only mode initially)
+  // Adjust based on your app's requirements
+  const cspDirectives = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // Monaco editor requires unsafe-eval
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: https:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+    "frame-ancestors 'none'",
+  ].join('; ')
+  
+  response.headers.set('Content-Security-Policy-Report-Only', cspDirectives)
+  
+  // Permissions Policy (formerly Feature Policy)
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+
+
   // Create Supabase client for middleware
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
