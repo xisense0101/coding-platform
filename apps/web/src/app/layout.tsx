@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import { Providers } from '@/providers'
+import { AuthProvider } from '@/lib/auth/AuthContext'
+import { Providers } from './providers'
+
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'Enterprise Educational Platform',
@@ -48,11 +51,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="font-sans antialiased">
+      <body className={inter.className}>
         <Providers>
-          <div className="min-h-screen bg-background text-foreground">
-            {children}
-          </div>
+          <AuthProvider>
+            <div className="min-h-screen bg-background text-foreground">
+              {children}
+            </div>
+          </AuthProvider>
         </Providers>
       </body>
     </html>
