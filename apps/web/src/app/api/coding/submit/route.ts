@@ -1,18 +1,30 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
+import { createRequestLogger, getRequestId } from '@/server/utils/logger'
+import { validateBody } from '@/server/utils/validation'
+import { submitCodeSchema } from '@/server/schemas/coding'
+import { UnauthorizedError, InternalServerError } from '@/server/utils/errors'
+import { withRateLimit, RateLimitPresets } from '@/server/middleware/rateLimit'
+import { NextRequest } from 'next/server'
 
-import { logger } from '@/lib/utils/logger'
-
-export async function POST(request: Request) {
+async function handler(request: NextRequest) {
+  const requestId = getRequestId(request.headers)
+  const log = createRequestLogger(requestId, { endpoint: '/api/coding/submit' })
+  
   try {
     const supabase = createSupabaseServerClient()
 
+    // Authenticate user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      log.warn('Unauthorized submission attempt')
+      throw new UnauthorizedError()
     }
 
-    const body = await request.json()
+    log.info({ userId: user.id }, 'Submission request received')
+
+    // Validate input
+    const validated = await validateBody(request, submitCodeSchema)
     const { 
       questionId, 
       code, 
@@ -21,11 +33,7 @@ export async function POST(request: Request) {
       testCasesPassed = 0,
       totalTestCases = 0,
       isCorrect = false
-    } = body
-
-    if (!questionId || code === undefined) {
-      return NextResponse.json({ error: 'questionId and code are required' }, { status: 400 })
-    }
+    } = validated
 
     // Get the current attempt number for this user and question (only count submitted attempts)
     const { data: existingAttempts, error: countError } = await supabase
@@ -46,6 +54,8 @@ export async function POST(request: Request) {
       language,
       submitted: true
     }
+
+    log.info({ questionId, attemptNumber }, 'Creating submission')
 
     const { data, error } = await supabase
       .from('attempts')
@@ -69,19 +79,40 @@ export async function POST(request: Request) {
       .single()
 
     if (error) {
-      logger.error('Error inserting submit attempt:', error)
-      return NextResponse.json({ error: 'Failed to create submission' }, { status: 500 })
+      log.error({ error: error.message }, 'Failed to create submission')
+      throw new InternalServerError('Failed to create submission')
     }
 
+    log.info({ 
+      submissionId: data.id,
+      testCasesPassed,
+      totalTestCases 
+    }, 'Submission created successfully')
+
+    // Return legacy format for backward compatibility
     return NextResponse.json({ 
       success: true,
       submission: data,
       message: totalTestCases > 0 
         ? `Code submitted! ${testCasesPassed}/${totalTestCases} test cases passed.`
         : 'Code submitted successfully!'
+    }, {
+      headers: { 'X-Request-ID': requestId }
     })
-  } catch (err) {
-    logger.error('Unexpected error in coding submit API:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err: any) {
+    log.error({ error: err.message }, 'Submission failed')
+    
+    // Return legacy error format
+    const statusCode = err instanceof UnauthorizedError ? 401 : 500
+    return NextResponse.json(
+      { error: err.message || 'Internal server error' },
+      { 
+        status: statusCode,
+        headers: { 'X-Request-ID': requestId }
+      }
+    )
   }
 }
+
+// Apply rate limiting - standard preset for submissions
+export const POST = withRateLimit(handler, RateLimitPresets.standard)

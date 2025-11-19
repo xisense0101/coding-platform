@@ -1,20 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
-import { logger } from '@/lib/utils/logger'
+import { createRequestLogger, getRequestId } from '@/server/utils/logger'
 import { getCached, CacheKeys, CacheTTL, invalidateCache } from '@/lib/redis/client'
+import { validateBody } from '@/server/utils/validation'
+import { createOrganizationSchema } from '@/server/schemas/admin'
+import { UnauthorizedError, ForbiddenError, ValidationError } from '@/server/utils/errors'
+import { withRateLimit, RateLimitPresets } from '@/server/middleware/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
 // GET /api/admin/organizations - Get all organizations
 export async function GET(request: NextRequest) {
+  const requestId = getRequestId(request.headers)
+  const log = createRequestLogger(requestId, { endpoint: 'GET /api/admin/organizations' })
+  
   try {
     const supabase = createSupabaseServerClient()
     
     // Get current user (cached by middleware)
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      log.warn('Unauthorized access attempt')
+      return NextResponse.json({ error: 'Unauthorized' }, { 
+        status: 401,
+        headers: { 'X-Request-ID': requestId }
+      })
     }
+
+    log.info({ userId: user.id }, 'Fetching organizations')
 
     // Get user profile with caching
     const userProfile = await getCached(
@@ -33,11 +46,18 @@ export async function GET(request: NextRequest) {
     )
 
     if (!userProfile) {
-      return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
+      return NextResponse.json({ error: 'User profile not found' }, { 
+        status: 404,
+        headers: { 'X-Request-ID': requestId }
+      })
     }
 
     if (userProfile.role !== 'super_admin') {
-      return NextResponse.json({ error: 'Forbidden - Super Admin access required' }, { status: 403 })
+      log.warn({ role: userProfile.role }, 'Forbidden access attempt')
+      return NextResponse.json({ error: 'Forbidden - Super Admin access required' }, { 
+        status: 403,
+        headers: { 'X-Request-ID': requestId }
+      })
     }
 
     // Cache organizations list for super admins
@@ -79,26 +99,40 @@ export async function GET(request: NextRequest) {
       CacheTTL.short // 1 minute cache for organizations list
     )
 
+    log.info({ count: orgsWithCounts.length }, 'Organizations fetched successfully')
+
     return NextResponse.json({
       organizations: orgsWithCounts
-    }, { status: 200 })
+    }, { 
+      status: 200,
+      headers: { 'X-Request-ID': requestId }
+    })
 
   } catch (error) {
-    logger.error('Admin organizations API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    log.error({ error }, 'Failed to fetch organizations')
+    return NextResponse.json({ error: 'Internal server error' }, { 
+      status: 500,
+      headers: { 'X-Request-ID': requestId }
+    })
   }
 }
 
 // POST /api/admin/organizations - Create new organization
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
+  const requestId = getRequestId(request.headers)
+  const log = createRequestLogger(requestId, { endpoint: 'POST /api/admin/organizations' })
+  
   try {
     const supabase = createSupabaseServerClient()
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      log.warn('Unauthorized access attempt')
+      throw new UnauthorizedError()
     }
+
+    log.info({ userId: user.id }, 'Creating organization')
 
     // Get user profile with caching
     const userProfile = await getCached(
@@ -117,10 +151,12 @@ export async function POST(request: NextRequest) {
     )
 
     if (!userProfile || userProfile.role !== 'super_admin') {
-      return NextResponse.json({ error: 'Forbidden - Super Admin access required' }, { status: 403 })
+      log.warn({ role: userProfile?.role }, 'Forbidden access attempt')
+      throw new ForbiddenError('Super Admin access required')
     }
 
-    const body = await request.json()
+    // Validate and sanitize input
+    const validated = await validateBody(request, createOrganizationSchema)
     const {
       name,
       slug,
@@ -131,15 +167,9 @@ export async function POST(request: NextRequest) {
       max_storage_gb = 10,
       max_courses = 50,
       max_exams_per_month = 100
-    } = body
+    } = validated
 
-    // Validate required fields
-    if (!name || !slug) {
-      return NextResponse.json(
-        { error: 'Missing required fields: name, slug' },
-        { status: 400 }
-      )
-    }
+    log.info({ name, slug }, 'Creating organization with validated data')
 
     // Create organization
     const { data: newOrg, error: createError } = await supabase
@@ -160,23 +190,58 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (createError) {
-      logger.error('Error creating organization:', createError)
+      log.error({ error: createError.message }, 'Failed to create organization')
       return NextResponse.json(
         { error: 'Failed to create organization: ' + createError.message },
-        { status: 500 }
+        { 
+          status: 500,
+          headers: { 'X-Request-ID': requestId }
+        }
       )
     }
 
     // Invalidate organizations list cache
     await invalidateCache('admin:organizations:list')
 
+    log.info({ orgId: newOrg.id }, 'Organization created successfully')
+
     return NextResponse.json({
       message: 'Organization created successfully',
       organization: newOrg
-    }, { status: 201 })
+    }, { 
+      status: 201,
+      headers: { 'X-Request-ID': requestId }
+    })
 
-  } catch (error) {
-    logger.error('Admin create organization API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (error: any) {
+    log.error({ error: error.message }, 'Failed to create organization')
+    
+    // Return appropriate error response
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: error.message }, { 
+        status: 401,
+        headers: { 'X-Request-ID': requestId }
+      })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { 
+        status: 403,
+        headers: { 'X-Request-ID': requestId }
+      })
+    }
+    if (error instanceof ValidationError) {
+      return NextResponse.json({ error: error.message, details: error.details }, { 
+        status: 400,
+        headers: { 'X-Request-ID': requestId }
+      })
+    }
+    
+    return NextResponse.json({ error: 'Internal server error' }, { 
+      status: 500,
+      headers: { 'X-Request-ID': requestId }
+    })
   }
 }
+
+// Apply sensitive rate limiting to organization creation
+export const POST = withRateLimit(postHandler, RateLimitPresets.sensitive)
