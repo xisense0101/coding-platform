@@ -1,78 +1,94 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useMemo } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { ChevronLeft, BookOpen, Play, CheckCircle2, Clock, FileText, Code, Video, PenTool, Lock, Star, TrendingUp, Users, Calendar, BarChart3 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { 
+  ChevronLeft, 
+  BookOpen, 
+  Play, 
+  CheckCircle2, 
+  Clock, 
+  FileText, 
+  Code, 
+  PenTool, 
+  Lock, 
+  Award,
+  User
+} from 'lucide-react';
 
 interface Lesson {
-  id: string
-  title: string
-  type: 'reading' | 'mcq' | 'coding' | 'essay'
-  duration?: string
-  isCompleted: boolean
-  isLocked: boolean
-  points?: number
+  id: string;
+  title: string;
+  type: 'reading' | 'mcq' | 'coding' | 'essay';
+  duration?: string;
+  isCompleted: boolean;
+  isLocked: boolean;
+  points?: number;
 }
 
 interface Section {
-  id: string
-  title: string
-  description?: string
-  lessons: Lesson[]
-  isCompleted: boolean
-  progress: number
-  order_index?: number
+  id: string;
+  title: string;
+  description?: string;
+  lessons: Lesson[];
+  isCompleted: boolean;
+  progress: number;
+  order_index?: number;
 }
 
 interface CourseData {
-  id: string
-  title: string
-  description?: string
-  totalProgress?: number
-  sections: Section[]
+  id: string;
+  title: string;
+  description?: string;
+  totalProgress?: number;
+  sections: Section[];
   teacher?: {
-    full_name?: string
-    email?: string
-  }
+    full_name?: string;
+    email?: string;
+  };
   enrollment?: {
-    progress_percentage?: number
-  }
+    progress_percentage?: number;
+  };
 }
 
 interface CourseSectionsProps {
-  courseData: CourseData
-  userId: string
+  courseData: CourseData;
+  userId: string;
+  completedQuestionIds?: string[];
 }
 
-export default function CourseSections({ courseData, userId }: CourseSectionsProps) {
-  const [selectedSection, setSelectedSection] = useState<Section | null>(null)
-  const [activeTab, setActiveTab] = useState("content")
-  const router = useRouter()
+export default function CourseSections({ 
+  courseData, 
+  userId,
+  completedQuestionIds = []
+}: CourseSectionsProps) {
+  const router = useRouter();
+  const [selectedSection, setSelectedSection] = useState<Section | null>(null);
 
   // Transform database data to component format
   const processedCourse = useMemo(() => {
     const sections: Section[] = (courseData.sections || []).map((section: any) => {
-      const questions = section.questions || []
-      const lessons: Lesson[] = questions.map((question: any, index: number) => ({
-        id: question.id,
-        title: question.title || `Question ${index + 1}`,
-        type: question.type as 'reading' | 'mcq' | 'coding' | 'essay',
-        duration: `${question.points || 5} min`,
-        isCompleted: false, // TODO: Get from user progress
-        isLocked: index > 0 && false, // TODO: Implement locking logic
-        points: question.points || 1
-      }))
+      const questions = section.questions || [];
+      const lessons: Lesson[] = questions.map((question: any, index: number) => {
+        const isCompleted = completedQuestionIds.includes(question.id);
+        // Simple locking: lock if previous question in section is not completed
+        // const previousQuestion = index > 0 ? questions[index - 1] : null;
+        // const isPreviousCompleted = previousQuestion ? completedQuestionIds.includes(previousQuestion.id) : true;
+        
+        return {
+          id: question.id,
+          title: question.title || `Question ${index + 1}`,
+          type: question.type as 'reading' | 'mcq' | 'coding' | 'essay',
+          duration: `${question.points || 5} min`,
+          isCompleted,
+          isLocked: false, // index > 0 && !isPreviousCompleted,
+          points: question.points || 1
+        };
+      });
 
       // Calculate section progress
-      const completedLessons = lessons.filter(l => l.isCompleted).length
-      const progress = lessons.length > 0 ? (completedLessons / lessons.length) * 100 : 0
+      const completedLessons = lessons.filter(l => l.isCompleted).length;
+      const progress = lessons.length > 0 ? (completedLessons / lessons.length) * 100 : 0;
 
       return {
         id: section.id,
@@ -82,267 +98,263 @@ export default function CourseSections({ courseData, userId }: CourseSectionsPro
         isCompleted: progress === 100,
         progress,
         order_index: section.order_index
-      }
-    })
+      };
+    });
 
     // Sort sections by order_index
-    sections.sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+    sections.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
 
-    const totalProgress = courseData.enrollment?.progress_percentage || 0
+    // Calculate total progress based on all lessons
+    const totalLessons = sections.reduce((acc, section) => acc + section.lessons.length, 0);
+    const totalCompleted = sections.reduce((acc, section) => acc + section.lessons.filter(l => l.isCompleted).length, 0);
+    const calculatedTotalProgress = totalLessons > 0 ? (totalCompleted / totalLessons) * 100 : 0;
 
     return {
       ...courseData,
       sections,
-      totalProgress
-    }
-  }, [courseData])
+      totalProgress: calculatedTotalProgress
+    };
+  }, [courseData, completedQuestionIds]);
 
   useEffect(() => {
     if (processedCourse.sections.length > 0 && !selectedSection) {
-      setSelectedSection(processedCourse.sections[0])
+      setSelectedSection(processedCourse.sections[0]);
     }
-  }, [processedCourse.sections, selectedSection])
+  }, [processedCourse.sections, selectedSection]);
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'reading': return <FileText className="h-4 w-4" />
-      case 'mcq': return <CheckCircle2 className="h-4 w-4" />
-      case 'coding': return <Code className="h-4 w-4" />
-      case 'essay': return <PenTool className="h-4 w-4" />
-      default: return <BookOpen className="h-4 w-4" />
+      case 'reading': return <FileText className="w-4 h-4" />;
+      case 'mcq': return <CheckCircle2 className="w-4 h-4" />;
+      case 'coding': return <Code className="w-4 h-4" />;
+      case 'essay': return <PenTool className="w-4 h-4" />;
+      default: return <BookOpen className="w-4 h-4" />;
     }
-  }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'reading': return 'Reading';
+      case 'mcq': return 'Quiz';
+      case 'coding': return 'Code';
+      case 'essay': return 'Essay';
+      default: return 'Lesson';
+    }
+  };
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'reading': return 'bg-blue-100 text-blue-700 border-blue-200'
-      case 'mcq': return 'bg-green-100 text-green-700 border-green-200'
-      case 'coding': return 'bg-purple-100 text-purple-700 border-purple-200'
-      case 'essay': return 'bg-orange-100 text-orange-700 border-orange-200'
-      default: return 'bg-sky-100 text-sky-700 border-sky-200'
+      case 'reading': return 'from-blue-500 to-blue-600';
+      case 'mcq': return 'from-green-500 to-green-600';
+      case 'coding': return 'from-purple-500 to-purple-600';
+      case 'essay': return 'from-orange-500 to-orange-600';
+      default: return 'from-blue-500 to-blue-600';
     }
-  }
+  };
 
   const handleLessonClick = (lesson: Lesson) => {
     if (lesson.isLocked) {
-      alert("This lesson is locked. Please complete previous lessons.")
-      return
+      alert("This lesson is locked. Please complete previous lessons.");
+      return;
     }
-    router.push(`/student/courses/${courseData.id}/lesson/${lesson.id}`)
-  }
+    router.push(`/student/courses/${courseData.id}/lesson/${lesson.id}`);
+  };
 
   const handleBackClick = () => {
-    router.push('/student/dashboard')
-  }
+    router.push('/student/dashboard');
+  };
+
+  const totalLessons = processedCourse.sections.reduce((sum, section) => sum + section.lessons.length, 0);
+  const completedLessons = processedCourse.sections.reduce(
+    (sum, section) => sum + section.lessons.filter(l => l.isCompleted).length, 
+    0
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-white">
-      {/* Header */}
-      <div className="border-b border-sky-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 shadow-sm">
-        <div className="flex items-center justify-between p-4 max-w-7xl mx-auto">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={handleBackClick}
-              className="border-sky-300 text-sky-700 hover:bg-sky-50"
-            >
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-sky-900">{processedCourse.title}</h1>
-              <p className="text-sky-600 text-sm">
-                {processedCourse.teacher?.full_name && `Instructor: ${processedCourse.teacher.full_name}`}
-              </p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Compact Header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleBackClick}
+                className="flex items-center gap-2 px-3 py-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span className="text-sm">Back</span>
+              </button>
+              <div className="h-6 w-px bg-gray-200"></div>
+              <div>
+                <h1 className="text-gray-900">{processedCourse.title}</h1>
+                {processedCourse.teacher?.full_name && (
+                  <p className="text-gray-500 text-xs flex items-center gap-1">
+                    <User className="w-3 h-3" />
+                    {processedCourse.teacher.full_name}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <div className="text-right text-sm">
-              <div className="font-medium text-sky-900">Progress</div>
-              <div className="text-sky-600">{Math.round(processedCourse.totalProgress || 0)}% Complete</div>
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-gray-500 text-xs">Progress</p>
+                <p className="text-gray-900 text-sm">
+                  {completedLessons}/{totalLessons} lessons
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white shadow-sm">
+                <span className="text-sm">
+                  {Math.round(processedCourse.totalProgress || 0)}%
+                </span>
+              </div>
             </div>
-            <Avatar className="h-8 w-8 border border-sky-200">
-              <AvatarFallback className="bg-sky-100 text-sky-700">
-                {processedCourse.teacher?.full_name?.charAt(0) || 'T'}
-              </AvatarFallback>
-            </Avatar>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto p-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-2 bg-sky-100">
-            <TabsTrigger
-              value="content"
-              className="data-[state=active]:bg-white data-[state=active]:text-sky-900"
-            >
-              <BookOpen className="h-4 w-4 mr-2" />
-              Course Content
-            </TabsTrigger>
-            <TabsTrigger
-              value="scores"
-              className="data-[state=active]:bg-white data-[state=active]:text-sky-900"
-            >
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Progress & Scores
-            </TabsTrigger>
-          </TabsList>
+      <main className="max-w-6xl mx-auto p-6">
+        <div className="grid grid-cols-12 gap-6">
+          {/* Section Sidebar */}
+          <div className="col-span-4 space-y-3">
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <h2 className="text-gray-900 text-sm mb-3">Course Sections</h2>
+              <div className="space-y-2">
+                {processedCourse.sections.map((section, index) => (
+                  <button
+                    key={section.id}
+                    onClick={() => setSelectedSection(section)}
+                    className={`w-full text-left p-3 rounded-lg border transition-all ${
+                      selectedSection?.id === section.id
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-gray-200 hover:border-blue-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-6 h-6 rounded-md flex items-center justify-center text-xs flex-shrink-0 ${
+                        selectedSection?.id === section.id
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {index + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className={`text-sm mb-1 truncate ${
+                          selectedSection?.id === section.id
+                            ? 'text-blue-900'
+                            : 'text-gray-900'
+                        }`}>
+                          {section.title}
+                        </h3>
+                        <div className="flex items-center justify-between text-xs mb-1.5">
+                          <span className="text-gray-500">{section.lessons.length} lessons</span>
+                          <span className={`${selectedSection?.id === section.id ? 'text-blue-600' : 'text-gray-600'}`}>
+                            {Math.round(section.progress)}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-1">
+                          <div 
+                            className="bg-blue-600 h-1 rounded-full transition-all" 
+                            style={{ width: `${section.progress}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
-          <TabsContent value="content" className="space-y-6">
-            {/* Course Progress */}
-            <Card className="border-sky-200 bg-gradient-to-r from-sky-50 to-blue-50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
+          {/* Lessons Content */}
+          <div className="col-span-8">
+            {selectedSection && (
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-start justify-between mb-6">
                   <div>
-                    <h3 className="text-lg font-semibold text-sky-900">Course Progress</h3>
-                    <p className="text-sky-600">
-                      {processedCourse.sections.filter(s => s.isCompleted).length} of {processedCourse.sections.length} sections completed
-                    </p>
+                    <h2 className="text-gray-900 text-xl mb-1">{selectedSection.title}</h2>
+                    {selectedSection.description && (
+                      <p className="text-gray-600 text-sm">{selectedSection.description}</p>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold text-sky-900">{Math.round(processedCourse.totalProgress || 0)}%</div>
-                    <div className="text-sm text-sky-600">Overall Progress</div>
+                  <div className={`px-3 py-1 rounded-full text-xs ${
+                    selectedSection.isCompleted
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {selectedSection.lessons.filter(l => l.isCompleted).length}/{selectedSection.lessons.length} Complete
                   </div>
                 </div>
-                <Progress
-                  value={processedCourse.totalProgress || 0}
-                  className="h-3 bg-sky-100"
-                />
-              </CardContent>
-            </Card>
 
-            {/* Sections Overview */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {processedCourse.sections.map((section) => (
-                <Card
-                  key={section.id}
-                  className={`cursor-pointer transition-all duration-200 hover:shadow-md border-2 ${
-                    selectedSection?.id === section.id
-                      ? 'border-sky-400 bg-sky-50'
-                      : 'border-sky-200 hover:border-sky-300'
-                  }`}
-                  onClick={() => setSelectedSection(section)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <Badge
-                        variant={section.isCompleted ? "default" : "secondary"}
-                        className={section.isCompleted ? "bg-green-500" : ""}
-                      >
-                        {section.isCompleted ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <Clock className="h-3 w-3 mr-1" />}
-                        {section.isCompleted ? 'Completed' : 'In Progress'}
-                      </Badge>
-                    </div>
-                    <h4 className="font-semibold text-sky-900 mb-1">{section.title}</h4>
-                    {section.description && (
-                      <p className="text-sm text-sky-600 mb-3">{section.description}</p>
-                    )}
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-sky-600">{section.lessons.length} lessons</span>
-                        <span className="font-medium text-sky-900">{Math.round(section.progress)}%</span>
-                      </div>
-                      <Progress value={section.progress} className="h-2" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Section Details */}
-            {selectedSection && (
-              <Card className="border-sky-200">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-sky-900">{selectedSection.title}</h3>
-                      {selectedSection.description && (
-                        <p className="text-sky-600 mt-1">{selectedSection.description}</p>
-                      )}
-                    </div>
-                    <Badge
-                      variant={selectedSection.isCompleted ? "default" : "secondary"}
-                      className={selectedSection.isCompleted ? "bg-green-500" : ""}
+                <div className="space-y-2">
+                  {selectedSection.lessons.map((lesson, index) => (
+                    <div
+                      key={lesson.id}
+                      className={`bg-gray-50 rounded-lg p-4 border transition-all ${
+                        lesson.isLocked
+                          ? 'opacity-60 cursor-not-allowed border-gray-200'
+                          : 'cursor-pointer hover:border-blue-200 hover:shadow-sm border-gray-200'
+                      }`}
+                      onClick={() => handleLessonClick(lesson)}
                     >
-                      {selectedSection.lessons.filter(l => l.isCompleted).length} / {selectedSection.lessons.length} Complete
-                    </Badge>
-                  </div>
-
-                  <div className="space-y-3">
-                    {selectedSection.lessons.map((lesson, index) => (
-                      <Card
-                        key={lesson.id}
-                        className={`transition-all duration-200 cursor-pointer hover:shadow-sm ${
-                          lesson.isLocked ? 'opacity-60' : 'hover:border-sky-300'
-                        }`}
-                        onClick={() => handleLessonClick(lesson)}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <div className={`p-2 rounded-full border ${getTypeColor(lesson.type)}`}>
-                                {getTypeIcon(lesson.type)}
-                              </div>
-                              <div>
-                                <h5 className="font-medium text-sky-900">{lesson.title}</h5>
-                                <p className="text-sm text-sky-600">
-                                  {lesson.duration} • {lesson.points} points
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              {lesson.isLocked ? (
-                                <Lock className="h-5 w-5 text-gray-400" />
-                              ) : lesson.isCompleted ? (
-                                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                              ) : (
-                                <Play className="h-5 w-5 text-sky-500" />
-                              )}
-                            </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className={`w-10 h-10 bg-gradient-to-br ${getTypeColor(lesson.type)} rounded-lg flex items-center justify-center text-white shadow-sm flex-shrink-0`}>
+                            {getTypeIcon(lesson.type)}
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="scores" className="space-y-6">
-            <Card className="border-sky-200">
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold text-sky-900 mb-4">Progress & Scores</h3>
-                <div className="grid md:grid-cols-2 gap-6">
-                  {processedCourse.sections.map((section) => (
-                    <Card key={section.id} className="border-sky-100">
-                      <CardContent className="p-4">
-                        <h4 className="font-semibold text-sky-900 mb-2">{section.title}</h4>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-sky-600">Progress</span>
-                            <span className="font-medium">{Math.round(section.progress)}%</span>
-                          </div>
-                          <Progress value={section.progress} className="h-2" />
-                          <div className="flex justify-between text-sm">
-                            <span className="text-sky-600">Completed Lessons</span>
-                            <span className="font-medium">
-                              {section.lessons.filter(l => l.isCompleted).length} / {section.lessons.length}
-                            </span>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="text-gray-900 text-sm">{lesson.title}</h3>
+                              <span className="px-2 py-0.5 bg-white rounded text-xs text-gray-600 border border-gray-200">
+                                {getTypeLabel(lesson.type)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-gray-500">
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {lesson.duration}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Award className="w-3 h-3" />
+                                {lesson.points} pts
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+
+                        <div className="flex items-center gap-3 ml-4">
+                          {lesson.isLocked ? (
+                            <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                              <Lock className="w-4 h-4 text-gray-400" />
+                            </div>
+                          ) : lesson.isCompleted ? (
+                            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                              <CheckCircle2 className="w-4 h-4 text-green-600" />
+                            </div>
+                          ) : (
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors group">
+                              <Play className="w-4 h-4 text-blue-600 group-hover:text-white" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+
+                {selectedSection.lessons.length === 0 && (
+                  <div className="text-center py-12">
+                    <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 text-sm">No lessons in this section yet</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
     </div>
-  )
+  );
 }

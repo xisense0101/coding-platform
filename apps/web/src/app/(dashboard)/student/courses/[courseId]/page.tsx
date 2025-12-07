@@ -17,6 +17,7 @@ interface Props {
 
 export default function CoursePage({ params }: Props) {
   const [course, setCourse] = useState<any>(null)
+  const [completedQuestions, setCompletedQuestions] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { user } = useAuth()
@@ -35,6 +36,20 @@ export default function CoursePage({ params }: Props) {
         if (!courseData) {
           router.push('/student/dashboard')
           return
+        }
+
+        // Extract question IDs
+        const questionIds: string[] = []
+        courseData.sections?.forEach((section: any) => {
+          section.questions?.forEach((question: any) => {
+            questionIds.push(question.id)
+          })
+        })
+
+        // Fetch completed questions
+        if (questionIds.length > 0) {
+          const completed = await courseService.getCompletedQuestions(user.id, questionIds)
+          setCompletedQuestions(completed)
         }
 
         setCourse(courseData)
@@ -77,5 +92,5 @@ export default function CoursePage({ params }: Props) {
     return null
   }
 
-  return <CourseSections courseData={course} userId={user?.id || ''} />
+  return <CourseSections courseData={course} userId={user?.id || ''} completedQuestionIds={completedQuestions} />
 }

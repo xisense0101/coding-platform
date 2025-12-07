@@ -27,7 +27,10 @@ const createSectionSchema = z.object({
       isHidden: z.boolean().optional(),
       is_hidden: z.boolean().default(false),
       weight: z.number().default(1)
-    })).optional()
+    })).optional(),
+    head: z.record(z.string()).optional(),
+    body_template: z.record(z.string()).optional(),
+    tail: z.record(z.string()).optional()
   })).default([])
 })
 
@@ -297,7 +300,10 @@ export async function POST(
               test_cases: testCases,
               allowed_languages: allowedLanguages,
               time_limit: 30,
-              memory_limit: 128
+              memory_limit: 128,
+              head: questionData.head || {},
+              body_template: questionData.body_template || {},
+              tail: questionData.tail || {}
             })
 
           if (codingError) {

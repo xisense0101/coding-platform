@@ -28,7 +28,10 @@ const createCourseSchema = z.object({
         input: z.string(),
         expectedOutput: z.string(),
         isHidden: z.boolean().default(true)
-      })).optional()
+      })).optional(),
+      head: z.record(z.string()).optional(),
+      body_template: z.record(z.string()).optional(),
+      tail: z.record(z.string()).optional()
     }))
   }))
 })
@@ -182,7 +185,10 @@ export async function POST(request: NextRequest) {
               memory_limit: 128,
               is_solution_provided: false,
               created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
+              head: questionData.head || {},
+              body_template: questionData.body_template || {},
+              tail: questionData.tail || {}
             })
         } else if (questionData.type === 'essay') {
           // Create essay question data

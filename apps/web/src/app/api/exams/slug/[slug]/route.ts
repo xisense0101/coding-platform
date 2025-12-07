@@ -94,7 +94,10 @@ export async function GET(
                     test_cases,
                     allowed_languages,
                     time_limit,
-                    memory_limit
+                    memory_limit,
+                    head,
+                    body_template,
+                    tail
                   )
                 )
               )

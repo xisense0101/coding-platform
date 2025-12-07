@@ -1,109 +1,122 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useRef, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { RichTextPreview } from '@/components/editors/RichTextEditor'
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
-import { ChevronLeft, Menu, X, Check, Info, Send, RotateCcw } from 'lucide-react'
-import { logger } from '@/lib/utils/logger'
-import { formatDateTime } from '@/lib/utils'
+import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { 
+  ChevronLeft, 
+  ChevronRight,
+  Check, 
+  Info, 
+  Send, 
+  RotateCcw,
+  AlertCircle,
+  CheckCircle2,
+  XCircle
+} from 'lucide-react';
+import { RichTextPreview } from '@/components/editors/RichTextEditor';
+import { logger } from '@/lib/utils/logger';
+import { LessonHeader } from '@/components/lesson/LessonHeader';
 
 interface McqQuestionProps {
-  questionId: string
-  userId: string
-  courseId: string
-  title: string
+  questionId: string;
+  userId: string;
+  courseId: string;
+  title: string;
   mcq: {
-    question_text: string
-    options: string[]
-    correct_answers: number[]
-    explanation?: string
-  }
+    question_text: string;
+    rich_question_text?: any;
+    options: string[];
+    correct_answers: number[];
+    explanation?: string;
+  };
+  navigation?: {
+    prev: string | null;
+    next: string | null;
+  };
 }
 
-export default function McqEditor({ questionId, userId, courseId, title, mcq }: McqQuestionProps) {
-  const [leftPanelWidth, setLeftPanelWidth] = useState(50)
-  const [isResizing, setIsResizing] = useState(false)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [selectedAnswer, setSelectedAnswer] = useState("")
-  const [isSubmitted, setIsSubmitted] = useState(false)
-  const [showResult, setShowResult] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [attempts, setAttempts] = useState<any[]>([])
-  const [loadingAttempts, setLoadingAttempts] = useState(false)
-  const [viewingAttempt, setViewingAttempt] = useState<any>(null)
+export default function McqEditor({ 
+  questionId, 
+  userId, 
+  courseId, 
+  title, 
+  mcq,
+  navigation
+}: McqQuestionProps) {
+  const router = useRouter();
+  const [leftPanelWidth, setLeftPanelWidth] = useState(50);
+  const [isResizing, setIsResizing] = useState(false);
+  const [selectedAnswer, setSelectedAnswer] = useState("");
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [showResult, setShowResult] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [attempts, setAttempts] = useState<any[]>([]);
+  const [loadingAttempts, setLoadingAttempts] = useState(false);
+  const [viewingAttempt, setViewingAttempt] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'question' | 'attempts'>('question');
 
-  const containerRef = useRef<HTMLDivElement>(null)
-  const resizerRef = useRef<HTMLDivElement>(null)
-  
-  // Store the working answer before viewing an attempt
-  const workingAnswerBeforeViewRef = useRef<string | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null);
+  const workingAnswerBeforeViewRef = useRef<string | null>(null);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    setIsResizing(true)
-    e.preventDefault()
-  }
+    setIsResizing(true);
+    e.preventDefault();
+  };
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing || !containerRef.current) return
+      if (!isResizing || !containerRef.current) return;
 
-      const containerRect = containerRef.current.getBoundingClientRect()
-      const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
 
       if (newWidth >= 30 && newWidth <= 70) {
-        setLeftPanelWidth(newWidth)
+        setLeftPanelWidth(newWidth);
       }
-    }
+    };
 
     const handleMouseUp = () => {
-      setIsResizing(false)
-    }
+      setIsResizing(false);
+    };
 
     if (isResizing) {
-      document.addEventListener("mousemove", handleMouseMove)
-      document.addEventListener("mouseup", handleMouseUp)
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
     }
 
     return () => {
-      document.removeEventListener("mousemove", handleMouseMove)
-      document.removeEventListener("mouseup", handleMouseUp)
-    }
-  }, [isResizing])
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
 
   // Load attempts when component mounts
   useEffect(() => {
-    fetchAttempts()
-  }, [questionId, userId])
+    fetchAttempts();
+  }, [questionId, userId]);
 
   const fetchAttempts = async () => {
-    setLoadingAttempts(true)
+    setLoadingAttempts(true);
     try {
-      const res = await fetch(`/api/attempts/${questionId}`)
+      const res = await fetch(`/api/attempts/${questionId}`);
       if (res.ok) {
-        const data = await res.json()
-        setAttempts(data.attempts || [])
+        const data = await res.json();
+        setAttempts(data.attempts || []);
       }
     } catch (err) {
-      logger.error('Error fetching attempts:', err)
+      logger.error('Error fetching attempts:', err);
     } finally {
-      setLoadingAttempts(false)
+      setLoadingAttempts(false);
     }
-  }
+  };
 
   const handleSubmit = async () => {
-    if (!selectedAnswer) return
+    if (!selectedAnswer) return;
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       // Convert letter ID back to index for database
-      const selectedIndex = selectedAnswer.charCodeAt(0) - 97 // 'a' = 0, 'b' = 1, etc.
+      const selectedIndex = selectedAnswer.charCodeAt(0) - 97; // 'a' = 0, 'b' = 1, etc.
 
       // Submit answer to database
       const res = await fetch('/api/mcq/submit', {
@@ -117,117 +130,244 @@ export default function McqEditor({ questionId, userId, courseId, title, mcq }: 
           selectedOption: selectedIndex,
           correctAnswers: mcq.correct_answers
         })
-      })
+      });
 
       if (res.ok) {
-        const data = await res.json()
-        setIsSubmitted(true)
-        setShowResult(true)
+        const data = await res.json();
+        setIsSubmitted(true);
+        setShowResult(true);
         // Refresh attempts list after successful submission
-        fetchAttempts()
+        fetchAttempts();
       } else {
-        alert('Failed to submit answer. Please try again.')
+        alert('Failed to submit answer. Please try again.');
       }
     } catch (error) {
-      logger.error('Error submitting answer:', error)
-      alert('Failed to submit answer. Please try again.')
+      logger.error('Error submitting answer:', error);
+      alert('Failed to submit answer. Please try again.');
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const clearSelection = () => {
-    setSelectedAnswer("")
-    setIsSubmitted(false)
-    setShowResult(false)
-    setViewingAttempt(null)
-    workingAnswerBeforeViewRef.current = null
-  }
+    setSelectedAnswer("");
+    setIsSubmitted(false);
+    setShowResult(false);
+    setViewingAttempt(null);
+    workingAnswerBeforeViewRef.current = null;
+  };
 
   const handleViewAttempt = (attempt: any) => {
-    // Save the current working answer before viewing attempt
-    workingAnswerBeforeViewRef.current = selectedAnswer
+    workingAnswerBeforeViewRef.current = selectedAnswer;
     
-    setViewingAttempt(attempt)
-    const selectedOption = attempt.answer?.selectedOption
+    setViewingAttempt(attempt);
+    const selectedOption = attempt.answer?.selectedOption;
     if (selectedOption !== undefined) {
-      const optionLetter = String.fromCharCode(97 + selectedOption) // 0='a', 1='b', etc.
-      setSelectedAnswer(optionLetter)
-      setIsSubmitted(true)
-      setShowResult(true)
+      const optionLetter = String.fromCharCode(97 + selectedOption);
+      setSelectedAnswer(optionLetter);
+      setIsSubmitted(true);
+      setShowResult(true);
     }
-  }
+    setActiveTab('question');
+  };
 
   const handleBackToNew = () => {
-    setViewingAttempt(null)
-    
-    // Restore the working answer from before viewing the attempt
+    setViewingAttempt(null);
     const restoredAnswer = workingAnswerBeforeViewRef.current !== null 
       ? workingAnswerBeforeViewRef.current 
-      : ""
+      : "";
     
-    setSelectedAnswer(restoredAnswer)
-    setIsSubmitted(false)
-    setShowResult(false)
-    
-    // Clear the saved working answer
-    workingAnswerBeforeViewRef.current = null
-  }
+    setSelectedAnswer(restoredAnswer);
+    setIsSubmitted(false);
+    setShowResult(false);
+    workingAnswerBeforeViewRef.current = null;
+  };
 
   const reportProblem = () => {
-    alert("Report problem functionality would be implemented here")
-  }
+    alert("Report problem functionality would be implemented here");
+  };
 
   const mcqOptions = mcq.options.map((option, index) => ({
-    id: String.fromCharCode(97 + index), // 'a', 'b', 'c', 'd'
+    id: String.fromCharCode(97 + index),
     text: option,
     isCorrect: mcq.correct_answers.includes(index)
-  }))
+  }));
+
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getOptionLetter = (index: number) => String.fromCharCode(97 + index).toUpperCase();
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-sky-50 to-white">
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Header */}
+      <LessonHeader
+        title={title}
+        type="mcq"
+        onBack={() => router.push(`/student/courses/${courseId}`)}
+        onNext={() => navigation?.next && router.push(`/student/courses/${courseId}/lesson/${navigation.next}`)}
+        onPrevious={() => navigation?.prev && router.push(`/student/courses/${courseId}/lesson/${navigation.prev}`)}
+        hasNext={!!navigation?.next}
+        hasPrevious={!!navigation?.prev}
+      />
+
       {/* Main Content */}
       <div ref={containerRef} className="flex-1 flex relative overflow-hidden">
-        {/* Mobile Menu Overlay */}
-        {isMobileMenuOpen && (
-          <div className="lg:hidden absolute inset-0 z-50 bg-white">
-            <div className="p-4 h-full overflow-auto">
-              <QuestionPanel 
-                mcq={mcq} 
-                onReportProblem={reportProblem} 
-                title={title}
-                attempts={attempts}
-                loadingAttempts={loadingAttempts}
-                onViewAttempt={handleViewAttempt}
-                viewingAttempt={viewingAttempt}
-              />
-            </div>
-          </div>
-        )}
-
         {/* Left Panel - Question */}
         <div
-          className={`hidden lg:block overflow-auto border-r border-sky-200 bg-white shadow-sm`}
+          className="overflow-auto border-r border-gray-200 bg-white [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
           style={{ width: `${leftPanelWidth}%` }}
         >
-          <QuestionPanel 
-            mcq={mcq} 
-            onReportProblem={reportProblem} 
-            title={title}
-            attempts={attempts}
-            loadingAttempts={loadingAttempts}
-            onViewAttempt={handleViewAttempt}
-            viewingAttempt={viewingAttempt}
-          />
+          <div className="p-6">
+            {/* Tab Navigation */}
+            <div className="flex items-center gap-2 mb-6">
+              <button
+                onClick={() => setActiveTab('question')}
+                className={`px-4 py-2 rounded-lg text-sm transition-all ${
+                  activeTab === 'question'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Question
+              </button>
+              <button
+                onClick={() => setActiveTab('attempts')}
+                className={`px-4 py-2 rounded-lg text-sm transition-all ${
+                  activeTab === 'attempts'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Submissions {attempts.length > 0 && `(${attempts.length})`}
+              </button>
+            </div>
+
+            {activeTab === 'question' && (
+              <div className="space-y-4">
+                <div className="flex items-start justify-between">
+                  <h2 className="text-gray-900 text-xl">Question</h2>
+                  <button
+                    onClick={reportProblem}
+                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Report a problem"
+                  >
+                    <Info className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Question Content */}
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                   {mcq.rich_question_text ? (
+                        <RichTextPreview content={mcq.rich_question_text} />
+                      ) : (
+                        <p className="text-gray-900 leading-relaxed">{mcq.question_text}</p>
+                      )}
+                </div>
+
+                {/* Explanation */}
+                {mcq.explanation && (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm text-green-900">
+                          <span className="font-medium">Explanation:</span> {mcq.explanation}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'attempts' && (
+              <div className="space-y-4">
+                <h2 className="text-gray-900 text-xl">Your Submissions</h2>
+                
+                {loadingAttempts ? (
+                  <div className="flex justify-center py-12">
+                    <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : attempts.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-200">
+                    <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 text-sm">No submissions yet</p>
+                    <p className="text-gray-400 text-xs mt-1">Submit your answer to see your attempts here!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {attempts.map((attempt) => {
+                      const selectedOption = attempt.answer?.selectedOption;
+                      const isViewing = viewingAttempt?.id === attempt.id;
+                      return (
+                        <div
+                          key={attempt.id}
+                          onClick={() => handleViewAttempt(attempt)}
+                          className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${
+                            isViewing 
+                              ? 'border-blue-600 bg-blue-50 shadow-md' 
+                              : attempt.is_correct 
+                                ? 'border-green-300 bg-green-50 hover:shadow-sm hover:border-green-400' 
+                                : 'border-red-300 bg-red-50 hover:shadow-sm hover:border-red-400'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className={`px-2 py-1 rounded text-xs border ${
+                                  isViewing 
+                                    ? 'bg-blue-100 text-blue-700 border-blue-300' 
+                                    : 'bg-white text-gray-600 border-gray-300'
+                                }`}>
+                                  Attempt #{attempt.attempt_number}
+                                </span>
+                                {attempt.is_correct ? (
+                                  <span className="px-2 py-1 bg-green-600 text-white rounded text-xs flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    Correct
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-1 bg-red-600 text-white rounded text-xs flex items-center gap-1">
+                                    <XCircle className="w-3 h-3" />
+                                    Incorrect
+                                  </span>
+                                )}
+                                {isViewing && (
+                                  <span className="px-2 py-1 bg-blue-600 text-white rounded text-xs">
+                                    Viewing
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                <span className="text-xs">Submitted: {formatDateTime(attempt.submitted_at || attempt.created_at)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Resizer */}
         <div
-          ref={resizerRef}
-          className="hidden lg:block w-1 bg-sky-200 hover:bg-sky-400 cursor-col-resize transition-colors relative group"
+          className="hidden lg:block w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize transition-colors relative group"
           onMouseDown={handleMouseDown}
         >
-          <div className="absolute inset-y-0 -left-1 -right-1 group-hover:bg-sky-300/30" />
+          <div className="absolute inset-y-0 -left-1 -right-1" />
         </div>
 
         {/* Right Panel - Answer Options */}
@@ -236,106 +376,141 @@ export default function McqEditor({ questionId, userId, courseId, title, mcq }: 
           style={{ width: `${100 - leftPanelWidth}%` }}
         >
           {/* Answer Header */}
-          <div className="p-6 border-b border-sky-200 bg-gradient-to-r from-sky-50 to-white">
-            <div className="flex items-center justify-between mb-2">
-              {viewingAttempt && (
+          <div className="p-4 border-b border-gray-200 bg-gray-50">
+            {viewingAttempt ? (
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="bg-amber-50 border-amber-300 text-amber-700">
+                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs border border-blue-300">
                     Viewing Attempt #{viewingAttempt.attempt_number}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleBackToNew}
-                    className="text-sky-600 hover:text-sky-700 hover:bg-sky-50"
-                  >
-                    <RotateCcw className="h-4 w-4 mr-1" />
-                    Back to New Attempt
-                  </Button>
+                  </span>
+                  {mcqOptions.find(opt => opt.id === selectedAnswer)?.isCorrect ? (
+                    <span className="text-green-600 text-sm flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Correct Answer
+                    </span>
+                  ) : (
+                    <span className="text-red-600 text-sm flex items-center gap-1">
+                      <XCircle className="w-4 h-4" />
+                      Incorrect Answer
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
-            {showResult && (
-              <div className="text-sm text-sky-700">
+                <button
+                  onClick={handleBackToNew}
+                  className="px-3 py-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-sm flex items-center gap-1 transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  New Attempt
+                </button>
+              </div>
+            ) : showResult ? (
+              <div className="text-sm">
                 {mcqOptions.find(opt => opt.id === selectedAnswer)?.isCorrect ? (
-                  <span className="text-green-600 font-medium">✓ Correct Answer!</span>
+                  <span className="text-green-600 flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span>Correct! Well done.</span>
+                  </span>
                 ) : (
-                  <span className="text-red-600 font-medium">✗ Incorrect. The correct answer is {mcqOptions.find(opt => opt.isCorrect)?.text}</span>
+                  <div className="text-red-600">
+                    <div className="flex items-center gap-2 mb-1">
+                      <XCircle className="w-5 h-5" />
+                      <span>Incorrect. Try again!</span>
+                    </div>
+                  </div>
                 )}
               </div>
+            ) : (
+              <p className="text-gray-600 text-sm">Select your answer from the options below</p>
             )}
           </div>
 
           {/* Answer Options */}
           <div className="flex-1 p-6 overflow-auto">
-            <RadioGroup value={selectedAnswer} onValueChange={setSelectedAnswer} className="space-y-4">
-              {mcqOptions.map((option) => (
-                <div
-                  key={option.id}
-                  className={`flex items-center space-x-3 p-4 rounded-lg border-2 transition-all duration-200 cursor-pointer hover:bg-sky-50 ${
-                    selectedAnswer === option.id
-                      ? showResult
-                        ? option.isCorrect
-                          ? "border-green-500 bg-green-50"
-                          : "border-red-500 bg-red-50"
-                        : "border-sky-500 bg-sky-50"
-                      : showResult && option.isCorrect
-                      ? "border-green-500 bg-green-50"
-                      : "border-sky-200"
-                  }`}
-                >
-                  <RadioGroupItem
-                    value={option.id}
-                    id={option.id}
+            <div className="space-y-3">
+              {mcqOptions.map((option) => {
+                const isSelected = selectedAnswer === option.id;
+                const isSelectedCorrect = mcqOptions.find(opt => opt.id === selectedAnswer)?.isCorrect;
+                const showCorrect = showResult && option.isCorrect && isSelectedCorrect;
+                const showIncorrect = showResult && isSelected && !option.isCorrect;
+
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => !isSubmitted && setSelectedAnswer(option.id)}
                     disabled={isSubmitted}
-                    className="text-sky-600"
-                  />
-                  <Label
-                    htmlFor={option.id}
-                    className={`flex-1 cursor-pointer font-mono text-base ${
-                      showResult && option.isCorrect ? "font-semibold text-green-800" : "text-black"
-                    }`}
+                    className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                      showCorrect
+                        ? 'border-green-500 bg-green-50'
+                        : showIncorrect
+                        ? 'border-red-500 bg-red-50'
+                        : isSelected
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-gray-200 hover:border-blue-200 hover:bg-gray-50'
+                    } ${isSubmitted ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                   >
-                    {option.text}
-                  </Label>
-                  {showResult && option.isCorrect && <Check className="h-5 w-5 text-green-600" />}
-                </div>
-              ))}
-            </RadioGroup>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                        showCorrect
+                          ? 'border-green-600 bg-green-600'
+                          : showIncorrect
+                          ? 'border-red-600 bg-red-600'
+                          : isSelected
+                          ? 'border-blue-600 bg-blue-600'
+                          : 'border-gray-300'
+                      }`}>
+                        {(isSelected || showCorrect) && (
+                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                        )}
+                      </div>
+                      <span className={`flex-1 ${
+                        showCorrect ? 'text-green-900 font-medium' : 'text-gray-900'
+                      }`}>
+                        {option.text}
+                      </span>
+                      {showCorrect && (
+                        <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      )}
+                      {showIncorrect && (
+                        <XCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="p-6 border-t border-sky-200 bg-gradient-to-r from-sky-50 to-white">
+          <div className="p-6 border-t border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between">
-              <Button
-                variant="ghost"
+              <button
                 onClick={clearSelection}
-                className="text-sky-600 hover:text-sky-700 hover:bg-sky-100"
                 disabled={!selectedAnswer || viewingAttempt !== null}
+                className="px-4 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                <RotateCcw className="h-4 w-4 mr-2" />
+                <RotateCcw className="w-4 h-4" />
                 Clear selection
-              </Button>
+              </button>
               <div className="relative group">
-                <Button
+                <button
                   onClick={handleSubmit}
                   disabled={!selectedAnswer || isSubmitted || isLoading || viewingAttempt !== null}
-                  className="bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white shadow-md transition-all duration-200 hover:shadow-lg font-semibold px-8 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isLoading ? (
                     <>
-                      <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                       Submitting...
                     </>
                   ) : (
                     <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Submit
+                      <Send className="w-4 h-4" />
+                      Submit Answer
                     </>
                   )}
-                </Button>
+                </button>
                 {viewingAttempt !== null && (
-                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                  <div className="absolute bottom-full mb-2 right-0 bg-gray-800 text-white text-xs px-3 py-1.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                     Cannot submit while viewing an attempt
                   </div>
                 )}
@@ -345,182 +520,5 @@ export default function McqEditor({ questionId, userId, courseId, title, mcq }: 
         </div>
       </div>
     </div>
-  )
-}
-
-function QuestionPanel({ 
-  mcq, 
-  onReportProblem, 
-  title,
-  attempts = [],
-  loadingAttempts = false,
-  onViewAttempt,
-  viewingAttempt
-}: { 
-  mcq: any, 
-  onReportProblem: () => void, 
-  title: string,
-  attempts?: any[],
-  loadingAttempts?: boolean,
-  onViewAttempt?: (attempt: any) => void,
-  viewingAttempt?: any
-}) {
-  const [activeTab, setActiveTab] = useState("question")
-
-  const getOptionLetter = (index: number) => String.fromCharCode(97 + index) // 0='a', 1='b', etc.
-
-  return (
-    <div className="p-6 space-y-6">
-      {/* Question Header */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-sky-100">
-              <TabsTrigger
-                value="question"
-                className="data-[state=active]:bg-white data-[state=active]:text-sky-700 data-[state=active]:shadow-sm"
-              >
-                Question
-              </TabsTrigger>
-              <TabsTrigger
-                value="attempts"
-                className="data-[state=active]:bg-white data-[state=active]:text-sky-700 data-[state=active]:shadow-sm"
-              >
-                Submissions {attempts.length > 0 && `(${attempts.length})`}
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="question" className="mt-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-black">{title}</h1>
-                    <Badge className="bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border-green-200 shadow-sm">
-                      <Check className="h-3 w-3 mr-1" />
-                    </Badge>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={onReportProblem}
-                    className="hover:bg-sky-100 text-sky-600 p-2"
-                    title="Report a problem"
-                  >
-                    <Info className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Question Content */}
-                <div className="space-y-6">
-                  <Card className="border-sky-200 shadow-sm">
-                    <CardContent className="p-6 bg-gradient-to-r from-sky-50 to-blue-50">
-                      {mcq.rich_question_text ? (
-                        <RichTextPreview content={mcq.rich_question_text} />
-                      ) : (
-                        <p className="text-lg text-black leading-relaxed">{mcq.question_text}</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                  {mcq.explanation && (
-                    <Card className="border-green-200 shadow-sm">
-                      <CardContent className="p-4 bg-green-50">
-                        <p className="text-sm text-gray-700">
-                          <strong>Explanation:</strong> {mcq.explanation}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="attempts" className="mt-6">
-              <div className="space-y-4">
-                <h2 className="text-xl font-bold text-black">Your Submissions</h2>
-                
-                {loadingAttempts ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin h-8 w-8 border-4 border-sky-500 border-t-transparent rounded-full" />
-                  </div>
-                ) : attempts.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No submissions yet. Submit your answer to see your attempts here!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {attempts.map((attempt, index) => {
-                      const selectedOption = attempt.answer?.selectedOption
-                      const isViewing = viewingAttempt?.id === attempt.id
-                      return (
-                        <Card 
-                          key={attempt.id} 
-                          className={`border-2 transition-all cursor-pointer ${
-                            isViewing 
-                              ? 'border-amber-500 bg-amber-50 shadow-lg ring-2 ring-amber-300' 
-                              : attempt.is_correct 
-                                ? 'border-green-300 bg-green-50 hover:shadow-md hover:border-green-400' 
-                                : 'border-red-300 bg-red-50 hover:shadow-md hover:border-red-400'
-                          }`}
-                          onClick={() => onViewAttempt?.(attempt)}
-                        >
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Badge variant="outline" className={isViewing ? "text-amber-700 border-amber-400 bg-amber-100" : "text-sky-700 border-sky-300"}>
-                                    Attempt #{attempt.attempt_number}
-                                  </Badge>
-                                  {attempt.is_correct ? (
-                                    <Badge className="bg-green-600 text-white">
-                                      <Check className="h-3 w-3 mr-1" />
-                                      Correct
-                                    </Badge>
-                                  ) : (
-                                    <Badge className="bg-red-600 text-white">
-                                      Incorrect
-                                    </Badge>
-                                  )}
-                                  {isViewing && (
-                                    <Badge className="bg-amber-600 text-white">
-                                      Currently Viewing
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="text-sm text-gray-700 space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium">Submitted:</span>
-                                    <span>{formatDateTime(attempt.submitted_at || attempt.created_at)}</span>
-                                  </div>
-                                  {selectedOption !== undefined && mcq.options && (
-                                    <div className="mt-2">
-                                      <span className="font-medium">Your Answer: </span>
-                                      <span className="font-mono">
-                                        {getOptionLetter(selectedOption).toUpperCase()}) {mcq.options[selectedOption]}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {!attempt.is_correct && mcq.correct_answers && mcq.options && (
-                                    <div className="mt-2 text-green-700">
-                                      <span className="font-medium">Correct Answer: </span>
-                                      <span className="font-mono">
-                                        {getOptionLetter(mcq.correct_answers[0]).toUpperCase()}) {mcq.options[mcq.correct_answers[0]]}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
-    </div>
-  )
+  );
 }

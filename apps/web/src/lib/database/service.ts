@@ -105,6 +105,34 @@ export class CourseService {
     if (error) throw error
     return data
   }
+
+  async getCompletedQuestions(userId: string, questionIds: string[]) {
+    if (questionIds.length === 0) return []
+    
+    const { data, error } = await this.supabase
+      .from('attempts')
+      .select('question_id, attempt_type, is_correct, test_cases_passed, total_test_cases')
+      .eq('user_id', userId)
+      .in('question_id', questionIds)
+      .not('submitted_at', 'is', null)
+
+    if (error) throw error
+    
+    // Filter for correct answers
+    const completedAttempts = data.filter((attempt: any) => {
+      if (attempt.attempt_type === 'mcq') {
+        return attempt.is_correct === true
+      } else if (attempt.attempt_type === 'coding') {
+        // Check if all test cases passed
+        return attempt.test_cases_passed === attempt.total_test_cases && attempt.total_test_cases > 0
+      }
+      // For other types (essay, reading), submission is enough
+      return true
+    })
+
+    // Return unique question IDs
+    return [...new Set(completedAttempts.map((a: any) => a.question_id))]
+  }
 }
 
 export class LessonService {

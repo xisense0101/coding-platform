@@ -161,55 +161,57 @@ export default function LessonView({ question, courseId, courseTitle, userId, na
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 to-white">
-      {/* Header */}
-      <div className="border-b border-sky-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 shadow-sm">
-        <div className="flex items-center justify-between p-4 max-w-7xl mx-auto">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={handleBackClick}
-              className="border-sky-300 text-sky-700 hover:bg-sky-50"
-            >
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Back to Course
-            </Button>
-            <div>
-              <h1 className="text-xl font-bold text-sky-900">{courseTitle}</h1>
-              <p className="text-sky-600 text-sm">{question.title}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
+      {/* Header - Hide for MCQ, Coding, and Essay as they have their own headers */}
+      {question.type !== 'mcq' && question.type !== 'coding' && question.type !== 'essay' && (
+        <div className="border-b border-sky-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 shadow-sm">
+          <div className="flex items-center justify-between p-4 max-w-7xl mx-auto">
+            <div className="flex items-center gap-4">
               <Button
                 variant="outline"
-                size="sm"
-                onClick={handlePrevious}
-                disabled={!navigation?.prev}
-                className="border-sky-300 text-sky-700 hover:bg-sky-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                title={navigation?.prev ? "Previous question" : "No previous question"}
+                onClick={handleBackClick}
+                className="border-sky-300 text-sky-700 hover:bg-sky-50"
               >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Previous
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Back to Course
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleNext}
-                disabled={!navigation?.next}
-                className="border-sky-300 text-sky-700 hover:bg-sky-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                title={navigation?.next ? "Next question" : "No next question"}
-              >
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
+              <div>
+                <h1 className="text-xl font-bold text-sky-900">{courseTitle}</h1>
+                <p className="text-sky-600 text-sm">{question.title}</p>
+              </div>
             </div>
-            <Badge className={`${getTypeColor(question.type)} text-white`}>
-              {getTypeIcon(question.type)}
-              <span className="ml-2 capitalize">{question.type}</span>
-            </Badge>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePrevious}
+                  disabled={!navigation?.prev}
+                  className="border-sky-300 text-sky-700 hover:bg-sky-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={navigation?.prev ? "Previous question" : "No previous question"}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNext}
+                  disabled={!navigation?.next}
+                  className="border-sky-300 text-sky-700 hover:bg-sky-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={navigation?.next ? "Next question" : "No next question"}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+              <Badge className={`${getTypeColor(question.type)} text-white`}>
+                {getTypeIcon(question.type)}
+                <span className="ml-2 capitalize">{question.type}</span>
+              </Badge>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content */}
       {question.type === 'coding' && (resolvedCoding || question.coding_question) ? (
@@ -217,6 +219,12 @@ export default function LessonView({ question, courseId, courseTitle, userId, na
           questionId={question.id}
           userId={userId}
           courseId={courseId}
+          title={question.title}
+          onBack={handleBackClick}
+          onNext={handleNext}
+          onPrevious={handlePrevious}
+          hasNext={!!navigation?.next}
+          hasPrevious={!!navigation?.prev}
           coding={resolvedCoding || {
             problem_statement: question.coding_question?.problem_statement || question.description || '',
             boilerplate_code: question.coding_question?.boilerplate_code || {},
@@ -236,6 +244,7 @@ export default function LessonView({ question, courseId, courseTitle, userId, na
           userId={userId}
           courseId={courseId}
           title={question.title}
+          navigation={navigation}
           mcq={resolvedMcq || {
             question_text: question.mcq_question?.question_text || question.description || '',
             options: question.mcq_question?.options || ["", "", "", ""],
@@ -249,6 +258,11 @@ export default function LessonView({ question, courseId, courseTitle, userId, na
           userId={userId}
           courseId={courseId}
           title={question.title}
+          onBack={handleBackClick}
+          onNext={handleNext}
+          onPrevious={handlePrevious}
+          hasNext={!!navigation?.next}
+          hasPrevious={!!navigation?.prev}
           essay={resolvedEssay || {
             prompt: question.essay_question?.prompt || question.description || '',
             rich_prompt: question.rich_content || question.essay_question?.rich_prompt || '',

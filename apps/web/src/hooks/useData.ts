@@ -144,7 +144,7 @@ export function useStudentCourses() {
     try {
       setLoading(true)
 
-      const { data, error } = await supabase
+      const { data: enrollments, error } = await supabase
         .from('course_enrollments')
         .select(`
           *,
@@ -153,7 +153,11 @@ export function useStudentCourses() {
             title,
             description,
             cover_image_url,
-            teacher:users!courses_teacher_id_fkey(full_name)
+            teacher:users!courses_teacher_id_fkey(full_name),
+            sections:sections!sections_course_id_fkey(
+              id,
+              questions:questions!questions_section_id_fkey(id)
+            )
           )
         `)
         .eq('student_id', userProfile.id)
@@ -165,18 +169,70 @@ export function useStudentCourses() {
         return
       }
 
+      // Collect all question IDs to fetch progress
+      const allQuestionIds: string[] = []
+      const courseQuestionMap = new Map<string, string[]>() // courseId -> questionIds
+
+      enrollments.forEach((enrollment: any) => {
+        const courseId = enrollment.course?.id
+        if (!courseId) return
+        
+        const qIds: string[] = []
+        enrollment.course.sections?.forEach((section: any) => {
+            section.questions?.forEach((q: any) => {
+                qIds.push(q.id)
+                allQuestionIds.push(q.id)
+            })
+        })
+        courseQuestionMap.set(courseId, qIds)
+      })
+
+      // Fetch completed attempts for these questions
+      const completedQuestionIds = new Set<string>()
+      if (allQuestionIds.length > 0) {
+          const { data: attempts, error: attemptsError } = await supabase
+            .from('attempts')
+            .select('question_id, attempt_type, is_correct, test_cases_passed, total_test_cases')
+            .eq('user_id', userProfile.id)
+            .in('question_id', allQuestionIds)
+            .not('submitted_at', 'is', null)
+          
+          if (!attemptsError && attempts) {
+              attempts.forEach((a: any) => {
+                let isCompleted = false;
+                if (a.attempt_type === 'mcq') {
+                  isCompleted = a.is_correct === true;
+                } else if (a.attempt_type === 'coding') {
+                  isCompleted = a.test_cases_passed === a.total_test_cases && a.total_test_cases > 0;
+                } else {
+                  // For other types, submission is enough
+                  isCompleted = true;
+                }
+
+                if (isCompleted) {
+                  completedQuestionIds.add(a.question_id)
+                }
+              })
+          }
+      }
+
       // ✅ Map once and cache the result
-      const mapped = (data || []).map((enrollment: any) => {
+      const mapped = (enrollments || []).map((enrollment: any) => {
         const course = enrollment.course || {}
-        const progress = enrollment.progress_percentage ?? enrollment.progress ?? 0
-        const totalLessons = enrollment.total_lessons ?? 20
+        const courseId = course.id
+        const questionIds = courseQuestionMap.get(courseId) || []
+        const totalLessons = questionIds.length
+        
+        const completedLessons = questionIds.filter(qId => completedQuestionIds.has(qId)).length
+        const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
+
         return {
-          id: course.id || enrollment.course_id || enrollment.id,
+          id: courseId || enrollment.course_id || enrollment.id,
           title: course.title || 'Untitled Course',
           description: course.description || '',
           progress,
           totalLessons,
-          completedLessons: Math.round((progress) / 100 * (totalLessons)),
+          completedLessons,
           instructor: course.teacher?.full_name || 'Unknown Instructor',
           thumbnail: course.cover_image_url || '',
           nextLesson: enrollment.next_lesson || ''

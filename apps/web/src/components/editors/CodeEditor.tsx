@@ -22,7 +22,7 @@ interface CodeEditorProps {
   placeholder?: string
   className?: string
   disabled?: boolean
-  height?: number
+  height?: number | string
   theme?: 'light' | 'dark'
   showLanguageSelector?: boolean
   showActionButtons?: boolean
@@ -180,7 +180,7 @@ export function CodeEditor({
       insertSpaces: true,
       wordWrap: 'on',
       minimap: {
-        enabled: height > 300
+        enabled: typeof height === 'number' ? height > 300 : true
       },
       scrollBeyondLastLine: false,
       automaticLayout: true,

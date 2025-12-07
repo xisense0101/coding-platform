@@ -9,15 +9,27 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RichTextEditor } from '@/components/editors/RichTextEditor'
 import { CodeEditor } from '@/components/editors/CodeEditor'
-import { CodeTemplateRow } from '@/components/coding'
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { ArrowLeft, Plus, Save, Eye, EyeOff, Code, FileText, Trash2, Settings, Users, Mail } from 'lucide-react'
+import { 
+  ChevronLeft, 
+  Plus, 
+  Save, 
+  Eye, 
+  EyeOff, 
+  Trash2, 
+  Settings, 
+  BookOpen, 
+  FileText, 
+  Code2, 
+  CheckCircle2, 
+  GripVertical, 
+  Users, 
+  Mail 
+} from 'lucide-react'
 
 import { logger } from '@/lib/utils/logger'
-
-// Using shared CodeTemplateRow from @/components/coding
 
 interface Question {
   id: number;
@@ -35,6 +47,7 @@ interface Question {
   isVisible: boolean;
   points: number;
   hasChanges?: boolean;
+  activeLanguage?: string; // UI state for coding question editor
 }
 
 interface TestCase {
@@ -75,6 +88,7 @@ function CreateCoursePageContent() {
   const [enrolling, setEnrolling] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [expandedQuestion, setExpandedQuestion] = useState<number | null>(null);
 
   // Load existing course data if in edit mode
   useEffect(() => {
@@ -274,6 +288,7 @@ function CreateCoursePageContent() {
         ? { ...section, questions: [...section.questions, newQuestion] }
         : section
     ))
+    setExpandedQuestion(newQuestion.id);
   }
 
   const updateSection = (sectionId: number, updates: Partial<Section>) => {
@@ -435,22 +450,41 @@ function CreateCoursePageContent() {
               title: section.title,
               description: section.description,
               order_index: sections.indexOf(section),
-              questions: section.questions.map(question => ({
-                type: question.type,
-                title: question.title,
-                description: question.content,
-                points: question.points,
-                isVisible: question.isVisible,
-                ...(question.type === 'mcq' && {
-                  options: question.options || ["", "", "", ""],
-                  correctAnswer: question.correctAnswer || 0
-                }),
-                ...(question.type === 'coding' && {
-                  code: question.code || "// Write your code here",
-                  languages: question.languages || ["JavaScript", "Python"],
-                  testCases: question.testCases || []
-                })
-              }))
+              questions: section.questions.map(question => {
+                // Construct head/body/tail objects for coding questions
+                const allLangs = programmingLanguages;
+                const headObj: Record<string, string> = {};
+                const bodyTemplateObj: Record<string, string> = {};
+                const tailObj: Record<string, string> = {};
+                
+                if (question.type === 'coding') {
+                  allLangs.forEach(lang => {
+                    headObj[lang.toLowerCase()] = (question.head && typeof question.head === 'object' ? question.head[lang.toLowerCase()] : "") || "";
+                    bodyTemplateObj[lang.toLowerCase()] = (question.body_template && typeof question.body_template === 'object' ? question.body_template[lang.toLowerCase()] : "") || "";
+                    tailObj[lang.toLowerCase()] = (question.tail && typeof question.tail === 'object' ? question.tail[lang.toLowerCase()] : "") || "";
+                  });
+                }
+
+                return {
+                  type: question.type,
+                  title: question.title,
+                  description: question.content,
+                  points: question.points,
+                  isVisible: question.isVisible,
+                  ...(question.type === 'mcq' && {
+                    options: question.options || ["", "", "", ""],
+                    correctAnswer: question.correctAnswer || 0
+                  }),
+                  ...(question.type === 'coding' && {
+                    code: question.code || "// Write your code here",
+                    languages: question.languages || ["JavaScript", "Python"],
+                    testCases: question.testCases || [],
+                    head: headObj,
+                    body_template: bodyTemplateObj,
+                    tail: tailObj
+                  })
+                };
+              })
             }
 
             const sectionResponse = await fetch(`/api/courses/${editCourseId}/sections`, {
@@ -542,6 +576,17 @@ function CreateCoursePageContent() {
                       weight: tc.weight || 1
                     }))
                     
+                    // Always save all languages from programmingLanguages for head/body_template/tail
+                    const allLangs = programmingLanguages;
+                    const headObj: Record<string, string> = {};
+                    const bodyTemplateObj: Record<string, string> = {};
+                    const tailObj: Record<string, string> = {};
+                    allLangs.forEach(lang => {
+                      headObj[lang.toLowerCase()] = (question.head && typeof question.head === 'object' ? question.head[lang.toLowerCase()] : "") || "";
+                      bodyTemplateObj[lang.toLowerCase()] = (question.body_template && typeof question.body_template === 'object' ? question.body_template[lang.toLowerCase()] : "") || "";
+                      tailObj[lang.toLowerCase()] = (question.tail && typeof question.tail === 'object' ? question.tail[lang.toLowerCase()] : "") || "";
+                    });
+
                     await fetch(`/api/questions/${createdQuestion.id}/coding`, {
                       method: 'PATCH',
                       headers: {
@@ -551,7 +596,10 @@ function CreateCoursePageContent() {
                         problem_statement: question.content || "",
                         rich_problem_statement: question.content || "",
                         test_cases: testCases,
-                        allowed_languages: question.languages || ["javascript", "python"]
+                        allowed_languages: question.languages || ["javascript", "python"],
+                        head: headObj,
+                        body_template: bodyTemplateObj,
+                        tail: tailObj
                       })
                     })
                   } else if (question.type === 'essay') {
@@ -697,22 +745,41 @@ function CreateCoursePageContent() {
             title: section.title,
             description: section.description,
             isVisible: section.isVisible,
-            questions: section.questions.map(question => ({
-              type: question.type,
-              title: question.title,
-              content: question.content,
-              points: question.points,
-              isVisible: question.isVisible,
-              ...(question.type === 'mcq' && {
-                options: question.options,
-                correctAnswer: question.correctAnswer
-              }),
-              ...(question.type === 'coding' && {
-                code: question.code,
-                languages: question.languages,
-                testCases: question.testCases
-              })
-            }))
+            questions: section.questions.map(question => {
+              // Construct head/body/tail objects for coding questions
+              const allLangs = programmingLanguages;
+              const headObj: Record<string, string> = {};
+              const bodyTemplateObj: Record<string, string> = {};
+              const tailObj: Record<string, string> = {};
+              
+              if (question.type === 'coding') {
+                allLangs.forEach(lang => {
+                  headObj[lang.toLowerCase()] = (question.head && typeof question.head === 'object' ? question.head[lang.toLowerCase()] : "") || "";
+                  bodyTemplateObj[lang.toLowerCase()] = (question.body_template && typeof question.body_template === 'object' ? question.body_template[lang.toLowerCase()] : "") || "";
+                  tailObj[lang.toLowerCase()] = (question.tail && typeof question.tail === 'object' ? question.tail[lang.toLowerCase()] : "") || "";
+                });
+              }
+
+              return {
+                type: question.type,
+                title: question.title,
+                content: question.content,
+                points: question.points,
+                isVisible: question.isVisible,
+                ...(question.type === 'mcq' && {
+                  options: question.options,
+                  correctAnswer: question.correctAnswer
+                }),
+                ...(question.type === 'coding' && {
+                  code: question.code,
+                  languages: question.languages,
+                  testCases: question.testCases,
+                  head: headObj,
+                  body_template: bodyTemplateObj,
+                  tail: tailObj
+                })
+              };
+            })
           }))
         }
 
@@ -844,200 +911,40 @@ function CreateCoursePageContent() {
     }
   }
 
-  const renderQuestionEditor = (section: Section, question: Question) => {
-    return (
-      <Card key={question.id} className="border-blue-200">
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-2">
-              <Badge variant={question.type === "mcq" ? "default" : question.type === "coding" ? "secondary" : "outline"}>
-                {question.type.toUpperCase()}
-              </Badge>
-              <Input
-                value={question.title}
-                onChange={(e) => updateQuestion(section.id, question.id, { title: e.target.value })}
-                className="font-medium"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Input
-                type="number"
-                value={question.points}
-                onChange={(e) => updateQuestion(section.id, question.id, { points: parseInt(e.target.value) || 1 })}
-                className="w-20"
-                placeholder="Points"
-              />
-              <Switch
-                checked={question.isVisible}
-                onCheckedChange={(checked) => updateQuestion(section.id, question.id, { isVisible: checked })}
-              />
-              {question.isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => deleteQuestion(section.id, question.id)}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label>Question Content</Label>
-            <RichTextEditor
-              value={question.content}
-              onChange={(val) => updateQuestion(section.id, question.id, { content: val })}
-              placeholder="Enter your question here..."
-              height={160}
-              toolbar="full"
-            />
-          </div>
+  const getQuestionTypeIcon = (type: string) => {
+    switch (type) {
+      case 'mcq':
+        return <CheckCircle2 className="w-4 h-4" />;
+      case 'coding':
+        return <Code2 className="w-4 h-4" />;
+      case 'essay':
+        return <FileText className="w-4 h-4" />;
+      case 'reading':
+        return <BookOpen className="w-4 h-4" />;
+      default:
+        return <FileText className="w-4 h-4" />;
+    }
+  };
 
-          {question.type === "mcq" && (
-            <div className="space-y-3">
-              <Label>Options</Label>
-              {(question.options || ["", "", "", ""]).map((option, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <Input
-                    value={option}
-                    onChange={(e) => {
-                      const newOptions = [...(question.options || ["", "", "", ""])]
-                      newOptions[index] = e.target.value
-                      updateQuestion(section.id, question.id, { options: newOptions })
-                    }}
-                    placeholder={`Option ${index + 1}`}
-                  />
-                  <Switch
-                    checked={question.correctAnswer === index}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        updateQuestion(section.id, question.id, { correctAnswer: index })
-                      }
-                    }}
-                  />
-                  <Label className="text-sm">Correct</Label>
-                </div>
-              ))}
-            </div>
-          )}
+  const getQuestionTypeBadge = (type: string) => {
+    switch (type) {
+      case 'mcq':
+        return 'bg-green-100 text-green-700 border-green-300';
+      case 'coding':
+        return 'bg-purple-100 text-purple-700 border-purple-300';
+      case 'essay':
+        return 'bg-orange-100 text-orange-700 border-orange-300';
+      case 'reading':
+        return 'bg-blue-100 text-blue-700 border-blue-300';
+      default:
+        return 'bg-gray-100 text-gray-700 border-gray-300';
+    }
+  };
 
-          {question.type === "coding" && (
-            <div className="space-y-4">
-              <div>
-                <Label>Allowed Programming Languages</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {programmingLanguages.map((lang) => (
-                    <Badge
-                      key={lang}
-                      variant={(question.languages || []).includes(lang) ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => {
-                        const currentLangs = question.languages || ["JavaScript", "Python"]
-                        const newLangs = currentLangs.includes(lang)
-                          ? currentLangs.filter(l => l !== lang)
-                          : [...currentLangs, lang]
-                        updateQuestion(section.id, question.id, { languages: newLangs })
-                      }}
-                    >
-                      {lang}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Code Problem Setup</Label>
-                <CodeTemplateRow
-                  question={question}
-                  sectionId={section.id}
-                  updateQuestion={updateQuestion}
-                  programmingLanguages={programmingLanguages}
-                />
-              </div>
-
-
-              <div>
-                <div className="flex justify-between items-center">
-                  <Label>Test Cases</Label>
-                  <Button
-                    size="sm"
-                    onClick={() => addTestCase(section.id, question.id)}
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add Test Case
-                  </Button>
-                </div>
-                <div className="space-y-3 mt-2">
-                  {(question.testCases || []).map((testCase, index) => (
-                    <Card key={testCase.id} className="p-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-xs">Input</Label>
-                          <Textarea
-                            value={testCase.input}
-                            onChange={(e) => {
-                              const newTestCases = (question.testCases || []).map(tc =>
-                                tc.id === testCase.id ? { ...tc, input: e.target.value } : tc
-                              )
-                              updateQuestion(section.id, question.id, { testCases: newTestCases })
-                            }}
-                            rows={2}
-                            className="font-mono text-xs"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs">Expected Output</Label>
-                          <Textarea
-                            value={testCase.expectedOutput}
-                            onChange={(e) => {
-                              const newTestCases = (question.testCases || []).map(tc =>
-                                tc.id === testCase.id ? { ...tc, expectedOutput: e.target.value } : tc
-                              )
-                              updateQuestion(section.id, question.id, { testCases: newTestCases })
-                            }}
-                            rows={2}
-                            className="font-mono text-xs"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center mt-2">
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            checked={testCase.isHidden}
-                            onCheckedChange={(checked) => {
-                              const newTestCases = (question.testCases || []).map(tc =>
-                                tc.id === testCase.id ? { ...tc, isHidden: checked } : tc
-                              )
-                              updateQuestion(section.id, question.id, { testCases: newTestCases })
-                            }}
-                          />
-                          <Label className="text-xs">Hidden from students</Label>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            const newTestCases = (question.testCases || []).filter(tc => tc.id !== testCase.id)
-                            updateQuestion(section.id, question.id, { testCases: newTestCases })
-                          }}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    )
-  }
+  const activeSecData = sections.find((s) => s.id === activeSection);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
+    <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Loading overlay for edit mode */}
       {isLoading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1049,26 +956,37 @@ function CreateCoursePageContent() {
       )}
 
       {/* Header */}
-      <div className="bg-white border-b border-blue-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <Button variant="outline" onClick={handleBack}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
-              </Button>
-              <h1 className="text-2xl font-bold text-blue-900">
-                {isEditMode ? 'Edit Course' : 'Create Course'}
-              </h1>
+      <header className="bg-white border-b border-gray-200">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleBack}
+                className="flex items-center gap-2 px-3 py-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span className="text-sm">Back to Dashboard</span>
+              </button>
+              <div className="h-6 w-px bg-gray-200"></div>
+              <div>
+                <h1 className="text-xl text-gray-900">
+                  {isEditMode ? 'Edit Course' : 'Create New Course'}
+                </h1>
+                <p className="text-xs text-gray-500">
+                  Build engaging courses with multiple question types
+                </p>
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-2">
               {isEditMode && (
                 <Dialog open={showEnrollModal} onOpenChange={setShowEnrollModal}>
                   <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <Users className="w-4 h-4 mr-2" />
+                    <button
+                      className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm"
+                    >
+                      <Users className="w-4 h-4" />
                       Enroll Students
-                    </Button>
+                    </button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
@@ -1113,50 +1031,50 @@ function CreateCoursePageContent() {
                   </DialogContent>
                 </Dialog>
               )}
-              <Button variant="outline">
-                <Eye className="w-4 h-4 mr-2" />
+              <button className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
+                <Eye className="w-4 h-4" />
                 Preview
-              </Button>
-              <Button 
-                onClick={handleSaveCourse} 
+              </button>
+              <button
+                onClick={handleSaveCourse}
                 disabled={isSubmitting}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm shadow-sm disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <>
-                    <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     {isEditMode ? 'Updating...' : 'Saving...'}
                   </>
                 ) : (
                   <>
-                    <Save className="w-4 h-4 mr-2" />
+                    <Save className="w-4 h-4" />
                     {isEditMode ? 'Update Course' : 'Save Course'}
                   </>
                 )}
-              </Button>
+              </button>
               {isEditMode && (
-                <Button 
-                  onClick={handleDeleteCourse} 
+                <button
+                  onClick={handleDeleteCourse}
                   disabled={isDeleting}
-                  className="bg-red-600 hover:bg-red-700"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-sm shadow-sm disabled:opacity-50"
                 >
                   {isDeleting ? (
                     <>
-                      <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                       Deleting...
                     </>
                   ) : (
                     <>
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete Course
+                      <Trash2 className="w-4 h-4" />
+                      Delete
                     </>
                   )}
-                </Button>
+                </button>
               )}
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Notification Messages */}
       {(error || success) && (
@@ -1192,174 +1110,746 @@ function CreateCoursePageContent() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Course Info Sidebar */}
-          <div className="lg:col-span-1">
-            <Card className="border-blue-200 sticky top-4">
-              <CardHeader>
-                <CardTitle className="text-blue-900">Course Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label>Course Title</Label>
-                  <Input
-                    value={courseTitle}
-                    onChange={(e) => setCourseTitle(e.target.value)}
-                    placeholder="Enter course title"
-                  />
-                </div>
-                <div>
-                  <Label>Description</Label>
-                  <Textarea
-                    value={courseDescription}
-                    onChange={(e) => setCourseDescription(e.target.value)}
-                    placeholder="Enter course description"
-                    rows={4}
-                  />
-                </div>
-                <div className="pt-4">
-                  <Button
-                    onClick={addSection}
-                    className="w-full bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Section
-                  </Button>
-                </div>
-                
-                {/* Sections List */}
-                <div className="space-y-2">
-                  <Label>Sections ({sections.length})</Label>
-                  {sections.map((section) => (
-                    <div
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden flex">
+        {/* Left Sidebar - Course Info & Sections */}
+        <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto">
+          <div className="p-6 space-y-6">
+            {/* Course Info */}
+            <div className="space-y-4">
+              <h3 className="text-sm text-gray-900 flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                Course Information
+              </h3>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">
+                  Course Title *
+                </label>
+                <input
+                  type="text"
+                  value={courseTitle}
+                  onChange={(e) => setCourseTitle(e.target.value)}
+                  placeholder="Enter course title"
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={courseDescription}
+                  onChange={(e) => setCourseDescription(e.target.value)}
+                  placeholder="Enter course description"
+                  rows={4}
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Sections List */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm text-gray-900 flex items-center gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  Sections ({sections.length})
+                </h3>
+                <button
+                  onClick={addSection}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 text-xs shadow-sm"
+                >
+                  <Plus className="w-3 h-3" />
+                  Add
+                </button>
+              </div>
+              <div className="space-y-2">
+                {sections.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400 text-xs">
+                    <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    No sections yet
+                  </div>
+                ) : (
+                  sections.map((section) => (
+                    <button
                       key={section.id}
-                      className={`p-2 rounded border cursor-pointer ${
-                        activeSection === section.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                      }`}
                       onClick={() => setActiveSection(section.id)}
+                      className={`w-full p-3 rounded-lg border text-left transition-all ${
+                        activeSection === section.id
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 bg-white hover:border-blue-300'
+                      }`}
                     >
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">{section.title}</span>
-                        <div className="flex items-center space-x-1">
-                          {section.isVisible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                          <Badge variant="outline" className="text-xs">
-                            {section.questions.length}
-                          </Badge>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-900 truncate">
+                            {section.title}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {section.questions.length} question
+                            {section.questions.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {section.isVisible ? (
+                            <Eye className="w-3 h-3 text-green-600" />
+                          ) : (
+                            <EyeOff className="w-3 h-3 text-gray-400" />
+                          )}
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Section Editor */}
-          <div className="lg:col-span-3">
-            {activeSection ? (
-              <div className="space-y-6">
-                {sections
-                  .filter(section => section.id === activeSection)
-                  .map(section => (
-                    <div key={section.id}>
-                      {/* Section Header */}
-                      <Card className="border-blue-200">
-                        <CardHeader>
-                          <div className="flex justify-between items-center">
-                            <CardTitle className="text-blue-900">Section Settings</CardTitle>
-                            <div className="flex items-center space-x-2">
-                              <Switch
-                                checked={section.isVisible}
-                                onCheckedChange={(checked) => updateSection(section.id, { isVisible: checked })}
-                              />
-                              {section.isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => deleteSection(section.id)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div>
-                            <Label>Section Title</Label>
-                            <Input
-                              value={section.title}
-                              onChange={(e) => updateSection(section.id, { title: e.target.value })}
-                              placeholder="Enter section title"
-                            />
-                          </div>
-                          <div>
-                            <Label>Section Description</Label>
-                            <Textarea
-                              value={section.description}
-                              onChange={(e) => updateSection(section.id, { description: e.target.value })}
-                              placeholder="Enter section description"
-                              rows={2}
-                            />
-                          </div>
-                          <div className="flex space-x-2">
-                            <Button
-                              size="sm"
-                              onClick={() => addQuestion(section.id, "mcq")}
-                              className="bg-green-600 hover:bg-green-700"
-                            >
-                              <Plus className="w-4 h-4 mr-1" />
-                              MCQ Question
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => addQuestion(section.id, "coding")}
-                              className="bg-purple-600 hover:bg-purple-700"
-                            >
-                              <Code className="w-4 h-4 mr-1" />
-                              Coding Question
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => addQuestion(section.id, "essay")}
-                              className="bg-orange-600 hover:bg-orange-700"
-                            >
-                              <FileText className="w-4 h-4 mr-1" />
-                              Essay Question
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => addQuestion(section.id, "reading")}
-                              className="bg-blue-600 hover:bg-blue-700"
-                            >
-                              <FileText className="w-4 h-4 mr-1" />
-                              Reading Material
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Questions */}
-                      <div className="space-y-4">
-                        {section.questions.map(question => renderQuestionEditor(section, question))}
-                      </div>
-                    </div>
-                  ))}
+                    </button>
+                  ))
+                )}
               </div>
-            ) : (
-              <Card className="border-blue-200">
-                <CardContent className="flex items-center justify-center h-64">
-                  <div className="text-center">
-                    <Settings className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Section Selected</h3>
-                    <p className="text-gray-500">Select a section from the sidebar to start editing, or create a new section.</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            </div>
           </div>
         </div>
+
+        {/* Right Content - Section Editor */}
+        <div className="flex-1 overflow-y-auto">
+          {activeSecData ? (
+            <div className="p-6 space-y-6">
+              {/* Section Header */}
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <h2 className="text-lg text-gray-900">Section Settings</h2>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() =>
+                        updateSection(activeSecData.id, {
+                          isVisible: !activeSecData.isVisible
+                        })
+                      }
+                      className={`px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs transition-colors ${
+                        activeSecData.isVisible
+                          ? 'bg-green-100 text-green-700 border border-green-300'
+                          : 'bg-gray-100 text-gray-600 border border-gray-300'
+                      }`}
+                    >
+                      {activeSecData.isVisible ? (
+                        <>
+                          <Eye className="w-3 h-3" />
+                          Visible
+                        </>
+                      ) : (
+                        <>
+                          <EyeOff className="w-3 h-3" />
+                          Hidden
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => deleteSection(activeSecData.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete section"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">
+                      Section Title *
+                    </label>
+                    <input
+                      type="text"
+                      value={activeSecData.title}
+                      onChange={(e) =>
+                        updateSection(activeSecData.id, { title: e.target.value })
+                      }
+                      placeholder="Enter section title"
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">
+                      Section Description
+                    </label>
+                    <textarea
+                      value={activeSecData.description}
+                      onChange={(e) =>
+                        updateSection(activeSecData.id, {
+                          description: e.target.value
+                        })
+                      }
+                      placeholder="Enter section description"
+                      rows={2}
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-2">
+                      Add Questions
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => addQuestion(activeSecData.id, 'mcq')}
+                        className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-xs"
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                        MCQ Quiz
+                      </button>
+                      <button
+                        onClick={() => addQuestion(activeSecData.id, 'coding')}
+                        className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-xs"
+                      >
+                        <Code2 className="w-3 h-3" />
+                        Coding
+                      </button>
+                      <button
+                        onClick={() => addQuestion(activeSecData.id, 'essay')}
+                        className="px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2 text-xs"
+                      >
+                        <FileText className="w-3 h-3" />
+                        Essay
+                      </button>
+                      <button
+                        onClick={() => addQuestion(activeSecData.id, 'reading')}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-xs"
+                      >
+                        <BookOpen className="w-3 h-3" />
+                        Reading
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Questions List */}
+              <div className="space-y-4">
+                {activeSecData.questions.length === 0 ? (
+                  <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+                    <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <h3 className="text-gray-900 mb-2">No Questions Yet</h3>
+                    <p className="text-gray-500 text-sm">
+                      Add questions using the buttons above
+                    </p>
+                  </div>
+                ) : (
+                  activeSecData.questions.map((question, qIdx) => (
+                    <div
+                      key={question.id}
+                      className="bg-white border border-gray-200 rounded-xl overflow-hidden"
+                    >
+                      {/* Question Header */}
+                      <div
+                        className="p-4 bg-gray-50 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() =>
+                          setExpandedQuestion(
+                            expandedQuestion === question.id ? null : question.id
+                          )
+                        }
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 flex-1">
+                            <GripVertical className="w-4 h-4 text-gray-400" />
+                            <span
+                              className={`px-2 py-1 rounded text-xs border flex items-center gap-1 ${getQuestionTypeBadge(question.type)}`}
+                            >
+                              {getQuestionTypeIcon(question.type)}
+                              {question.type.toUpperCase()}
+                            </span>
+                            <input
+                              type="text"
+                              value={question.title}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                updateQuestion(activeSecData.id, question.id, {
+                                  title: e.target.value
+                                });
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex-1 px-2 py-1 bg-transparent border-0 text-sm focus:outline-none focus:bg-white focus:border focus:border-blue-500 focus:rounded"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              value={question.points}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                updateQuestion(activeSecData.id, question.id, {
+                                  points: parseInt(e.target.value) || 1
+                                });
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-16 px-2 py-1 bg-white border border-gray-300 rounded text-xs text-center"
+                              placeholder="pts"
+                            />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateQuestion(activeSecData.id, question.id, {
+                                  isVisible: !question.isVisible
+                                });
+                              }}
+                              className={`px-2 py-1 rounded text-xs ${
+                                question.isVisible
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-gray-100 text-gray-600'
+                              }`}
+                            >
+                              {question.isVisible ? (
+                                <Eye className="w-3 h-3" />
+                              ) : (
+                                <EyeOff className="w-3 h-3" />
+                              )}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteQuestion(activeSecData.id, question.id);
+                              }}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Question Content (Expandable) */}
+                      {expandedQuestion === question.id && (
+                        <div className="p-6 space-y-4">
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">
+                              Question Content
+                            </label>
+                            <RichTextEditor
+                              value={question.content}
+                              onChange={(val) => updateQuestion(activeSecData.id, question.id, { content: val })}
+                              placeholder="Enter your question here..."
+                              height={160}
+                              toolbar="full"
+                            />
+                          </div>
+
+                          {/* MCQ Options */}
+                          {question.type === 'mcq' && (
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-2">
+                                Answer Options
+                              </label>
+                              <div className="space-y-2">
+                                {(question.options || ['', '', '', '']).map(
+                                  (option, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center gap-2"
+                                    >
+                                      <input
+                                        type="text"
+                                        value={option}
+                                        onChange={(e) => {
+                                          const newOptions = [
+                                            ...(question.options || [
+                                              '',
+                                              '',
+                                              '',
+                                              ''
+                                            ])
+                                          ];
+                                          newOptions[idx] = e.target.value;
+                                          updateQuestion(
+                                            activeSecData.id,
+                                            question.id,
+                                            { options: newOptions }
+                                          );
+                                        }}
+                                        placeholder={`Option ${idx + 1}`}
+                                        className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      />
+                                      <button
+                                        onClick={() =>
+                                          updateQuestion(
+                                            activeSecData.id,
+                                            question.id,
+                                            { correctAnswer: idx }
+                                          )
+                                        }
+                                        className={`px-3 py-2 rounded-lg text-xs transition-colors ${
+                                          question.correctAnswer === idx
+                                            ? 'bg-green-600 text-white'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                      >
+                                        {question.correctAnswer === idx
+                                          ? '✓ Correct'
+                                          : 'Mark Correct'}
+                                      </button>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Coding Question */}
+                          {question.type === 'coding' && (
+                            <div className="space-y-4">
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-2">
+                                  Allowed Programming Languages
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                  {programmingLanguages.map((lang) => (
+                                    <button
+                                      key={lang}
+                                      onClick={() => {
+                                        const currentLangs =
+                                          question.languages || [
+                                            'JavaScript',
+                                            'Python'
+                                          ];
+                                        const newLangs = currentLangs.includes(lang)
+                                          ? currentLangs.filter((l) => l !== lang)
+                                          : [...currentLangs, lang];
+                                        updateQuestion(activeSecData.id, question.id, {
+                                          languages: newLangs
+                                        });
+                                      }}
+                                      className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+                                        (question.languages || []).includes(lang)
+                                          ? 'bg-blue-600 text-white border-blue-600'
+                                          : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                                      }`}
+                                    >
+                                      {lang}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Code Problem Setup - Head/Body/Tail for each language */}
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-2">
+                                  Code Problem Setup
+                                </label>
+                                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                  <p className="text-xs text-gray-500 mb-3">
+                                    Configure the code template for each language. The final code will be: <strong>HEAD + BODY_TEMPLATE + TAIL</strong>
+                                  </p>
+                                  
+                                  {/* Language tabs */}
+                                  <div className="mb-3">
+                                    <div className="flex flex-wrap gap-1 mb-3">
+                                      {(question.languages || ['JavaScript', 'Python']).map((lang) => (
+                                        <button
+                                          key={lang}
+                                          onClick={() => {
+                                            // Set active language for editing
+                                            const langLower = lang.toLowerCase();
+                                            updateQuestion(activeSecData.id, question.id, {
+                                              activeLanguage: langLower
+                                            });
+                                          }}
+                                          className={`px-3 py-1.5 rounded text-xs transition-colors ${
+                                            (question.activeLanguage === lang.toLowerCase() || 
+                                            (!question.activeLanguage && lang === (question.languages || ['JavaScript'])[0]))
+                                              ? 'bg-blue-600 text-white'
+                                              : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-100'
+                                          }`}
+                                        >
+                                          {lang}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    
+                                    {/* Display editors for active language */}
+                                    {(question.languages || ['JavaScript', 'Python']).map((lang) => {
+                                      const langLower = lang.toLowerCase();
+                                      const isActive = (question.activeLanguage === langLower || 
+                                        (!question.activeLanguage && lang === (question.languages || ['JavaScript'])[0]));
+                                      
+                                      if (!isActive) return null;
+                                      
+                                      return (
+                                        <div key={lang} className="space-y-3">
+                                          {/* HEAD */}
+                                          <div>
+                                            <label className="block text-xs text-gray-600 mb-1">
+                                              HEAD - Prepended to student code (hidden from student)
+                                            </label>
+                                            <CodeEditor
+                                              value={(question.head && typeof question.head === 'object' ? question.head[langLower] : '') || ''}
+                                              onChange={(val) => {
+                                                const newHead = { ...(question.head || {}) };
+                                                newHead[langLower] = val;
+                                                updateQuestion(activeSecData.id, question.id, {
+                                                  head: newHead
+                                                });
+                                              }}
+                                              language={langLower}
+                                              placeholder={`// Code that runs before student's solution\n// Example: import statements, helper functions, etc.`}
+                                              height={100}
+                                              className="rounded border"
+                                            />
+                                          </div>
+
+                                          {/* BODY TEMPLATE */}
+                                          <div>
+                                            <label className="block text-xs text-gray-600 mb-1">
+                                              BODY TEMPLATE - What students see and edit
+                                            </label>
+                                            <CodeEditor
+                                              value={(question.body_template && typeof question.body_template === 'object' ? question.body_template[langLower] : '') || question.code || ''}
+                                              onChange={(val) => {
+                                                const newBodyTemplate = { ...(question.body_template || {}) };
+                                                newBodyTemplate[langLower] = val;
+                                                updateQuestion(activeSecData.id, question.id, {
+                                                  body_template: newBodyTemplate,
+                                                  code: val // Keep for backward compatibility
+                                                });
+                                              }}
+                                              language={langLower}
+                                              placeholder={lang === 'JavaScript' 
+                                                ? `function solution(input) {\n  // Write your code here\n  \n}`
+                                                : lang === 'Python'
+                                                ? `def solution(input):\n    # Write your code here\n    pass`
+                                                : `// Write your code here`
+                                              }
+                                              height={200}
+                                              className="rounded border"
+                                            />
+                                          </div>
+
+                                          {/* TAIL */}
+                                          <div>
+                                            <label className="block text-xs text-gray-600 mb-1">
+                                              TAIL - Appended to student code (hidden from student)
+                                            </label>
+                                            <CodeEditor
+                                              value={(question.tail && typeof question.tail === 'object' ? question.tail[langLower] : '') || ''}
+                                              onChange={(val) => {
+                                                const newTail = { ...(question.tail || {}) };
+                                                newTail[langLower] = val;
+                                                updateQuestion(activeSecData.id, question.id, {
+                                                  tail: newTail
+                                                });
+                                              }}
+                                              language={langLower}
+                                              placeholder={`// Code that runs after student's solution\n// Example: test runner, output formatter, etc.`}
+                                              height={100}
+                                              className="rounded border"
+                                            />
+                                          </div>
+
+                                          {/* Preview */}
+                                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                            <p className="text-xs text-blue-800 mb-1">
+                                              <strong>Final execution order:</strong>
+                                            </p>
+                                            <p className="text-xs text-blue-700 font-mono">
+                                              HEAD → BODY_TEMPLATE (student code) → TAIL
+                                            </p>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <label className="block text-xs text-gray-600">
+                                    Test Cases
+                                  </label>
+                                  <button
+                                    onClick={() =>
+                                      addTestCase(activeSecData.id, question.id)
+                                    }
+                                    className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 text-xs"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    Add Test
+                                  </button>
+                                </div>
+                                <div className="space-y-2">
+                                  {(question.testCases || []).map((tc, tcIdx) => (
+                                    <div
+                                      key={tc.id}
+                                      className="p-3 bg-gray-50 border border-gray-200 rounded-lg"
+                                    >
+                                      <div className="grid grid-cols-2 gap-3 mb-2">
+                                        <div>
+                                          <label className="block text-xs text-gray-500 mb-1">
+                                            Input
+                                          </label>
+                                          <Textarea
+                                            value={tc.input}
+                                            onChange={(e) => {
+                                              const newTestCases = [
+                                                ...(question.testCases || [])
+                                              ];
+                                              newTestCases[tcIdx] = {
+                                                ...tc,
+                                                input: e.target.value
+                                              };
+                                              updateQuestion(
+                                                activeSecData.id,
+                                                question.id,
+                                                { testCases: newTestCases }
+                                              );
+                                            }}
+                                            rows={2}
+                                            className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs text-gray-500 mb-1">
+                                            Expected Output
+                                          </label>
+                                          <Textarea
+                                            value={tc.expectedOutput}
+                                            onChange={(e) => {
+                                              const newTestCases = [
+                                                ...(question.testCases || [])
+                                              ];
+                                              newTestCases[tcIdx] = {
+                                                ...tc,
+                                                expectedOutput: e.target.value
+                                              };
+                                              updateQuestion(
+                                                activeSecData.id,
+                                                question.id,
+                                                { testCases: newTestCases }
+                                              );
+                                            }}
+                                            rows={2}
+                                            className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                          />
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center justify-between">
+                                        <label className="flex items-center gap-2 text-xs text-gray-600">
+                                          <input
+                                            type="checkbox"
+                                            checked={tc.isHidden}
+                                            onChange={(e) => {
+                                              const newTestCases = [
+                                                ...(question.testCases || [])
+                                              ];
+                                              newTestCases[tcIdx] = {
+                                                ...tc,
+                                                isHidden: e.target.checked
+                                              };
+                                              updateQuestion(
+                                                activeSecData.id,
+                                                question.id,
+                                                { testCases: newTestCases }
+                                              );
+                                            }}
+                                            className="rounded"
+                                          />
+                                          Hidden from students
+                                        </label>
+                                        <button
+                                          onClick={() => {
+                                            const newTestCases = (
+                                              question.testCases || []
+                                            ).filter((_, i) => i !== tcIdx);
+                                            updateQuestion(
+                                              activeSecData.id,
+                                              question.id,
+                                              { testCases: newTestCases }
+                                            );
+                                          }}
+                                          className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <Settings className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-gray-900 mb-2">No Section Selected</h3>
+                <p className="text-gray-500 text-sm mb-4">
+                  Select a section from the sidebar or create a new one
+                </p>
+                <button
+                  onClick={addSection}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create Section
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Enroll Students Modal */}
+      {showEnrollModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg text-gray-900">Enroll Students</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Add students to this course
+              </p>
+            </div>
+            <div className="p-6">
+              <label className="block text-sm text-gray-600 mb-2">
+                Student Email Addresses
+              </label>
+              <Textarea
+                value={studentEmails}
+                onChange={(e) => setStudentEmails(e.target.value)}
+                placeholder="Enter student email addresses (one per line or separated by commas)"
+                rows={6}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                You can enter multiple emails separated by new lines, commas, or
+                spaces
+              </p>
+            </div>
+            <div className="p-6 border-t border-gray-200 flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowEnrollModal(false)}
+                className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleEnrollStudents}
+                disabled={enrolling || !studentEmails.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-50"
+              >
+                {enrolling ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Enrolling...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4" />
+                    Enroll Students
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
