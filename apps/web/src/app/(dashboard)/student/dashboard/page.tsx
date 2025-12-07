@@ -12,7 +12,9 @@ import {
   Settings,
   FileText,
   Award,
-  PlayCircle
+  PlayCircle,
+  Menu,
+  X
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { useStudentCourses } from '@/hooks/useData';
@@ -55,6 +57,7 @@ export default function StudentDashboard() {
   const [activeSection, setActiveSection] = useState('courses');
   const [activityData, setActivityData] = useState<ActivityData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const userEmail = userProfile?.email || 'student@example.com';
 
@@ -105,18 +108,36 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      {/* Mobile Overlay */}
+      {isMobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col fixed h-screen">
+      <aside className={`w-64 bg-white border-r border-gray-200 flex flex-col fixed h-screen z-50 transition-transform duration-300 lg:translate-x-0 ${
+        isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
         {/* Logo */}
         <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center shadow-md">
-              <Shield className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center shadow-md">
+                <Shield className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-gray-900 text-base">BlocksCode</h1>
+                <p className="text-gray-500 text-xs">Student Portal</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-gray-900">BlocksCode</h1>
-              <p className="text-gray-500 text-xs">Student Portal</p>
-            </div>
+            <button
+              onClick={() => setIsMobileSidebarOpen(false)}
+              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
           </div>
         </div>
 
@@ -126,7 +147,10 @@ export default function StudentDashboard() {
             {sidebarItems.map((item) => (
               <li key={item.id}>
                 <button
-                  onClick={() => setActiveSection(item.id)}
+                  onClick={() => {
+                    setActiveSection(item.id);
+                    setIsMobileSidebarOpen(false);
+                  }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                     activeSection === item.id
                       ? 'bg-blue-50 text-blue-600'
@@ -163,25 +187,31 @@ export default function StudentDashboard() {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto ml-64">
+      <div className="flex-1 overflow-auto lg:ml-64">
         {/* Header */}
         <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-          <div className="px-8 py-4">
+          <div className="px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
-              {/* Current Section Title */}
-              <div>
-                <h2 className="text-gray-900 text-xl capitalize">{activeSection === 'courses' ? 'My Courses' : activeSection}</h2>
+              {/* Mobile Menu Button & Title */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsMobileSidebarOpen(true)}
+                  className="lg:hidden p-2 hover:bg-gray-50 rounded-lg transition-colors"
+                >
+                  <Menu className="w-6 h-6 text-gray-600" />
+                </button>
+                <h2 className="text-gray-900 text-lg sm:text-xl capitalize">{activeSection === 'courses' ? 'My Courses' : activeSection}</h2>
               </div>
 
               {/* Right Section */}
-              <div className="flex items-center gap-3">
-                <button className="p-2.5 hover:bg-gray-50 rounded-lg transition-colors relative">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <button className="p-2 sm:p-2.5 hover:bg-gray-50 rounded-lg transition-colors relative">
                   <Bell className="w-5 h-5 text-gray-600" />
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+                  <span className="absolute top-1 right-1 sm:top-1.5 sm:right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
                 </button>
                 <button 
                   onClick={() => setActiveSection('profile')}
-                  className="p-2.5 hover:bg-gray-50 rounded-lg transition-colors"
+                  className="p-2 sm:p-2.5 hover:bg-gray-50 rounded-lg transition-colors"
                 >
                   <Settings className="w-5 h-5 text-gray-600" />
                 </button>
@@ -191,7 +221,7 @@ export default function StudentDashboard() {
         </header>
 
         {/* Main Content Area */}
-        <main className="p-8">
+        <main className="p-4 sm:p-6 lg:p-8">
           {activeSection === 'profile' && (
             <ProfileSection userEmail={userEmail} />
           )}
@@ -229,27 +259,27 @@ export default function StudentDashboard() {
 function ProfileSection({ userEmail }: { userEmail: string }) {
   return (
     <div className="max-w-4xl">
-      <h2 className="text-gray-900 text-3xl mb-2">Profile Settings</h2>
-      <p className="text-gray-500 mb-8">Manage your account settings and preferences</p>
+      <h2 className="text-gray-900 text-2xl sm:text-3xl mb-2">Profile Settings</h2>
+      <p className="text-gray-500 text-sm sm:text-base mb-6 sm:mb-8">Manage your account settings and preferences</p>
 
       <div className="space-y-6">
         {/* Profile Information */}
-        <div className="bg-white rounded-2xl p-6 border border-gray-200">
-          <h3 className="text-gray-900 text-xl mb-6">Personal Information</h3>
+        <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-200">
+          <h3 className="text-gray-900 text-lg sm:text-xl mb-4 sm:mb-6">Personal Information</h3>
           
-          <div className="flex items-start gap-6 mb-8">
+          <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6 mb-6 sm:mb-8">
             <div className="relative">
-              <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-3xl">
-                <User className="w-12 h-12" />
+              <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-2xl sm:text-3xl">
+                <User className="w-10 h-10 sm:w-12 sm:h-12" />
               </div>
-              <button className="absolute bottom-0 right-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors">
-                <Settings className="w-4 h-4" />
+              <button className="absolute bottom-0 right-0 w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors">
+                <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
             </div>
-            <div className="flex-1">
-              <h4 className="text-gray-900 text-xl mb-1">Student User</h4>
-              <p className="text-gray-500 mb-4">{userEmail}</p>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
+            <div className="flex-1 w-full">
+              <h4 className="text-gray-900 text-lg sm:text-xl mb-1">Student User</h4>
+              <p className="text-gray-500 text-sm sm:text-base mb-3 sm:mb-4 break-all">{userEmail}</p>
+              <button className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
                 Change Profile Picture
               </button>
             </div>
@@ -284,19 +314,19 @@ function ProfileSection({ userEmail }: { userEmail: string }) {
             </div>
           </div>
 
-          <div className="mt-6 flex gap-3">
-            <button className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors">
+          <div className="mt-6 flex flex-col sm:flex-row gap-3">
+            <button className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors">
               Save Changes
             </button>
-            <button className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors">
+            <button className="w-full sm:w-auto px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors">
               Cancel
             </button>
           </div>
         </div>
 
         {/* Account Security */}
-        <div className="bg-white rounded-2xl p-6 border border-gray-200">
-          <h3 className="text-gray-900 text-xl mb-6">Account Security</h3>
+        <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-200">
+          <h3 className="text-gray-900 text-lg sm:text-xl mb-4 sm:mb-6">Account Security</h3>
           
           <div className="space-y-4">
             <div>
@@ -326,45 +356,45 @@ function ProfileSection({ userEmail }: { userEmail: string }) {
           </div>
 
           <div className="mt-6">
-            <button className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors">
+            <button className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors">
               Update Password
             </button>
           </div>
         </div>
 
         {/* Preferences */}
-        <div className="bg-white rounded-2xl p-6 border border-gray-200">
-          <h3 className="text-gray-900 text-xl mb-6">Preferences</h3>
+        <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-200">
+          <h3 className="text-gray-900 text-lg sm:text-xl mb-4 sm:mb-6">Preferences</h3>
           
           <div className="space-y-4">
-            <div className="flex items-center justify-between py-3 border-b border-gray-100">
-              <div>
-                <p className="text-gray-900">Email Notifications</p>
-                <p className="text-gray-500 text-sm">Receive email updates about your courses</p>
+            <div className="flex items-center justify-between py-3 border-b border-gray-100 gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="text-gray-900 text-sm sm:text-base">Email Notifications</p>
+                <p className="text-gray-500 text-xs sm:text-sm">Receive email updates about your courses</p>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
                 <input type="checkbox" defaultChecked className="sr-only peer" />
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
             </div>
             
-            <div className="flex items-center justify-between py-3 border-b border-gray-100">
-              <div>
-                <p className="text-gray-900">Push Notifications</p>
-                <p className="text-gray-500 text-sm">Get notified about deadlines and updates</p>
+            <div className="flex items-center justify-between py-3 border-b border-gray-100 gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="text-gray-900 text-sm sm:text-base">Push Notifications</p>
+                <p className="text-gray-500 text-xs sm:text-sm">Get notified about deadlines and updates</p>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
                 <input type="checkbox" defaultChecked className="sr-only peer" />
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
             </div>
             
-            <div className="flex items-center justify-between py-3">
-              <div>
-                <p className="text-gray-900">Weekly Progress Report</p>
-                <p className="text-gray-500 text-sm">Receive weekly summary of your progress</p>
+            <div className="flex items-center justify-between py-3 gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="text-gray-900 text-sm sm:text-base">Weekly Progress Report</p>
+                <p className="text-gray-500 text-xs sm:text-sm">Receive weekly summary of your progress</p>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
                 <input type="checkbox" className="sr-only peer" />
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
@@ -388,31 +418,31 @@ function CoursesSection({
 }) {
   return (
     <div>
-      <h2 className="text-gray-900 text-3xl mb-2">My Courses</h2>
-      <p className="text-gray-500 mb-8">Track your progress across all enrolled courses</p>
+      <h2 className="text-gray-900 text-2xl sm:text-3xl mb-2">My Courses</h2>
+      <p className="text-gray-500 text-sm sm:text-base mb-6 sm:mb-8">Track your progress across all enrolled courses</p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {courses.map((course) => (
           <div
             key={course.id}
             onClick={() => onContinue(course.id)}
-            className="bg-gray-50 rounded-xl p-5 border border-gray-200 hover:border-blue-200 hover:shadow-md transition-all cursor-pointer group"
+            className="bg-gray-50 rounded-xl p-4 sm:p-5 border border-gray-200 hover:border-blue-200 hover:shadow-md transition-all cursor-pointer group"
           >
-            <div className="flex items-start gap-4">
+            <div className="flex items-start gap-3 sm:gap-4">
               {course.thumbnail && (course.thumbnail.startsWith('http') || course.thumbnail.startsWith('/')) ? (
                 <img 
                   src={course.thumbnail} 
                   alt={course.title} 
-                  className="w-14 h-14 rounded-xl object-cover shadow-md flex-shrink-0"
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover shadow-md flex-shrink-0"
                 />
               ) : (
-                <div className={`w-14 h-14 bg-gradient-to-br ${getCourseIcon(course.thumbnail)} rounded-xl flex items-center justify-center flex-shrink-0 shadow-md`}>
-                  <BookOpen className="w-7 h-7 text-white" />
+                <div className={`w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br ${getCourseIcon(course.thumbnail)} rounded-xl flex items-center justify-center flex-shrink-0 shadow-md`}>
+                  <BookOpen className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h4 className="text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">{course.title}</h4>
-                <p className="text-gray-500 text-sm mb-3">{course.instructor}</p>
+                <h4 className="text-gray-900 text-base sm:text-lg mb-1 group-hover:text-blue-600 transition-colors truncate">{course.title}</h4>
+                <p className="text-gray-500 text-xs sm:text-sm mb-2 sm:mb-3 truncate">{course.instructor}</p>
                 <div className="mb-2">
                   <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
                     <span>{course.completedLessons} of {course.totalLessons} lessons</span>
