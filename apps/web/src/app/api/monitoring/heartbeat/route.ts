@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
 import { logger } from '@/lib/utils/logger'
 
+// Force dynamic rendering for this route since it uses cookies
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/monitoring/heartbeat
  * 
