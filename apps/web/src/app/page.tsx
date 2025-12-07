@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useInView } from "motion/react";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   Shield,
   GraduationCap,
@@ -788,7 +788,7 @@ function SlideThree() {
 
                 {/* Social Links */}
                 <div className="flex gap-2 sm:gap-3">
-                  <motion.a
+                  {/* <motion.a
                     href="https://github.com/xisense0101"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -797,7 +797,7 @@ function SlideThree() {
                     whileTap={{ scale: 0.9 }}
                   >
                     <Github className="w-4 h-4 sm:w-5 sm:h-5" />
-                  </motion.a>
+                  </motion.a> */}
                   <motion.a
                     href="#"
                     className="w-10 h-10 sm:w-11 sm:h-11 bg-white border-2 border-gray-200 rounded-lg sm:rounded-xl flex items-center justify-center hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50 transition-all shadow-sm hover:shadow-md"

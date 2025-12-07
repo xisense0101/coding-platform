@@ -124,6 +124,7 @@ export async function POST(request: NextRequest) {
     const {
       name,
       slug,
+      subdomain,
       contact_email,
       contact_phone,
       subscription_plan = 'basic',
@@ -134,10 +135,33 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Validate required fields
-    if (!name || !slug) {
+    if (!name || !slug || !subdomain) {
       return NextResponse.json(
-        { error: 'Missing required fields: name, slug' },
+        { error: 'Missing required fields: name, slug, subdomain' },
         { status: 400 }
+      )
+    }
+
+    // Validate subdomain format (3-63 chars, lowercase alphanumeric + hyphens)
+    const subdomainRegex = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/
+    if (!subdomainRegex.test(subdomain)) {
+      return NextResponse.json(
+        { error: 'Invalid subdomain format. Must be 3-63 characters, lowercase letters, numbers, and hyphens only.' },
+        { status: 400 }
+      )
+    }
+
+    // Check if subdomain already exists
+    const { data: existingOrg, error: checkError } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('subdomain', subdomain)
+      .single()
+
+    if (existingOrg) {
+      return NextResponse.json(
+        { error: 'Subdomain already exists. Please choose a different subdomain.' },
+        { status: 409 }
       )
     }
 
@@ -147,6 +171,7 @@ export async function POST(request: NextRequest) {
       .insert({
         name,
         slug,
+        subdomain,
         contact_email,
         contact_phone,
         subscription_plan,

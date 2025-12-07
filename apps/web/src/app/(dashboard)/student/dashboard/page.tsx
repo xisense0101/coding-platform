@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { 
   Shield, 
   LogOut, 
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { useStudentCourses } from '@/hooks/useData';
+import { useOrganizationBranding } from '@/hooks/useOrganizationBranding';
 
 interface RecentActivityItem {
   type: 'course' | 'exam' | 'student';
@@ -54,6 +56,7 @@ export default function StudentDashboard() {
   const { signOut, userProfile } = useAuth();
   const router = useRouter();
   const { courses, loading: coursesLoading } = useStudentCourses();
+  const { logoUrl, organizationName } = useOrganizationBranding();
   const [activeSection, setActiveSection] = useState('courses');
   const [activityData, setActivityData] = useState<ActivityData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,11 +127,23 @@ export default function StudentDashboard() {
         <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center shadow-md">
-                <Shield className="w-6 h-6 text-white" />
-              </div>
+              {logoUrl ? (
+                <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-gray-100 shadow-md">
+                  <Image 
+                    src={logoUrl} 
+                    alt={organizationName || 'Organization'} 
+                    width={40} 
+                    height={40}
+                    className="object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-400 rounded-lg flex items-center justify-center shadow-md">
+                  <Shield className="w-6 h-6 text-white" />
+                </div>
+              )}
               <div>
-                <h1 className="text-gray-900 text-base">BlocksCode</h1>
+                <h1 className="text-gray-900 text-base">{organizationName || 'BlocksCode'}</h1>
                 <p className="text-gray-500 text-xs">Student Portal</p>
               </div>
             </div>

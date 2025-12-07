@@ -3,8 +3,10 @@
 import { useState, useEffect, Suspense } from 'react';
 import { Shield, ArrowLeft, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useOrganizationBranding } from '@/hooks/useOrganizationBranding';
 
 function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -19,6 +21,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const nextParam = searchParams?.get('next') || undefined;
   const errorParam = searchParams?.get('error');
+  const { logoUrl, organizationName, isLoading: brandingLoading } = useOrganizationBranding();
 
   useEffect(() => {
     if (errorParam === 'suspended') {
@@ -78,15 +81,29 @@ function LoginForm() {
             href="/"
             className="flex items-center justify-center mb-8 w-full hover:opacity-80 transition-opacity"
           >
-            <div className="relative w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-400 rounded-xl flex items-center justify-center shadow-lg">
-              <Shield className="w-8 h-8 text-white" />
-            </div>
+            {logoUrl ? (
+              <div className="relative w-24 h-24">
+                <Image
+                  src={logoUrl}
+                  alt={`${organizationName} logo`}
+                  fill
+                  className="object-contain"
+                  priority
+                />
+              </div>
+            ) : (
+              <div className="relative w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-400 rounded-xl flex items-center justify-center shadow-lg">
+                <Shield className="w-8 h-8 text-white" />
+              </div>
+            )}
           </Link>
 
           {/* Heading */}
           <div className="text-center mb-8">
             <h1 className="text-gray-900 text-3xl mb-2">Sign In to Your Account</h1>
-            <p className="text-gray-500">Continue your learning journey with BlocksCode</p>
+            <p className="text-gray-500">
+              {organizationName ? `Welcome to ${organizationName}` : 'Continue your learning journey with BlocksCode'}
+            </p>
           </div>
 
           {/* Error Message */}

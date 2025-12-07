@@ -16,7 +16,9 @@ import {
   Home,
   Edit,
   Trash2,
-  LogOut
+  LogOut,
+  Upload,
+  X
 } from 'lucide-react'
 import { logger } from '@/lib/utils/logger'
 import Link from 'next/link'
@@ -27,6 +29,8 @@ interface Organization {
   id: string
   name: string
   slug: string
+  subdomain?: string
+  logo_url?: string
   contact_email?: string
   contact_phone?: string
   subscription_plan: string
@@ -48,6 +52,8 @@ export default function AdminOrganizationsPage() {
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [search, setSearch] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteOrgId, setDeleteOrgId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Check if user is super_admin, redirect regular admins to their organization
@@ -145,6 +151,36 @@ export default function AdminOrganizationsPage() {
     org.name.toLowerCase().includes(search.toLowerCase()) ||
     org.slug.toLowerCase().includes(search.toLowerCase())
   )
+
+  const handleDeleteClick = (orgId: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDeleteOrgId(orgId)
+    setShowDeleteModal(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteOrgId) return
+
+    try {
+      const response = await fetch(`/api/admin/organizations/${deleteOrgId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to delete organization')
+      }
+
+      alert('✅ Organization deleted successfully')
+      setShowDeleteModal(false)
+      setDeleteOrgId(null)
+      fetchOrganizations()
+    } catch (error: any) {
+      logger.error('Error deleting organization:', error)
+      alert('❌ ' + (error.message || 'Failed to delete organization'))
+    }
+  }
 
   // Show loading while checking authentication
   if (checkingAuth) {
@@ -323,8 +359,24 @@ export default function AdminOrganizationsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                        <Users className="h-4 w-4" />
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          router.push(`/admin/organizations/${org.id}`)
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={(e) => handleDeleteClick(org.id, e)}
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -345,6 +397,50 @@ export default function AdminOrganizationsPage() {
           }}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-destructive">Delete Organization</CardTitle>
+              <CardDescription>
+                Are you sure you want to delete this organization? This action cannot be undone.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <p className="text-sm font-medium text-destructive">Warning:</p>
+                  <ul className="list-disc ml-4 mt-2 text-sm text-muted-foreground">
+                    <li>All users in this organization will be deleted</li>
+                    <li>All courses and exams will be deleted</li>
+                    <li>All student data and submissions will be deleted</li>
+                    <li>This action is permanent and cannot be reversed</li>
+                  </ul>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowDeleteModal(false)
+                      setDeleteOrgId(null)
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleDeleteConfirm}
+                  >
+                    Delete Organization
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
@@ -353,6 +449,7 @@ function CreateOrganizationModal({ onClose, onSuccess }: { onClose: () => void; 
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
+    subdomain: '',
     contact_email: '',
     contact_phone: '',
     subscription_plan: 'basic' as 'basic' | 'premium' | 'enterprise',
@@ -361,6 +458,8 @@ function CreateOrganizationModal({ onClose, onSuccess }: { onClose: () => void; 
     max_courses: 50,
     max_exams_per_month: 100
   })
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -368,6 +467,7 @@ function CreateOrganizationModal({ onClose, onSuccess }: { onClose: () => void; 
     setLoading(true)
 
     try {
+      // Step 1: Create organization
       const response = await fetch('/api/admin/organizations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -377,6 +477,23 @@ function CreateOrganizationModal({ onClose, onSuccess }: { onClose: () => void; 
       if (!response.ok) {
         const error = await response.json()
         throw new Error(error.error || 'Failed to create organization')
+      }
+
+      const { organization } = await response.json()
+
+      // Step 2: Upload logo if provided
+      if (logoFile && organization.id) {
+        const logoFormData = new FormData()
+        logoFormData.append('logo', logoFile)
+
+        const logoResponse = await fetch(`/api/admin/organizations/${organization.id}/logo`, {
+          method: 'POST',
+          body: logoFormData
+        })
+
+        if (!logoResponse.ok) {
+          console.warn('Logo upload failed, but organization was created')
+        }
       }
 
       alert('✅ Organization created successfully!')
@@ -389,13 +506,44 @@ function CreateOrganizationModal({ onClose, onSuccess }: { onClose: () => void; 
     }
   }
 
-  // Auto-generate slug from name
+  // Auto-generate slug and subdomain from name
   const handleNameChange = (name: string) => {
+    const generatedSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
     setFormData({
       ...formData,
       name,
-      slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      slug: generatedSlug,
+      subdomain: generatedSlug
     })
+  }
+
+  // Handle logo file selection
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file')
+        return
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image size must be less than 5MB')
+        return
+      }
+      setLogoFile(file)
+      // Create preview
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const removeLogo = () => {
+    setLogoFile(null)
+    setLogoPreview(null)
   }
 
   return (
@@ -428,6 +576,59 @@ function CreateOrganizationModal({ onClose, onSuccess }: { onClose: () => void; 
                 <p className="text-xs text-muted-foreground mt-1">
                   Unique identifier for URLs (auto-generated from name)
                 </p>
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium">Subdomain *</label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    required
+                    value={formData.subdomain}
+                    onChange={(e) => setFormData({ ...formData, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                    placeholder="e.g., chitkara"
+                    pattern="[a-z0-9-]{3,63}"
+                  />
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">.blockscode.me</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Organization subdomain (3-63 characters, lowercase letters, numbers, hyphens only)
+                </p>
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium">Organization Logo</label>
+                <div className="mt-2">
+                  {logoPreview ? (
+                    <div className="relative inline-block">
+                      <img 
+                        src={logoPreview} 
+                        alt="Logo preview" 
+                        className="h-24 w-24 object-contain border rounded-lg"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                        onClick={removeLogo}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-accent/50 transition-colors">
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <Upload className="h-8 w-8 mb-2 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Click to upload logo</p>
+                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG, SVG (max 5MB)</p>
+                      </div>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleLogoChange}
+                      />
+                    </label>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium">Contact Email</label>

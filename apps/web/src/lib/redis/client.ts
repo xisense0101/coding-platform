@@ -40,6 +40,7 @@ export const CacheKeys = {
   courseEnrollments: (courseId: string) => `course:enrollments:${courseId}`,
   examSubmissions: (examId: string) => `exam:submissions:${examId}`,
   question: (questionId: string) => `question:${questionId}`,
+  organizationBySubdomain: (subdomain: string) => `organization:subdomain:${subdomain}`,
 }
 
 // Cache TTL (Time To Live) in seconds

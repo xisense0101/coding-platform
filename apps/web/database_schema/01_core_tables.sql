@@ -19,6 +19,7 @@ CREATE TABLE organizations (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
+  subdomain TEXT UNIQUE, -- Organization's unique subdomain (e.g., 'chitkara' for chitkara.blockscode.me)
   logo_url TEXT,
   website_url TEXT,
   primary_color TEXT DEFAULT '#3B82F6',
@@ -37,7 +38,15 @@ CREATE TABLE organizations (
   is_active BOOLEAN DEFAULT TRUE,
   trial_ends_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  -- Subdomain validation constraints
+  CONSTRAINT chk_subdomain_format CHECK (
+    subdomain IS NULL OR (
+      subdomain ~ '^[a-z0-9][a-z0-9-]*[a-z0-9]$' AND 
+      LENGTH(subdomain) >= 3 AND 
+      LENGTH(subdomain) <= 63
+    )
+  )
 );
 
 -- ===============================================================================
@@ -393,6 +402,10 @@ CREATE INDEX idx_course_enrollments_status ON course_enrollments(enrollment_stat
 
 -- Full-text search for courses
 CREATE INDEX idx_courses_search ON courses USING gin(to_tsvector('english', title || ' ' || COALESCE(description, '')));
+
+-- Organizations subdomain index for fast lookup
+CREATE INDEX idx_organizations_subdomain ON organizations(subdomain) WHERE subdomain IS NOT NULL;
+CREATE INDEX idx_organizations_active ON organizations(is_active) WHERE is_active = true;
 
 -- ===============================================================================
 -- SAMPLE DATA FOR CORE TABLES
