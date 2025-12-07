@@ -317,7 +317,38 @@ export async function DELETE(
       logger.error('Error deleting sessions:', sessionsError)
     }
 
-    // Step 7: Delete user profile
+    // Step 7: CRITICAL - Delete auth user FIRST before database user
+    // This prevents orphaned auth users that can't be re-registered
+    logger.info(`Attempting to delete auth user: ${userId}`)
+    
+    const { data: authDeleteData, error: authDeleteError } = await adminClient.auth.admin.deleteUser(userId)
+
+    if (authDeleteError) {
+      logger.error('Error deleting auth user:', {
+        error: authDeleteError,
+        message: authDeleteError.message,
+        status: authDeleteError.status,
+        userId: userId
+      })
+      
+      // If user doesn't exist in auth, that's actually OK - proceed with database deletion
+      if (authDeleteError.status === 404 || authDeleteError.message?.includes('not found')) {
+        logger.warn(`Auth user ${userId} not found, but continuing with database deletion`)
+      } else {
+        return NextResponse.json(
+          { 
+            error: 'Failed to delete user from authentication system',
+            message: authDeleteError.message || 'Unable to remove user from authentication',
+            details: authDeleteError
+          },
+          { status: 500 }
+        )
+      }
+    }
+
+    logger.info(`Auth user deleted successfully: ${userId}`)
+
+    // Step 8: Delete user profile (only after auth deletion succeeds)
     const { error: userDeleteError } = await supabase
       .from('users')
       .delete()
@@ -325,15 +356,13 @@ export async function DELETE(
 
     if (userDeleteError) {
       logger.error('Error deleting user profile:', userDeleteError)
-      throw userDeleteError
-    }
-
-    // Step 8: Delete auth user using admin client
-    const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(userId)
-
-    if (authDeleteError) {
-      logger.error('Error deleting auth user:', authDeleteError)
-      // User profile is already deleted, so we just log this
+      return NextResponse.json(
+        { 
+          error: 'Failed to delete user from database',
+          message: userDeleteError.message || 'An error occurred while deleting user profile'
+        },
+        { status: 500 }
+      )
     }
 
     logger.info(`Successfully deleted user ${userId} and all associated content`)

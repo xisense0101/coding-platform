@@ -370,31 +370,47 @@ export async function DELETE(
       // Continue with deletion anyway
     }
 
-    // Now delete the user from database
+    // CRITICAL: Delete auth user FIRST before database user
+    // This prevents orphaned auth users that can't be re-registered
+    logger.info(`Attempting to delete auth user: ${userId}`)
+    
+    const adminClient = createAdminClient()
+    const { data: authDeleteData, error: authDeleteError } = await adminClient.auth.admin.deleteUser(userId)
+    
+    if (authDeleteError) {
+      logger.error('Failed to delete auth user:', {
+        error: authDeleteError,
+        message: authDeleteError.message,
+        status: authDeleteError.status,
+        userId: userId
+      })
+      
+      // If user doesn't exist in auth, that's actually OK - proceed with database deletion
+      if (authDeleteError.status === 404 || authDeleteError.message?.includes('not found')) {
+        logger.warn(`Auth user ${userId} not found, but continuing with database deletion`)
+      } else {
+        return NextResponse.json({ 
+          error: 'Failed to delete user from authentication system',
+          message: authDeleteError.message || 'Unable to remove user from authentication. Please try again or contact support.',
+          details: authDeleteError
+        }, { status: 500 })
+      }
+    }
+
+    logger.info(`Auth user deleted successfully: ${userId}`)
+
+    // Now delete the user from database (only after auth deletion succeeds)
     const { error: deleteError } = await supabase
       .from('users')
       .delete()
       .eq('id', userId)
 
     if (deleteError) {
-      logger.error('Error deleting user:', deleteError)
+      logger.error('Error deleting user from database:', deleteError)
       return NextResponse.json({ 
-        error: 'Failed to delete user',
-        message: deleteError.message || 'An error occurred while deleting the user'
+        error: 'Failed to delete user from database',
+        message: deleteError.message || 'An error occurred while deleting the user from database'
       }, { status: 500 })
-    }
-
-    // Delete auth user using admin client with service role key
-    try {
-      const adminClient = createAdminClient()
-      const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(userId)
-      if (authDeleteError) {
-        logger.warn('Auth user deletion failed:', authDeleteError)
-        // Continue anyway as the database record is deleted
-      }
-    } catch (authError) {
-      logger.warn('Failed to delete auth user:', authError)
-      // Continue anyway as the database record is already deleted
     }
 
     return NextResponse.json({

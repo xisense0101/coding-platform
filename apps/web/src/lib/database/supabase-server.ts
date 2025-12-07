@@ -37,8 +37,15 @@ export const createSupabaseServerClient = () => {
 // Admin client with service role key (for admin operations)
 export const createAdminClient = () => {
   if (!supabaseServiceKey) {
-    throw new Error('Missing Supabase service role key')
+    console.error('❌ SUPABASE_SERVICE_ROLE_KEY is not set in environment variables')
+    throw new Error('Missing Supabase service role key. Please set SUPABASE_SERVICE_ROLE_KEY in your .env.local file')
   }
+  
+  if (!supabaseServiceKey.startsWith('eyJ')) {
+    console.error('❌ SUPABASE_SERVICE_ROLE_KEY appears to be invalid (should start with "eyJ")')
+    throw new Error('Invalid Supabase service role key format')
+  }
+  
   return createClient<Database>(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
