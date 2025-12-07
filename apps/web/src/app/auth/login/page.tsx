@@ -81,7 +81,10 @@ function LoginForm() {
             href="/"
             className="flex items-center justify-center mb-8 w-full hover:opacity-80 transition-opacity"
           >
-            {logoUrl ? (
+            {brandingLoading ? (
+              // Show loading skeleton while fetching branding
+              <div className="relative w-14 h-14 bg-gray-200 rounded-xl animate-pulse" />
+            ) : logoUrl ? (
               <div className="relative w-24 h-24">
                 <Image
                   src={logoUrl}
@@ -102,7 +105,13 @@ function LoginForm() {
           <div className="text-center mb-8">
             <h1 className="text-gray-900 text-3xl mb-2">Sign In to Your Account</h1>
             <p className="text-gray-500">
-              {organizationName ? `Welcome to ${organizationName}` : 'Continue your learning journey with BlocksCode'}
+              {brandingLoading ? (
+                <span className="inline-block w-64 h-5 bg-gray-200 rounded animate-pulse" />
+              ) : organizationName ? (
+                `Welcome to ${organizationName}`
+              ) : (
+                'Continue your learning journey with BlocksCode'
+              )}
             </p>
           </div>
 

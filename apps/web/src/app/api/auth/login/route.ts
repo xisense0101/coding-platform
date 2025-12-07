@@ -42,7 +42,64 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Attempt to sign in
+    // CRITICAL FIX: Validate user belongs to organization BEFORE authentication
+    // This prevents session creation for users from wrong organizations
+    if (orgId) {
+      // First, check if user exists and get their organization
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, organization_id, email, is_active')
+        .eq('email', email.toLowerCase())
+        .single()
+
+      // If user doesn't exist, return generic error (don't reveal user existence)
+      if (userError || !userData) {
+        return NextResponse.json(
+          { error: 'Invalid email or password' },
+          { status: 401 }
+        )
+      }
+
+      // Check if user belongs to this organization
+      if (userData.organization_id !== orgId) {
+        // Log security event for attempted cross-org access
+        await supabase
+          .from('security_events')
+          .insert({
+            organization_id: userData.organization_id,
+            user_id: userData.id,
+            event_type: 'login_failed',
+            severity: 'warning',
+            description: `User attempted to login to wrong organization subdomain: ${orgSubdomain}`,
+            ip_address: request.headers.get('x-forwarded-for') || 
+                       request.headers.get('x-real-ip') || 
+                       'unknown',
+            user_agent: request.headers.get('user-agent') || 'unknown',
+            metadata: {
+              attempted_org_id: orgId,
+              user_org_id: userData.organization_id,
+              subdomain: orgSubdomain,
+              email: email
+            }
+          })
+        
+        // Return generic error to prevent user enumeration
+        return NextResponse.json(
+          { error: 'Invalid credentials for this organization' },
+          { status: 403 }
+        )
+      }
+
+      // Check if account is suspended
+      if (!userData.is_active) {
+        return NextResponse.json(
+          { error: 'Your account has been suspended. Please contact your administrator.' },
+          { status: 403 }
+        )
+      }
+    }
+
+    // NOW authenticate - only if org validation passed or no org context
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -62,7 +119,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get user profile
+    // Get user profile with organization details
     const { data: userProfile, error: profileError } = await supabase
       .from('users')
       .select('*, organization:organizations(*)')
@@ -74,38 +131,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Failed to fetch user profile' },
         { status: 500 }
-      )
-    }
-
-    // CRITICAL: Validate user belongs to this organization's subdomain
-    if (orgId && userProfile.organization_id !== orgId) {
-      // User exists but doesn't belong to this organization
-      // Sign them out to prevent unauthorized access
-      await supabase.auth.signOut()
-      
-      // Log security event for attempted cross-org access
-      await supabase
-        .from('security_events')
-        .insert({
-          organization_id: userProfile?.organization_id,
-          user_id: data.user.id,
-          event_type: 'login_failed',
-          severity: 'warning',
-          description: `User attempted to login to wrong organization subdomain: ${orgSubdomain}`,
-          ip_address: request.headers.get('x-forwarded-for') || 
-                     request.headers.get('x-real-ip') || 
-                     'unknown',
-          user_agent: request.headers.get('user-agent') || 'unknown',
-          metadata: {
-            attempted_org_id: orgId,
-            user_org_id: userProfile.organization_id,
-            subdomain: orgSubdomain
-          }
-        })
-      
-      return NextResponse.json(
-        { error: 'Invalid credentials for this organization' },
-        { status: 403 }
       )
     }
 

@@ -208,6 +208,14 @@ export async function middleware(request: NextRequest) {
       // CRITICAL: Validate user belongs to the organization subdomain
       if (organization && userOrgId && userOrgId !== organization.id) {
         // User is logged in but trying to access a different organization's subdomain
+        // Sign them out immediately to prevent unauthorized access
+        await supabase.auth.signOut()
+        
+        // Clear session cache
+        if (sessionToken) {
+          sessionCache.delete(sessionToken)
+        }
+        
         // Redirect to unauthorized page
         if (!pathname.startsWith('/unauthorized')) {
           return NextResponse.redirect(new URL('/unauthorized', request.url))

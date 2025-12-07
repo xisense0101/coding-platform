@@ -1,11 +1,33 @@
 "use client"
 
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ShieldAlert } from 'lucide-react'
 import { motion } from 'motion/react'
+import { createClient } from '@/lib/database/client'
 
 export default function Unauthorized() {
+  useEffect(() => {
+    // CRITICAL: Clear any lingering session when user lands on unauthorized page
+    // This ensures users with wrong org don't stay authenticated
+    const clearSession = async () => {
+      try {
+        const supabase = createClient()
+        const { error } = await supabase.auth.signOut()
+        if (error) {
+          console.error('Error clearing session:', error)
+        } else {
+          console.log('Session cleared successfully')
+        }
+      } catch (error) {
+        console.error('Error in clearSession:', error)
+      }
+    }
+    
+    clearSession()
+  }, [])
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 via-white to-orange-50">
       <div className="text-center px-4 max-w-md">

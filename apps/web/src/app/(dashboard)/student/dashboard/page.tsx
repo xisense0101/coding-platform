@@ -274,9 +274,6 @@ export default function StudentDashboard() {
 function ProfileSection({ userEmail }: { userEmail: string }) {
   return (
     <div className="max-w-4xl">
-      <h2 className="text-gray-900 text-2xl sm:text-3xl mb-2">Profile Settings</h2>
-      <p className="text-gray-500 text-sm sm:text-base mb-6 sm:mb-8">Manage your account settings and preferences</p>
-
       <div className="space-y-6">
         {/* Profile Information */}
         <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-200">
@@ -433,9 +430,6 @@ function CoursesSection({
 }) {
   return (
     <div>
-      <h2 className="text-gray-900 text-2xl sm:text-3xl mb-2">My Courses</h2>
-      <p className="text-gray-500 text-sm sm:text-base mb-6 sm:mb-8">Track your progress across all enrolled courses</p>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {courses.map((course) => (
           <div
