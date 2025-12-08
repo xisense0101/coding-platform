@@ -26,10 +26,12 @@ import {
   CheckCircle2, 
   GripVertical, 
   Users, 
-  Mail 
+  Mail,
+  Sparkles
 } from 'lucide-react'
 
 import { logger } from '@/lib/utils/logger'
+import { GenerateCourseModal } from "@/components/course/GenerateCourseModal"
 
 interface Question {
   id: number;
@@ -38,7 +40,7 @@ interface Question {
   content: string;
   options?: string[];
   correctAnswer?: string | number;
-  code?: string;
+  code?: string | Record<string, string>;
   head?: Record<string, string>; // per-language
   body_template?: Record<string, string>; // per-language
   tail?: Record<string, string>; // per-language
@@ -89,6 +91,50 @@ function CreateCoursePageContent() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [expandedQuestion, setExpandedQuestion] = useState<number | null>(null);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+
+  const handleCourseUpdate = (data: any) => {
+    if (data.title) setCourseTitle(data.title);
+    if (data.description) setCourseDescription(data.description);
+    
+    if (data.newSection) {
+      const newSection: Section = {
+        id: Date.now(),
+        title: data.newSection.title,
+        description: data.newSection.description,
+        isVisible: true,
+        questions: (data.newSection.questions || []).map((q: any, idx: number) => ({
+          id: Date.now() + idx,
+          type: q.type,
+          title: q.title,
+          content: q.content,
+          points: q.points || 10,
+          isVisible: true,
+          hasChanges: true,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+          code: q.code,
+          languages: q.languages,
+          head: q.head,
+          body_template: q.body_template,
+          tail: q.tail,
+          testCases: q.testCases?.map((tc: any, tcIdx: number) => ({
+            id: Date.now() + idx + tcIdx,
+            input: tc.input,
+            expectedOutput: tc.expectedOutput,
+            isHidden: tc.isHidden,
+            weight: 1
+          }))
+        }))
+      };
+      
+      setSections(prev => [...prev, newSection]);
+      // If it's the first section, make it active
+      if (sections.length === 0) {
+        setActiveSection(newSection.id);
+      }
+    }
+  };
 
   // Load existing course data if in edit mode
   useEffect(() => {
@@ -677,10 +723,12 @@ function CreateCoursePageContent() {
                     const codingData = {
                       problem_statement: question.content || "",
                       rich_problem_statement: question.content || "",
-                      boilerplate_code: { 
-                        javascript: question.code || "// Write your code here",
-                        python: (question.code || "# Write your code here").replace(/\//g, '#').replace(/function|{|}/g, '').trim()
-                      },
+                      boilerplate_code: typeof question.code === 'object' && question.code !== null
+                        ? question.code
+                        : { 
+                            javascript: question.code || "// Write your code here",
+                            python: (question.code || "# Write your code here").replace(/\//g, '#').replace(/function|{|}/g, '').trim()
+                          },
                       allowed_languages: question.languages && question.languages.length > 0 ? question.languages : programmingLanguages,
                       test_cases: testCases,
                       head: headObj,
@@ -918,7 +966,7 @@ function CreateCoursePageContent() {
       case 'coding':
         return <Code2 className="w-4 h-4" />;
       case 'essay':
-        return <FileText className="w-4 h-4" />;
+        return <BookOpen className="w-4 h-4" />;
       case 'reading':
         return <BookOpen className="w-4 h-4" />;
       default:
@@ -933,7 +981,7 @@ function CreateCoursePageContent() {
       case 'coding':
         return 'bg-purple-100 text-purple-700 border-purple-300';
       case 'essay':
-        return 'bg-orange-100 text-orange-700 border-orange-300';
+        return 'bg-blue-100 text-blue-700 border-blue-300';
       case 'reading':
         return 'bg-blue-100 text-blue-700 border-blue-300';
       default:
@@ -1031,6 +1079,13 @@ function CreateCoursePageContent() {
                   </DialogContent>
                 </Dialog>
               )}
+              <button 
+                onClick={() => setShowGenerateModal(true)}
+                className="px-4 py-2 bg-purple-50 border border-purple-200 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-2 text-sm"
+              >
+                <Sparkles className="w-4 h-4" />
+                Generate with AI
+              </button>
               <button className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
                 <Eye className="w-4 h-4" />
                 Preview
@@ -1299,17 +1354,10 @@ function CreateCoursePageContent() {
                       </button>
                       <button
                         onClick={() => addQuestion(activeSecData.id, 'essay')}
-                        className="px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2 text-xs"
-                      >
-                        <FileText className="w-3 h-3" />
-                        Essay
-                      </button>
-                      <button
-                        onClick={() => addQuestion(activeSecData.id, 'reading')}
                         className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-xs"
                       >
                         <BookOpen className="w-3 h-3" />
-                        Reading
+                        Reading Material
                       </button>
                     </div>
                   </div>
@@ -1593,13 +1641,21 @@ function CreateCoursePageContent() {
                                               BODY TEMPLATE - What students see and edit
                                             </label>
                                             <CodeEditor
-                                              value={(question.body_template && typeof question.body_template === 'object' ? question.body_template[langLower] : '') || question.code || ''}
+                                              value={(question.body_template && typeof question.body_template === 'object' ? question.body_template[langLower] : '') || (typeof question.code === 'string' ? question.code : (question.code && typeof question.code === 'object' ? question.code[langLower] : '')) || ''}
                                               onChange={(val) => {
                                                 const newBodyTemplate = { ...(question.body_template || {}) };
                                                 newBodyTemplate[langLower] = val;
+                                                
+                                                let newCode = question.code;
+                                                if (typeof question.code === 'object' && question.code !== null) {
+                                                  newCode = { ...question.code, [langLower]: val };
+                                                } else {
+                                                  newCode = val;
+                                                }
+
                                                 updateQuestion(activeSecData.id, question.id, {
                                                   body_template: newBodyTemplate,
-                                                  code: val // Keep for backward compatibility
+                                                  code: newCode // Keep for backward compatibility
                                                 });
                                               }}
                                               language={langLower}
@@ -1850,6 +1906,12 @@ function CreateCoursePageContent() {
           </div>
         </div>
       )}
+
+      <GenerateCourseModal 
+        open={showGenerateModal} 
+        onOpenChange={setShowGenerateModal}
+        onCourseUpdate={handleCourseUpdate}
+      />
     </div>
   )
 }

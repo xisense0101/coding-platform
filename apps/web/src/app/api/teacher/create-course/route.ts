@@ -22,7 +22,7 @@ const createCourseSchema = z.object({
       options: z.array(z.string()).optional(),
       correctAnswer: z.union([z.string(), z.number()]).optional(),
       // Coding specific fields
-      code: z.string().optional(),
+      code: z.union([z.string(), z.record(z.string())]).optional(),
       languages: z.array(z.string()).optional(),
       testCases: z.array(z.object({
         input: z.string(),
@@ -177,7 +177,9 @@ export async function POST(request: NextRequest) {
               question_id: question.id,
               problem_statement: questionData.content,
               rich_problem_statement: { content: questionData.content },
-              boilerplate_code: { [questionData.languages?.[0] || 'javascript']: questionData.code || '' },
+              boilerplate_code: typeof questionData.code === 'object' && questionData.code !== null
+                ? questionData.code 
+                : { [questionData.languages?.[0] || 'javascript']: questionData.code || '' },
               solution_code: {},
               test_cases: testCases,
               allowed_languages: questionData.languages || ['javascript', 'python'],

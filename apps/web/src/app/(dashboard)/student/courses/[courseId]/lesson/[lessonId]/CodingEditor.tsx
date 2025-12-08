@@ -95,7 +95,7 @@ export default function CodingEditor({
   };
 
   const [body, setBody] = useState(() => getSavedCode(selectedLanguage));
-  const [fullCode, setFullCode] = useState(`${head}${getSavedCode(selectedLanguage)}${tail}`);
+  const [fullCode, setFullCode] = useState(`${head}\n${getSavedCode(selectedLanguage)}\n${tail}`);
   const [customInput, setCustomInput] = useState('');
   const [consoleOutput, setConsoleOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
@@ -164,7 +164,7 @@ export default function CodingEditor({
     const newTail = coding.tail?.[languageKey] || '';
     const savedCode = getSavedCode(selectedLanguage);
     setBody(savedCode);
-    setFullCode(`${newHead}${savedCode}${newTail}`);
+    setFullCode(`${newHead}\n${savedCode}\n${newTail}`);
   }, [selectedLanguage, coding.head, coding.tail, coding.body_template, coding.boilerplate_code]);
 
   useEffect(() => {
@@ -210,7 +210,7 @@ export default function CodingEditor({
     setBody(resetBody);
     const newHead = coding.head?.[languageKey] || '';
     const newTail = coding.tail?.[languageKey] || '';
-    setFullCode(`${newHead}${resetBody}${newTail}`);
+    setFullCode(`${newHead}\n${resetBody}\n${newTail}`);
 
     setConsoleOutput('Code reset to initial template.\n');
     setBottomTab('console');
@@ -232,7 +232,7 @@ export default function CodingEditor({
     const languageKey = attemptLanguage.toLowerCase();
     const newHead = coding.head?.[languageKey] || '';
     const newTail = coding.tail?.[languageKey] || '';
-    setFullCode(`${newHead}${attemptCode}${newTail}`);
+    setFullCode(`${newHead}\n${attemptCode}\n${newTail}`);
 
     setConsoleOutput(
       `Viewing Attempt #${attempt.attempt_number} (${attemptLanguage})\nSubmitted: ${new Date(
@@ -260,7 +260,7 @@ export default function CodingEditor({
     const languageKey = restoredLanguage.toLowerCase();
     const newHead = coding.head?.[languageKey] || '';
     const newTail = coding.tail?.[languageKey] || '';
-    setFullCode(`${newHead}${restoredCode}${newTail}`);
+    setFullCode(`${newHead}\n${restoredCode}\n${newTail}`);
 
     workingCodeBeforeViewRef.current = null;
     workingLanguageBeforeViewRef.current = null;
@@ -746,7 +746,7 @@ export default function CodingEditor({
                     value={body}
                     onChange={(val) => {
                       setBody(val);
-                      setFullCode(`${head}${val}${tail}`);
+                      setFullCode(`${head}\n${val}\n${tail}`);
                     }}
                     language={selectedLanguage}
                     disabled={isRunning || isSubmitting}

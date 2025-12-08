@@ -286,7 +286,8 @@ export function useTeacherCourses() {
 
     try {
       setLoading(true)
-      const response = await fetch('/api/courses?my_courses=true', {
+      // Pass published=false to fetch both published and draft courses
+      const response = await fetch('/api/courses?my_courses=true&published=false', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include'

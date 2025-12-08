@@ -76,23 +76,44 @@ export default function EssayEditor({
   };
 
   const renderContent = () => {
+    // 1. Try to get HTML content from rich_prompt
+    let htmlContent = '';
+    
     if (essay.rich_prompt) {
       if (typeof essay.rich_prompt === 'string') {
         try {
           const parsed = JSON.parse(essay.rich_prompt);
           if (parsed && parsed.content) {
-            return <RichTextPreview content={parsed.content} />;
+            htmlContent = parsed.content;
+          } else {
+            htmlContent = essay.rich_prompt;
           }
         } catch (e) {
-          return <RichTextPreview content={essay.rich_prompt} />;
+          htmlContent = essay.rich_prompt;
         }
-      } else if (typeof essay.rich_prompt === 'object' && essay.rich_prompt.content) {
-        return <RichTextPreview content={essay.rich_prompt.content} />;
+      } else if (typeof essay.rich_prompt === 'object') {
+        htmlContent = essay.rich_prompt.content || '';
       }
-      return <RichTextPreview content={essay.rich_prompt} />;
-    } else if (essay.prompt) {
+    }
+    
+    // 2. If no rich_prompt, check prompt for HTML
+    if (!htmlContent && essay.prompt) {
+       // Simple check for HTML tags
+       if (/<[a-z][\s\S]*>/i.test(essay.prompt)) {
+         htmlContent = essay.prompt;
+       }
+    }
+
+    // 3. Render HTML if found
+    if (htmlContent) {
+      return <RichTextPreview content={htmlContent} className="prose-lg max-w-none" />;
+    }
+
+    // 4. Fallback to plain text prompt
+    if (essay.prompt) {
       return <div className="text-lg text-gray-900 leading-relaxed whitespace-pre-wrap">{essay.prompt}</div>;
     }
+
     return <div className="text-lg text-gray-500 italic">No content available</div>;
   };
 
