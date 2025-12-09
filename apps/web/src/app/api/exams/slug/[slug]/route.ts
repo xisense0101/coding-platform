@@ -49,6 +49,7 @@ export async function GET(
             pass_percentage,
             is_published,
             require_invite_token,
+            teacher_id,
             organization_id,
             proctoring_enabled,
             strict_level,
@@ -115,6 +116,19 @@ export async function GET(
       },
       CacheTTL.medium // 5 minutes cache for exams
     )
+
+    // Check if exam is published
+    if (!examData.is_published) {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      // Only allow teacher/creator to view unpublished exams
+      if (!user || user.id !== examData.teacher_id) {
+        return NextResponse.json(
+          { error: 'Exam not found', details: `No exam found with slug: ${params.slug}` },
+          { status: 404 }
+        )
+      }
+    }
 
     // Format the exam data for the frontend
     const formattedExam = {

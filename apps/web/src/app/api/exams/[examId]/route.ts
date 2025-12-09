@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/database/supabase-server'
+import { invalidateCache, CacheKeys } from '@/lib/redis/client'
 
 import { logger } from '@/lib/utils/logger'
 
@@ -217,6 +218,15 @@ export async function PATCH(
         { error: 'Failed to update exam' },
         { status: 500 }
       )
+    }
+
+    // Invalidate cache
+    if (exam) {
+      const keysToInvalidate = [CacheKeys.exam(exam.id)]
+      if (exam.slug) {
+        keysToInvalidate.push(CacheKeys.examBySlug(exam.slug))
+      }
+      await invalidateCache(keysToInvalidate)
     }
 
     // If sections are provided, update them (delete old ones and create new ones)
