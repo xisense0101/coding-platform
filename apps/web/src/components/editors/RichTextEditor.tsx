@@ -220,18 +220,12 @@ export function RichTextPreview({ content, className }: RichTextPreviewProps) {
   // If the HTML is entity-encoded (e.g. contains &lt;), decode it in the browser
   if (typeof window !== 'undefined' && html && /&lt;|&gt;|&amp;/.test(html)) {
     try {
-      const parser = new DOMParser()
-      // parse as text/html then take textContent to decode entities
-      const doc = parser.parseFromString(html, 'text/html')
-      const decoded = doc.documentElement.textContent || ''
-      if (decoded) html = decoded
+      // Use textarea trick to decode HTML entities while preserving tags
+      const textarea = document.createElement('textarea')
+      textarea.innerHTML = html
+      html = textarea.value || html
     } catch (e) {
-      // fallback: use textarea trick
-      try {
-        const textarea = document.createElement('textarea')
-        textarea.innerHTML = html
-        html = textarea.value || html
-      } catch {}
+      // ignore errors
     }
   }
 

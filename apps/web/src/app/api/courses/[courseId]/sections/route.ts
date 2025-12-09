@@ -129,7 +129,11 @@ export async function GET(
       sections.map(async (section) => {
         const { data: questions, error: questionsError } = await supabase
           .from('questions')
-          .select('id, type, title, description, points, is_published, order_index')
+          .select(`
+            id, type, title, description, points, is_published, order_index,
+            mcq_questions (*),
+            coding_questions (*)
+          `)
           .eq('section_id', section.id)
           .order('order_index', { ascending: true })
 
@@ -141,9 +145,29 @@ export async function GET(
           }
         }
 
+        // Transform the data to flatten the structure if needed, or just return as is
+        // The frontend expects specific fields, so we might need to map them here or in the frontend
+        // For now, let's return the raw data with the joined tables
+        const processedQuestions = (questions || []).map(q => {
+          // Flatten the arrays returned by Supabase for 1:1 relationships
+          const mcqDetails = q.mcq_questions && Array.isArray(q.mcq_questions) && q.mcq_questions.length > 0 
+            ? q.mcq_questions[0] 
+            : null;
+            
+          const codingDetails = q.coding_questions && Array.isArray(q.coding_questions) && q.coding_questions.length > 0
+            ? q.coding_questions[0]
+            : null;
+
+          return {
+            ...q,
+            mcq_details: mcqDetails,
+            coding_details: codingDetails
+          };
+        });
+
         return {
           ...section,
-          questions: questions || []
+          questions: processedQuestions
         }
       })
     )

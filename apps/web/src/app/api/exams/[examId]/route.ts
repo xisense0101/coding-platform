@@ -191,6 +191,17 @@ export async function PATCH(
     if (body.test_code_rotation_minutes !== undefined) examUpdateData.test_code_rotation_minutes = body.test_code_rotation_minutes
     if (body.test_code_last_rotated !== undefined) examUpdateData.test_code_last_rotated = body.test_code_last_rotated
 
+    // Monitoring settings
+    if (body.strict_level !== undefined) examUpdateData.strict_level = body.strict_level
+    if (body.max_tab_switches !== undefined) examUpdateData.max_tab_switches = body.max_tab_switches
+    if (body.max_screen_lock_duration !== undefined) examUpdateData.max_screen_lock_duration = body.max_screen_lock_duration
+    if (body.auto_terminate_on_violations !== undefined) examUpdateData.auto_terminate_on_violations = body.auto_terminate_on_violations
+    if (body.track_tab_switches !== undefined) examUpdateData.track_tab_switches = body.track_tab_switches
+    if (body.track_screen_locks !== undefined) examUpdateData.track_screen_locks = body.track_screen_locks
+    if (body.detect_vm !== undefined) examUpdateData.detect_vm = body.detect_vm
+    if (body.require_single_monitor !== undefined) examUpdateData.require_single_monitor = body.require_single_monitor
+    if (body.allow_zoom_changes !== undefined) examUpdateData.allow_zoom_changes = body.allow_zoom_changes
+
     const { data: exam, error: examError } = await supabase
       .from('exams')
       .update(examUpdateData)

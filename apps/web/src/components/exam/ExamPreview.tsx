@@ -28,13 +28,13 @@ import { CodingQuestionInterface } from "@/components/coding"
 
 interface PreviewQuestion {
   id: number
-  type: "mcq" | "coding"
+  type: "mcq" | "coding" | "essay" | "reading"
   title: string
   content: string
   points: number
   options?: string[]
   correctAnswer?: string | number
-  code?: string
+  code?: string | Record<string, string>
   head?: Record<string, string>
   body_template?: Record<string, string>
   tail?: Record<string, string>
@@ -352,7 +352,7 @@ export function ExamPreview({
                   </div>
                 </div>
               </>
-            ) : (
+            ) : currentQ.type === 'coding' ? (
               <>
                 {/* Coding Question Panel */}
                 <div
@@ -411,6 +411,37 @@ export function ExamPreview({
                   )}
                 </div>
               </>
+            ) : (
+              <div className="flex-1 flex flex-col bg-white h-full overflow-auto">
+                  <div className="p-6 space-y-6 max-w-4xl mx-auto w-full">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <h1 className="text-2xl font-bold text-black">
+                          Question {currentQuestionIdx + 1}. {currentQ.title}
+                        </h1>
+                        <Badge className="bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border-green-200">
+                          <Check className="h-3 w-3 mr-1" />
+                          {currentQ.points} pts
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <Card className="border-sky-200 shadow-sm">
+                      <CardContent className="p-6 bg-gradient-to-r from-sky-50 to-blue-50">
+                        <RichTextPreview
+                          content={currentQ.content}
+                          className={cn("text-lg text-black leading-relaxed", currentFontSizeClass)}
+                        />
+                      </CardContent>
+                    </Card>
+                    
+                    {currentQ.type === 'essay' && (
+                        <div className="mt-6 p-4 border border-gray-200 rounded-lg bg-gray-50 text-center text-gray-500">
+                            Essay input area would appear here during the exam.
+                        </div>
+                    )}
+                  </div>
+              </div>
             )}
           </div>
         </div>

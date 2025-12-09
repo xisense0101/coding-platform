@@ -1,10 +1,11 @@
 
 "use client"
 
-import { RichTextPreview } from '@/components/editors/RichTextEditor'
-import { CodeEditor } from '@/components/editors/CodeEditor'
-import { CodeTemplateRow } from '@/components/coding'
 import { ExamPreview } from '@/components/exam/ExamPreview'
+import { GenerateExamModal } from '@/components/exam/GenerateExamModal'
+import { SectionList } from '@/components/common/content/SectionList'
+import { ContentEditor } from '@/components/common/content/ContentEditor'
+import { Section, Question } from '@/types/content'
 
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -13,47 +14,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { RichTextEditor } from '@/components/editors/RichTextEditor'
-import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { ArrowLeft, Plus, Save, Eye, EyeOff, Code, CheckCircle, Trash2, Settings } from 'lucide-react'
+import { ArrowLeft, Save, Eye, Trash2, Settings, Plus, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
 
 import { logger } from '@/lib/utils/logger'
 import { formatDateTimeLocal } from '@/lib/utils'
-
-interface Question {
-  id: number
-  type: "mcq" | "coding"
-  title: string
-  content: string
-  options?: string[]
-  correctAnswer?: string | number
-  code?: string
-  head?: Record<string, string>
-  body_template?: Record<string, string>
-  tail?: Record<string, string>
-  testCases?: TestCase[]
-  languages?: string[]
-  isVisible: boolean
-  points: number
-  hasChanges?: boolean
-}
-
-interface TestCase {
-  id: number
-  input: string
-  expectedOutput: string
-  isHidden: boolean
-  weight?: number
-}
-
-interface Section {
-  id: number
-  title: string
-  description: string
-  questions: Question[]
-  isVisible: boolean
-}
 
 const programmingLanguages = [
   "JavaScript", "Python", "Java", "C++", "C", "Go", "Rust", "TypeScript"
@@ -89,12 +54,15 @@ function CreateExamPageContent() {
   
   const [sections, setSections] = useState<Section[]>([])
   const [activeSection, setActiveSection] = useState<number | null>(null)
+  const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [showPreview, setShowPreview] = useState(false)
+  const [showAiModal, setShowAiModal] = useState(false)
+  const [isExamInfoCollapsed, setIsExamInfoCollapsed] = useState(false)
 
   // Load existing exam data if in edit mode
   useEffect(() => {
@@ -358,22 +326,7 @@ function CreateExamPageContent() {
     )
   }
 
-  const addTestCase = (sectionId: number, questionId: number) => {
-    const newTestCase: TestCase = {
-      id: Date.now(),
-      input: "",
-      expectedOutput: "",
-      isHidden: true,
-      weight: 1
-    }
 
-    updateQuestion(sectionId, questionId, {
-      testCases: [
-        ...(sections.find(s => s.id === sectionId)?.questions.find(q => q.id === questionId)?.testCases || []),
-        newTestCase
-      ]
-    })
-  }
 
   const deleteSection = async (sectionId: number) => {
     if (!confirm('Are you sure you want to delete this section? This will also delete all questions in this section.')) {
@@ -615,227 +568,33 @@ function CreateExamPageContent() {
     }
   }
 
-  const renderQuestionEditor = (section: Section, question: Question) => {
-    return (
-      <Card key={question.id} className="border-blue-200">
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-2">
-              <Badge variant={question.type === "mcq" ? "default" : "secondary"}>
-                {question.type.toUpperCase()}
-              </Badge>
-              <Input
-                value={question.title}
-                onChange={(e) => updateQuestion(section.id, question.id, { title: e.target.value })}
-                className="font-medium"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Input
-                type="number"
-                value={question.points}
-                onChange={(e) => updateQuestion(section.id, question.id, { points: parseInt(e.target.value) || 1 })}
-                className="w-20"
-                placeholder="Points"
-              />
-              <Switch
-                checked={question.isVisible}
-                onCheckedChange={(checked) => updateQuestion(section.id, question.id, { isVisible: checked })}
-              />
-              {question.isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => deleteQuestion(section.id, question.id)}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label>Question Content</Label>
-            <RichTextEditor
-              value={question.content}
-              onChange={(val) => updateQuestion(section.id, question.id, { content: val })}
-              placeholder="Enter your question here..."
-              height={160}
-              toolbar="full"
-            />
-            <div className="mt-4">
-              <RichTextPreview content={question.content} />
-            </div>
-          </div>
-
-          {question.type === "mcq" && (
-            <div className="space-y-3">
-              <Label>Options</Label>
-              {(question.options || ["", "", "", ""]).map((option, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <Input
-                    value={option}
-                    onChange={(e) => {
-                      const newOptions = [...(question.options || ["", "", "", ""])]
-                      newOptions[index] = e.target.value
-                      updateQuestion(section.id, question.id, { options: newOptions })
-                    }}
-                    placeholder={`Option ${index + 1}`}
-                  />
-                  <Switch
-                    checked={question.correctAnswer === index}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        updateQuestion(section.id, question.id, { correctAnswer: index })
-                      }
-                    }}
-                  />
-                  <Label className="text-sm">Correct</Label>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {question.type === "coding" && (
-            <div className="space-y-4">
-              <div>
-                <Label>Allowed Programming Languages</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {programmingLanguages.map((lang) => (
-                    <Badge
-                      key={lang}
-                      variant={(question.languages || []).includes(lang) ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => {
-                        const currentLangs = question.languages || ["JavaScript", "Python"]
-                        const newLangs = currentLangs.includes(lang)
-                          ? currentLangs.filter(l => l !== lang)
-                          : [...currentLangs, lang]
-                        updateQuestion(section.id, question.id, { languages: newLangs })
-                      }}
-                    >
-                      {lang}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Code Problem Setup (per language)</Label>
-                <CodeTemplateRow
-                  question={question}
-                  sectionId={section.id}
-                  updateQuestion={updateQuestion}
-                  programmingLanguages={programmingLanguages}
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center">
-                  <Label>Test Cases</Label>
-                  <Button
-                    size="sm"
-                    onClick={() => addTestCase(section.id, question.id)}
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add Test Case
-                  </Button>
-                </div>
-                <div className="space-y-3 mt-2">
-                  {(question.testCases || []).map((testCase, index) => (
-                    <Card key={testCase.id} className="p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <Badge variant="outline" className="text-xs">
-                          Test Case {index + 1}
-                        </Badge>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            const newTestCases = (question.testCases || []).filter(tc => tc.id !== testCase.id)
-                            updateQuestion(section.id, question.id, { testCases: newTestCases })
-                          }}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-xs">Input</Label>
-                          <Textarea
-                            value={testCase.input}
-                            onChange={(e) => {
-                              const newTestCases = (question.testCases || []).map(tc =>
-                                tc.id === testCase.id ? { ...tc, input: e.target.value } : tc
-                              )
-                              updateQuestion(section.id, question.id, { testCases: newTestCases })
-                            }}
-                            rows={2}
-                            className="font-mono text-xs"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs">Expected Output</Label>
-                          <Textarea
-                            value={testCase.expectedOutput}
-                            onChange={(e) => {
-                              const newTestCases = (question.testCases || []).map(tc =>
-                                tc.id === testCase.id ? { ...tc, expectedOutput: e.target.value } : tc
-                              )
-                              updateQuestion(section.id, question.id, { testCases: newTestCases })
-                            }}
-                            rows={2}
-                            className="font-mono text-xs"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center mt-3 pt-2 border-t">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              checked={testCase.isHidden}
-                              onCheckedChange={(checked) => {
-                                const newTestCases = (question.testCases || []).map(tc =>
-                                  tc.id === testCase.id ? { ...tc, isHidden: checked } : tc
-                                )
-                                updateQuestion(section.id, question.id, { testCases: newTestCases })
-                              }}
-                            />
-                            <Label className="text-xs">Hidden</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Label className="text-xs font-medium text-gray-700">Marks if passed:</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={testCase.weight || 1}
-                              onChange={(e) => {
-                                const newTestCases = (question.testCases || []).map(tc =>
-                                  tc.id === testCase.id ? { ...tc, weight: parseInt(e.target.value) || 1 } : tc
-                                )
-                                updateQuestion(section.id, question.id, { testCases: newTestCases })
-                              }}
-                              className="w-16 h-7 text-xs font-semibold text-center"
-                              placeholder="1"
-                            />
-                            <span className="text-xs text-gray-600 font-medium">marks</span>
-                          </div>
-                        </div>
-                        <div className="text-xs text-blue-600 font-medium">
-                          ✓ Pass = +{testCase.weight || 1} marks  |  ✗ Fail = 0 marks
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    )
-  }
+  const handleAiGenerated = (generatedSections: Section[]) => {
+    // Append generated sections to existing ones
+    const newSections = generatedSections.map((s, index) => ({
+      ...s,
+      id: Date.now() + index, // Ensure unique numeric IDs
+      isVisible: true,
+      questions: s.questions.map((q, qIndex) => ({
+        ...q,
+        id: Date.now() + index * 100 + qIndex, // Ensure unique numeric IDs
+        isVisible: true,
+        hasChanges: false,
+        // Ensure test cases have IDs if they exist
+        testCases: (q.testCases || []).map((tc, tcIndex) => ({
+          ...tc,
+          id: tc.id || (Date.now() + index * 100 + qIndex + tcIndex + 10000)
+        }))
+      }))
+    }));
+    
+    setSections([...sections, ...newSections]);
+    setSuccess("Exam content generated successfully!");
+    
+    // Auto-select the first new section
+    if (newSections.length > 0) {
+      setActiveSection(newSections[0].id);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
@@ -863,6 +622,14 @@ function CreateExamPageContent() {
               </h1>
             </div>
             <div className="flex items-center space-x-2">
+              <Button 
+                variant="outline"
+                onClick={() => setShowAiModal(true)}
+                className="bg-gradient-to-r from-indigo-50 to-blue-50 border-blue-200 text-blue-700 hover:from-indigo-100 hover:to-blue-100"
+              >
+                <Sparkles className="w-4 h-4 mr-2 text-blue-600" />
+                Generate with AI
+              </Button>
               <Button 
                 variant="outline"
                 onClick={() => setShowPreview(true)}
@@ -955,8 +722,17 @@ function CreateExamPageContent() {
                 <CardTitle className="text-blue-900">Exam Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label>Exam Title</Label>
+                <div className="flex items-center justify-between pb-2 border-b mb-4 cursor-pointer" onClick={() => setIsExamInfoCollapsed(!isExamInfoCollapsed)}>
+                  <span className="text-sm font-medium text-gray-500">
+                    {isExamInfoCollapsed ? "Show Details" : "Hide Details"}
+                  </span>
+                  {isExamInfoCollapsed ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronUp className="w-4 h-4 text-gray-500" />}
+                </div>
+
+                {!isExamInfoCollapsed && (
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Exam Title</Label>
                   <Input
                     value={examTitle}
                     onChange={(e) => setExamTitle(e.target.value)}
@@ -1229,6 +1005,8 @@ function CreateExamPageContent() {
                   />
                   <Label>Published</Label>
                 </div>
+                  </div>
+                )}
                 <div className="pt-4">
                   <Button
                     onClick={addSection}
@@ -1240,118 +1018,29 @@ function CreateExamPageContent() {
                 </div>
                 
                 {/* Sections List */}
-                <div className="space-y-2">
-                  <Label>Sections ({sections.length})</Label>
-                  {sections.map((section) => (
-                    <div
-                      key={section.id}
-                      className={`p-2 rounded border cursor-pointer ${
-                        activeSection === section.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                      }`}
-                      onClick={() => setActiveSection(section.id)}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">{section.title}</span>
-                        <div className="flex items-center space-x-1">
-                          {section.isVisible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                          <Badge variant="outline" className="text-xs">
-                            {section.questions.length}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <SectionList
+                  sections={sections}
+                  activeSectionId={activeSection}
+                  onSelectSection={setActiveSection}
+                  onAddSection={addSection}
+                  onDeleteSection={deleteSection}
+                />
               </CardContent>
             </Card>
           </div>
 
           {/* Section Editor */}
           <div className="lg:col-span-3">
-            {activeSection ? (
-              <div className="space-y-6">
-                {sections
-                  .filter(section => section.id === activeSection)
-                  .map(section => (
-                    <div key={section.id}>
-                      {/* Section Header */}
-                      <Card className="border-blue-200">
-                        <CardHeader>
-                          <div className="flex justify-between items-center">
-                            <CardTitle className="text-blue-900">Section Settings</CardTitle>
-                            <div className="flex items-center space-x-2">
-                              <Switch
-                                checked={section.isVisible}
-                                onCheckedChange={(checked) => updateSection(section.id, { isVisible: checked })}
-                              />
-                              {section.isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => deleteSection(section.id)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div>
-                            <Label>Section Title</Label>
-                            <Input
-                              value={section.title}
-                              onChange={(e) => updateSection(section.id, { title: e.target.value })}
-                              placeholder="Enter section title"
-                            />
-                          </div>
-                          <div>
-                            <Label>Section Description</Label>
-                            <Textarea
-                              value={section.description}
-                              onChange={(e) => updateSection(section.id, { description: e.target.value })}
-                              placeholder="Enter section description"
-                              rows={2}
-                            />
-                          </div>
-                          <div className="flex space-x-2">
-                            <Button
-                              size="sm"
-                              onClick={() => addQuestion(section.id, "mcq")}
-                              className="bg-green-600 hover:bg-green-700"
-                            >
-                              <CheckCircle className="w-4 h-4 mr-1" />
-                              MCQ Question
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => addQuestion(section.id, "coding")}
-                              className="bg-purple-600 hover:bg-purple-700"
-                            >
-                              <Code className="w-4 h-4 mr-1" />
-                              Coding Question
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Questions */}
-                      <div className="space-y-4">
-                        {section.questions.map(question => renderQuestionEditor(section, question))}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <Card className="border-blue-200">
-                <CardContent className="flex items-center justify-center h-64">
-                  <div className="text-center">
-                    <Settings className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Section Selected</h3>
-                    <p className="text-gray-500">Select a section from the sidebar to start editing, or create a new section.</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            <ContentEditor
+              activeSection={sections.find(s => s.id === activeSection)}
+              onUpdateSection={(updates) => activeSection && updateSection(activeSection, updates)}
+              onDeleteSection={() => activeSection && deleteSection(activeSection)}
+              onAddQuestion={(type) => activeSection && addQuestion(activeSection, type)}
+              onUpdateQuestion={(qId, updates) => activeSection && updateQuestion(activeSection, qId, updates)}
+              onDeleteQuestion={(qId) => activeSection && deleteQuestion(activeSection, qId)}
+              expandedQuestionId={expandedQuestionId}
+              setExpandedQuestionId={setExpandedQuestionId}
+            />
           </div>
         </div>
       </div>
@@ -1389,6 +1078,12 @@ function CreateExamPageContent() {
           onClose={() => setShowPreview(false)}
         />
       )}
+
+      <GenerateExamModal 
+        open={showAiModal} 
+        onOpenChange={setShowAiModal} 
+        onExamGenerated={handleAiGenerated} 
+      />
     </div>
   )
 }

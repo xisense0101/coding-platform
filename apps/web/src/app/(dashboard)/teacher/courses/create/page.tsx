@@ -3,28 +3,17 @@ import React from "react";
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { RichTextEditor } from '@/components/editors/RichTextEditor'
-import { CodeEditor } from '@/components/editors/CodeEditor'
-import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { 
   ChevronLeft, 
   Plus, 
   Save, 
   Eye, 
-  EyeOff, 
   Trash2, 
   Settings, 
-  BookOpen, 
-  FileText, 
-  Code2, 
-  CheckCircle2, 
-  GripVertical, 
   Users, 
   Mail,
   Sparkles
@@ -32,41 +21,9 @@ import {
 
 import { logger } from '@/lib/utils/logger'
 import { GenerateCourseModal } from "@/components/course/GenerateCourseModal"
-
-interface Question {
-  id: number;
-  type: "mcq" | "coding" | "essay" | "reading";
-  title: string;
-  content: string;
-  options?: string[];
-  correctAnswer?: string | number;
-  code?: string | Record<string, string>;
-  head?: Record<string, string>; // per-language
-  body_template?: Record<string, string>; // per-language
-  tail?: Record<string, string>; // per-language
-  testCases?: TestCase[];
-  languages?: string[];
-  isVisible: boolean;
-  points: number;
-  hasChanges?: boolean;
-  activeLanguage?: string; // UI state for coding question editor
-}
-
-interface TestCase {
-  id: number
-  input: string
-  expectedOutput: string
-  isHidden: boolean
-  weight?: number
-}
-
-interface Section {
-  id: number
-  title: string
-  description: string
-  questions: Question[]
-  isVisible: boolean
-}
+import { SectionList } from '@/components/common/content/SectionList'
+import { ContentEditor } from '@/components/common/content/ContentEditor'
+import { Section, Question } from '@/types/content'
 
 const programmingLanguages = [
   "JavaScript", "Python", "Java", "C++", "C", "Go", "Rust", "TypeScript"
@@ -90,7 +47,7 @@ function CreateCoursePageContent() {
   const [enrolling, setEnrolling] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const [expandedQuestion, setExpandedQuestion] = useState<number | null>(null);
+  const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
 
   const handleCourseUpdate = (data: any) => {
@@ -161,99 +118,90 @@ function CreateCoursePageContent() {
         const sectionsData = await sectionsResponse.json()
         
         // Convert sections data to the format expected by the UI
-        const convertedSections: Section[] = await Promise.all(
-          sectionsData.map(async (section: any) => {
-            // For each question, fetch its detailed data
-            const questionsWithDetails = await Promise.all(
-              section.questions.map(async (question: any) => {
-                try {
-                  // Fetch question details including MCQ options and coding details
-                  let questionDetails: Question = {
-                    id: question.id,
-                    type: question.type,
-                    title: question.title,
-                    content: question.description || "",
-                    points: question.points,
-                    isVisible: question.is_published,
-                    hasChanges: false
-                  }
+        const convertedSections: Section[] = sectionsData.map((section: any) => {
+          // Map questions directly from the response which now includes details
+          const questions = section.questions.map((question: any) => {
+            try {
+              let questionDetails: Question = {
+                id: question.id,
+                type: question.type,
+                title: question.title,
+                content: question.description || "",
+                points: question.points,
+                isVisible: question.is_published,
+                hasChanges: false
+              }
 
-                  if (question.type === 'mcq') {
-                    // Fetch MCQ details
-                    const mcqResponse = await fetch(`/api/questions/${question.id}/mcq`)
-                    if (mcqResponse.ok) {
-                      const mcqData = await mcqResponse.json()
-                      questionDetails.options = mcqData.options || ["", "", "", ""]
-                      questionDetails.correctAnswer = Array.isArray(mcqData.correct_answers) ? mcqData.correct_answers[0] : 0
-                    } else {
-                      // Default MCQ structure
-                      questionDetails.options = ["", "", "", ""]
-                      questionDetails.correctAnswer = 0
-                    }
-                  } else if (question.type === 'coding') {
-                    // Fetch coding details
-                    const codingResponse = await fetch(`/api/questions/${question.id}/coding`)
-                    if (codingResponse.ok) {
-                      const codingData = await codingResponse.json()
-                      questionDetails.code = codingData.boilerplate_code?.javascript || "// Write your code here"
-                      questionDetails.languages = codingData.allowed_languages || ["JavaScript", "Python"]
-                      // Convert test cases format from API to frontend format
-                      questionDetails.testCases = (codingData.test_cases || []).map((tc: any, index: number) => ({
-                        id: tc.id || index + 1,
-                        input: tc.input || "",
-                        expectedOutput: tc.expected_output || "",
-                        isHidden: tc.is_hidden || false,
-                        weight: tc.weight || 1
-                      }))
-                      // Load head/body_template/tail for each language (default to javascript)
-                      questionDetails.head = typeof codingData.head === 'object' && codingData.head !== null ? codingData.head : {};
-                      questionDetails.body_template = typeof codingData.body_template === 'object' && codingData.body_template !== null ? codingData.body_template : {};
-                      questionDetails.tail = typeof codingData.tail === 'object' && codingData.tail !== null ? codingData.tail : {};
-                    } else {
-                      // Default coding structure
-                      questionDetails.code = "// Write your code here"
-                      questionDetails.languages = ["JavaScript", "Python"]
-                      questionDetails.testCases = []
-                    }
-                  }
-
-                  return questionDetails
-                } catch (error) {
-                  logger.error('Error loading question details:', error)
-                  // Return basic question data if detailed fetch fails
-                  return {
-                    id: question.id,
-                    type: question.type,
-                    title: question.title,
-                    content: question.description || "",
-                    points: question.points,
-                    isVisible: question.is_published,
-                    ...(question.type === 'mcq' && {
-                      options: ["", "", "", ""],
-                      correctAnswer: 0
-                    }),
-                    ...(question.type === 'coding' && {
-                      code: "// Write your code here",
-                      languages: ["JavaScript", "Python"],
-                      testCases: [],
-                      head: {},
-                      body_template: {},
-                      tail: {},
-                    })
-                  }
+              if (question.type === 'mcq') {
+                const mcqData = question.mcq_details;
+                if (mcqData) {
+                  questionDetails.options = mcqData.options || ["", "", "", ""]
+                  questionDetails.correctAnswer = Array.isArray(mcqData.correct_answers) ? mcqData.correct_answers[0] : 0
+                } else {
+                  // Default MCQ structure
+                  questionDetails.options = ["", "", "", ""]
+                  questionDetails.correctAnswer = 0
                 }
-              })
-            )
+              } else if (question.type === 'coding') {
+                const codingData = question.coding_details;
+                if (codingData) {
+                  questionDetails.code = codingData.boilerplate_code?.javascript || "// Write your code here"
+                  questionDetails.languages = codingData.allowed_languages || ["JavaScript", "Python"]
+                  // Convert test cases format from API to frontend format
+                  questionDetails.testCases = (codingData.test_cases || []).map((tc: any, index: number) => ({
+                    id: tc.id || index + 1,
+                    input: tc.input || "",
+                    expectedOutput: tc.expected_output || "",
+                    isHidden: tc.is_hidden || false,
+                    weight: tc.weight || 1
+                  }))
+                  // Load head/body_template/tail for each language (default to javascript)
+                  questionDetails.head = typeof codingData.head === 'object' && codingData.head !== null ? codingData.head : {};
+                  questionDetails.body_template = typeof codingData.body_template === 'object' && codingData.body_template !== null ? codingData.body_template : {};
+                  questionDetails.tail = typeof codingData.tail === 'object' && codingData.tail !== null ? codingData.tail : {};
+                } else {
+                  // Default coding structure
+                  questionDetails.code = "// Write your code here"
+                  questionDetails.languages = ["JavaScript", "Python"]
+                  questionDetails.testCases = []
+                }
+              }
 
-            return {
-              id: section.id,
-              title: section.title,
-              description: section.description || "",
-              isVisible: section.is_published,
-              questions: questionsWithDetails
+              return questionDetails
+            } catch (error) {
+              logger.error('Error processing question details:', error)
+              // Return basic question data if processing fails
+              return {
+                id: question.id,
+                type: question.type,
+                title: question.title,
+                content: question.description || "",
+                points: question.points,
+                isVisible: question.is_published,
+                ...(question.type === 'mcq' && {
+                  options: ["", "", "", ""],
+                  correctAnswer: 0
+                }),
+                ...(question.type === 'coding' && {
+                  code: "// Write your code here",
+                  languages: ["JavaScript", "Python"],
+                  testCases: [],
+                  head: {},
+                  body_template: {},
+                  tail: {},
+                })
+              }
             }
           })
-        )
+
+          return {
+            id: section.id,
+            title: section.title,
+            description: section.description || "",
+            isVisible: section.is_published,
+            questions: questions
+          }
+        })
         
         setSections(convertedSections)
         if (convertedSections.length > 0) {
@@ -334,7 +282,7 @@ function CreateCoursePageContent() {
         ? { ...section, questions: [...section.questions, newQuestion] }
         : section
     ))
-    setExpandedQuestion(newQuestion.id);
+    setExpandedQuestionId(newQuestion.id);
   }
 
   const updateSection = (sectionId: number, updates: Partial<Section>) => {
@@ -376,22 +324,7 @@ function CreateCoursePageContent() {
     })
   }
 
-  const addTestCase = (sectionId: number, questionId: number) => {
-    const newTestCase: TestCase = {
-      id: Date.now(),
-      input: "",
-      expectedOutput: "",
-      isHidden: true,
-      weight: 1
-    }
 
-    updateQuestion(sectionId, questionId, {
-      testCases: [
-        ...(sections.find(s => s.id === sectionId)?.questions.find(q => q.id === questionId)?.testCases || []),
-        newTestCase
-      ]
-    })
-  }
 
   const deleteSection = async (sectionId: number) => {
     // Show confirmation dialog
@@ -487,7 +420,7 @@ function CreateCoursePageContent() {
         }
 
         // Process sections: update existing ones and create new ones
-        for (const section of sections) {
+        await Promise.all(sections.map(async (section) => {
           const isNewSection = typeof section.id === 'number' && section.id > 1000000000
           
           if (isNewSection) {
@@ -566,7 +499,7 @@ function CreateCoursePageContent() {
             }
 
             // Handle questions in existing sections
-            for (const question of section.questions) {
+            await Promise.all(section.questions.map(async (question) => {
               const isNewQuestion = typeof question.id === 'number' && question.id > 1000000000
 
               if (isNewQuestion) {
@@ -776,9 +709,9 @@ function CreateCoursePageContent() {
                   logger.error('Failed to update question:', question.title)
                 }
               }
-            }
+            }))
           }
-        }
+        }))
 
         setSuccess('Course updated successfully!')
         setTimeout(() => {
@@ -959,35 +892,7 @@ function CreateCoursePageContent() {
     }
   }
 
-  const getQuestionTypeIcon = (type: string) => {
-    switch (type) {
-      case 'mcq':
-        return <CheckCircle2 className="w-4 h-4" />;
-      case 'coding':
-        return <Code2 className="w-4 h-4" />;
-      case 'essay':
-        return <BookOpen className="w-4 h-4" />;
-      case 'reading':
-        return <BookOpen className="w-4 h-4" />;
-      default:
-        return <FileText className="w-4 h-4" />;
-    }
-  };
 
-  const getQuestionTypeBadge = (type: string) => {
-    switch (type) {
-      case 'mcq':
-        return 'bg-green-100 text-green-700 border-green-300';
-      case 'coding':
-        return 'bg-purple-100 text-purple-700 border-purple-300';
-      case 'essay':
-        return 'bg-blue-100 text-blue-700 border-blue-300';
-      case 'reading':
-        return 'bg-blue-100 text-blue-700 border-blue-300';
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-300';
-    }
-  };
 
   const activeSecData = sections.find((s) => s.id === activeSection);
 
@@ -1203,651 +1108,28 @@ function CreateCoursePageContent() {
             </div>
 
             {/* Sections List */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm text-gray-900 flex items-center gap-2">
-                  <BookOpen className="w-4 h-4" />
-                  Sections ({sections.length})
-                </h3>
-                <button
-                  onClick={addSection}
-                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 text-xs shadow-sm"
-                >
-                  <Plus className="w-3 h-3" />
-                  Add
-                </button>
-              </div>
-              <div className="space-y-2">
-                {sections.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400 text-xs">
-                    <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    No sections yet
-                  </div>
-                ) : (
-                  sections.map((section) => (
-                    <button
-                      key={section.id}
-                      onClick={() => setActiveSection(section.id)}
-                      className={`w-full p-3 rounded-lg border text-left transition-all ${
-                        activeSection === section.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 bg-white hover:border-blue-300'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-900 truncate">
-                            {section.title}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            {section.questions.length} question
-                            {section.questions.length !== 1 ? 's' : ''}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {section.isVisible ? (
-                            <Eye className="w-3 h-3 text-green-600" />
-                          ) : (
-                            <EyeOff className="w-3 h-3 text-gray-400" />
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
+            <SectionList
+              sections={sections}
+              activeSectionId={activeSection}
+              onSelectSection={setActiveSection}
+              onAddSection={addSection}
+              onDeleteSection={deleteSection}
+            />
           </div>
         </div>
 
         {/* Right Content - Section Editor */}
         <div className="flex-1 overflow-y-auto">
-          {activeSecData ? (
-            <div className="p-6 space-y-6">
-              {/* Section Header */}
-              <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <h2 className="text-lg text-gray-900">Section Settings</h2>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() =>
-                        updateSection(activeSecData.id, {
-                          isVisible: !activeSecData.isVisible
-                        })
-                      }
-                      className={`px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs transition-colors ${
-                        activeSecData.isVisible
-                          ? 'bg-green-100 text-green-700 border border-green-300'
-                          : 'bg-gray-100 text-gray-600 border border-gray-300'
-                      }`}
-                    >
-                      {activeSecData.isVisible ? (
-                        <>
-                          <Eye className="w-3 h-3" />
-                          Visible
-                        </>
-                      ) : (
-                        <>
-                          <EyeOff className="w-3 h-3" />
-                          Hidden
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => deleteSection(activeSecData.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Delete section"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      Section Title *
-                    </label>
-                    <input
-                      type="text"
-                      value={activeSecData.title}
-                      onChange={(e) =>
-                        updateSection(activeSecData.id, { title: e.target.value })
-                      }
-                      placeholder="Enter section title"
-                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      Section Description
-                    </label>
-                    <textarea
-                      value={activeSecData.description}
-                      onChange={(e) =>
-                        updateSection(activeSecData.id, {
-                          description: e.target.value
-                        })
-                      }
-                      placeholder="Enter section description"
-                      rows={2}
-                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-2">
-                      Add Questions
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => addQuestion(activeSecData.id, 'mcq')}
-                        className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-xs"
-                      >
-                        <CheckCircle2 className="w-3 h-3" />
-                        MCQ Quiz
-                      </button>
-                      <button
-                        onClick={() => addQuestion(activeSecData.id, 'coding')}
-                        className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-xs"
-                      >
-                        <Code2 className="w-3 h-3" />
-                        Coding
-                      </button>
-                      <button
-                        onClick={() => addQuestion(activeSecData.id, 'essay')}
-                        className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-xs"
-                      >
-                        <BookOpen className="w-3 h-3" />
-                        Reading Material
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Questions List */}
-              <div className="space-y-4">
-                {activeSecData.questions.length === 0 ? (
-                  <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
-                    <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <h3 className="text-gray-900 mb-2">No Questions Yet</h3>
-                    <p className="text-gray-500 text-sm">
-                      Add questions using the buttons above
-                    </p>
-                  </div>
-                ) : (
-                  activeSecData.questions.map((question, qIdx) => (
-                    <div
-                      key={question.id}
-                      className="bg-white border border-gray-200 rounded-xl overflow-hidden"
-                    >
-                      {/* Question Header */}
-                      <div
-                        className="p-4 bg-gray-50 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
-                        onClick={() =>
-                          setExpandedQuestion(
-                            expandedQuestion === question.id ? null : question.id
-                          )
-                        }
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 flex-1">
-                            <GripVertical className="w-4 h-4 text-gray-400" />
-                            <span
-                              className={`px-2 py-1 rounded text-xs border flex items-center gap-1 ${getQuestionTypeBadge(question.type)}`}
-                            >
-                              {getQuestionTypeIcon(question.type)}
-                              {question.type.toUpperCase()}
-                            </span>
-                            <input
-                              type="text"
-                              value={question.title}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                updateQuestion(activeSecData.id, question.id, {
-                                  title: e.target.value
-                                });
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex-1 px-2 py-1 bg-transparent border-0 text-sm focus:outline-none focus:bg-white focus:border focus:border-blue-500 focus:rounded"
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              value={question.points}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                updateQuestion(activeSecData.id, question.id, {
-                                  points: parseInt(e.target.value) || 1
-                                });
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-16 px-2 py-1 bg-white border border-gray-300 rounded text-xs text-center"
-                              placeholder="pts"
-                            />
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateQuestion(activeSecData.id, question.id, {
-                                  isVisible: !question.isVisible
-                                });
-                              }}
-                              className={`px-2 py-1 rounded text-xs ${
-                                question.isVisible
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-gray-100 text-gray-600'
-                              }`}
-                            >
-                              {question.isVisible ? (
-                                <Eye className="w-3 h-3" />
-                              ) : (
-                                <EyeOff className="w-3 h-3" />
-                              )}
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteQuestion(activeSecData.id, question.id);
-                              }}
-                              className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Question Content (Expandable) */}
-                      {expandedQuestion === question.id && (
-                        <div className="p-6 space-y-4">
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">
-                              Question Content
-                            </label>
-                            <RichTextEditor
-                              value={question.content}
-                              onChange={(val) => updateQuestion(activeSecData.id, question.id, { content: val })}
-                              placeholder="Enter your question here..."
-                              height={160}
-                              toolbar="full"
-                            />
-                          </div>
-
-                          {/* MCQ Options */}
-                          {question.type === 'mcq' && (
-                            <div>
-                              <label className="block text-xs text-gray-600 mb-2">
-                                Answer Options
-                              </label>
-                              <div className="space-y-2">
-                                {(question.options || ['', '', '', '']).map(
-                                  (option, idx) => (
-                                    <div
-                                      key={idx}
-                                      className="flex items-center gap-2"
-                                    >
-                                      <input
-                                        type="text"
-                                        value={option}
-                                        onChange={(e) => {
-                                          const newOptions = [
-                                            ...(question.options || [
-                                              '',
-                                              '',
-                                              '',
-                                              ''
-                                            ])
-                                          ];
-                                          newOptions[idx] = e.target.value;
-                                          updateQuestion(
-                                            activeSecData.id,
-                                            question.id,
-                                            { options: newOptions }
-                                          );
-                                        }}
-                                        placeholder={`Option ${idx + 1}`}
-                                        className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      />
-                                      <button
-                                        onClick={() =>
-                                          updateQuestion(
-                                            activeSecData.id,
-                                            question.id,
-                                            { correctAnswer: idx }
-                                          )
-                                        }
-                                        className={`px-3 py-2 rounded-lg text-xs transition-colors ${
-                                          question.correctAnswer === idx
-                                            ? 'bg-green-600 text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                        }`}
-                                      >
-                                        {question.correctAnswer === idx
-                                          ? '✓ Correct'
-                                          : 'Mark Correct'}
-                                      </button>
-                                    </div>
-                                  )
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Coding Question */}
-                          {question.type === 'coding' && (
-                            <div className="space-y-4">
-                              <div>
-                                <label className="block text-xs text-gray-600 mb-2">
-                                  Allowed Programming Languages
-                                </label>
-                                <div className="flex flex-wrap gap-2">
-                                  {programmingLanguages.map((lang) => (
-                                    <button
-                                      key={lang}
-                                      onClick={() => {
-                                        const currentLangs =
-                                          question.languages || [
-                                            'JavaScript',
-                                            'Python'
-                                          ];
-                                        const newLangs = currentLangs.includes(lang)
-                                          ? currentLangs.filter((l) => l !== lang)
-                                          : [...currentLangs, lang];
-                                        updateQuestion(activeSecData.id, question.id, {
-                                          languages: newLangs
-                                        });
-                                      }}
-                                      className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
-                                        (question.languages || []).includes(lang)
-                                          ? 'bg-blue-600 text-white border-blue-600'
-                                          : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                                      }`}
-                                    >
-                                      {lang}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Code Problem Setup - Head/Body/Tail for each language */}
-                              <div>
-                                <label className="block text-xs text-gray-600 mb-2">
-                                  Code Problem Setup
-                                </label>
-                                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                                  <p className="text-xs text-gray-500 mb-3">
-                                    Configure the code template for each language. The final code will be: <strong>HEAD + BODY_TEMPLATE + TAIL</strong>
-                                  </p>
-                                  
-                                  {/* Language tabs */}
-                                  <div className="mb-3">
-                                    <div className="flex flex-wrap gap-1 mb-3">
-                                      {(question.languages || ['JavaScript', 'Python']).map((lang) => (
-                                        <button
-                                          key={lang}
-                                          onClick={() => {
-                                            // Set active language for editing
-                                            const langLower = lang.toLowerCase();
-                                            updateQuestion(activeSecData.id, question.id, {
-                                              activeLanguage: langLower
-                                            });
-                                          }}
-                                          className={`px-3 py-1.5 rounded text-xs transition-colors ${
-                                            (question.activeLanguage === lang.toLowerCase() || 
-                                            (!question.activeLanguage && lang === (question.languages || ['JavaScript'])[0]))
-                                              ? 'bg-blue-600 text-white'
-                                              : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-100'
-                                          }`}
-                                        >
-                                          {lang}
-                                        </button>
-                                      ))}
-                                    </div>
-                                    
-                                    {/* Display editors for active language */}
-                                    {(question.languages || ['JavaScript', 'Python']).map((lang) => {
-                                      const langLower = lang.toLowerCase();
-                                      const isActive = (question.activeLanguage === langLower || 
-                                        (!question.activeLanguage && lang === (question.languages || ['JavaScript'])[0]));
-                                      
-                                      if (!isActive) return null;
-                                      
-                                      return (
-                                        <div key={lang} className="space-y-3">
-                                          {/* HEAD */}
-                                          <div>
-                                            <label className="block text-xs text-gray-600 mb-1">
-                                              HEAD - Prepended to student code (hidden from student)
-                                            </label>
-                                            <CodeEditor
-                                              value={(question.head && typeof question.head === 'object' ? question.head[langLower] : '') || ''}
-                                              onChange={(val) => {
-                                                const newHead = { ...(question.head || {}) };
-                                                newHead[langLower] = val;
-                                                updateQuestion(activeSecData.id, question.id, {
-                                                  head: newHead
-                                                });
-                                              }}
-                                              language={langLower}
-                                              placeholder={`// Code that runs before student's solution\n// Example: import statements, helper functions, etc.`}
-                                              height={100}
-                                              className="rounded border"
-                                            />
-                                          </div>
-
-                                          {/* BODY TEMPLATE */}
-                                          <div>
-                                            <label className="block text-xs text-gray-600 mb-1">
-                                              BODY TEMPLATE - What students see and edit
-                                            </label>
-                                            <CodeEditor
-                                              value={(question.body_template && typeof question.body_template === 'object' ? question.body_template[langLower] : '') || (typeof question.code === 'string' ? question.code : (question.code && typeof question.code === 'object' ? question.code[langLower] : '')) || ''}
-                                              onChange={(val) => {
-                                                const newBodyTemplate = { ...(question.body_template || {}) };
-                                                newBodyTemplate[langLower] = val;
-                                                
-                                                let newCode = question.code;
-                                                if (typeof question.code === 'object' && question.code !== null) {
-                                                  newCode = { ...question.code, [langLower]: val };
-                                                } else {
-                                                  newCode = val;
-                                                }
-
-                                                updateQuestion(activeSecData.id, question.id, {
-                                                  body_template: newBodyTemplate,
-                                                  code: newCode // Keep for backward compatibility
-                                                });
-                                              }}
-                                              language={langLower}
-                                              placeholder={lang === 'JavaScript' 
-                                                ? `function solution(input) {\n  // Write your code here\n  \n}`
-                                                : lang === 'Python'
-                                                ? `def solution(input):\n    # Write your code here\n    pass`
-                                                : `// Write your code here`
-                                              }
-                                              height={200}
-                                              className="rounded border"
-                                            />
-                                          </div>
-
-                                          {/* TAIL */}
-                                          <div>
-                                            <label className="block text-xs text-gray-600 mb-1">
-                                              TAIL - Appended to student code (hidden from student)
-                                            </label>
-                                            <CodeEditor
-                                              value={(question.tail && typeof question.tail === 'object' ? question.tail[langLower] : '') || ''}
-                                              onChange={(val) => {
-                                                const newTail = { ...(question.tail || {}) };
-                                                newTail[langLower] = val;
-                                                updateQuestion(activeSecData.id, question.id, {
-                                                  tail: newTail
-                                                });
-                                              }}
-                                              language={langLower}
-                                              placeholder={`// Code that runs after student's solution\n// Example: test runner, output formatter, etc.`}
-                                              height={100}
-                                              className="rounded border"
-                                            />
-                                          </div>
-
-                                          {/* Preview */}
-                                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                            <p className="text-xs text-blue-800 mb-1">
-                                              <strong>Final execution order:</strong>
-                                            </p>
-                                            <p className="text-xs text-blue-700 font-mono">
-                                              HEAD → BODY_TEMPLATE (student code) → TAIL
-                                            </p>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <label className="block text-xs text-gray-600">
-                                    Test Cases
-                                  </label>
-                                  <button
-                                    onClick={() =>
-                                      addTestCase(activeSecData.id, question.id)
-                                    }
-                                    className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 text-xs"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                    Add Test
-                                  </button>
-                                </div>
-                                <div className="space-y-2">
-                                  {(question.testCases || []).map((tc, tcIdx) => (
-                                    <div
-                                      key={tc.id}
-                                      className="p-3 bg-gray-50 border border-gray-200 rounded-lg"
-                                    >
-                                      <div className="grid grid-cols-2 gap-3 mb-2">
-                                        <div>
-                                          <label className="block text-xs text-gray-500 mb-1">
-                                            Input
-                                          </label>
-                                          <Textarea
-                                            value={tc.input}
-                                            onChange={(e) => {
-                                              const newTestCases = [
-                                                ...(question.testCases || [])
-                                              ];
-                                              newTestCases[tcIdx] = {
-                                                ...tc,
-                                                input: e.target.value
-                                              };
-                                              updateQuestion(
-                                                activeSecData.id,
-                                                question.id,
-                                                { testCases: newTestCases }
-                                              );
-                                            }}
-                                            rows={2}
-                                            className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                          />
-                                        </div>
-                                        <div>
-                                          <label className="block text-xs text-gray-500 mb-1">
-                                            Expected Output
-                                          </label>
-                                          <Textarea
-                                            value={tc.expectedOutput}
-                                            onChange={(e) => {
-                                              const newTestCases = [
-                                                ...(question.testCases || [])
-                                              ];
-                                              newTestCases[tcIdx] = {
-                                                ...tc,
-                                                expectedOutput: e.target.value
-                                              };
-                                              updateQuestion(
-                                                activeSecData.id,
-                                                question.id,
-                                                { testCases: newTestCases }
-                                              );
-                                            }}
-                                            rows={2}
-                                            className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                          />
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center justify-between">
-                                        <label className="flex items-center gap-2 text-xs text-gray-600">
-                                          <input
-                                            type="checkbox"
-                                            checked={tc.isHidden}
-                                            onChange={(e) => {
-                                              const newTestCases = [
-                                                ...(question.testCases || [])
-                                              ];
-                                              newTestCases[tcIdx] = {
-                                                ...tc,
-                                                isHidden: e.target.checked
-                                              };
-                                              updateQuestion(
-                                                activeSecData.id,
-                                                question.id,
-                                                { testCases: newTestCases }
-                                              );
-                                            }}
-                                            className="rounded"
-                                          />
-                                          Hidden from students
-                                        </label>
-                                        <button
-                                          onClick={() => {
-                                            const newTestCases = (
-                                              question.testCases || []
-                                            ).filter((_, i) => i !== tcIdx);
-                                            updateQuestion(
-                                              activeSecData.id,
-                                              question.id,
-                                              { testCases: newTestCases }
-                                            );
-                                          }}
-                                          className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                        >
-                                          <Trash2 className="w-3 h-3" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <Settings className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-gray-900 mb-2">No Section Selected</h3>
-                <p className="text-gray-500 text-sm mb-4">
-                  Select a section from the sidebar or create a new one
-                </p>
-                <button
-                  onClick={addSection}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Create Section
-                </button>
-              </div>
-            </div>
-          )}
+          <ContentEditor
+            activeSection={activeSecData}
+            onUpdateSection={(updates) => activeSection && updateSection(activeSection, updates)}
+            onDeleteSection={() => activeSection && deleteSection(activeSection)}
+            onAddQuestion={(type) => activeSection && addQuestion(activeSection, type)}
+            onUpdateQuestion={(questionId, updates) => activeSection && updateQuestion(activeSection, questionId, updates)}
+            onDeleteQuestion={(questionId) => activeSection && deleteQuestion(activeSection, questionId)}
+            expandedQuestionId={expandedQuestionId}
+            setExpandedQuestionId={setExpandedQuestionId}
+          />
         </div>
       </div>
 

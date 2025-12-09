@@ -428,7 +428,7 @@ export default function TeacherDashboard() {
           getCourseIcon={getCourseIcon}
           onCreateCourse={handleCreateCourse}
           onViewCourse={(id) => router.push(`/teacher/courses/${id}`)}
-          onEditCourse={(id) => router.push(`/teacher/courses/${id}/edit`)}
+          onEditCourse={(id) => router.push(`/teacher/courses/create?edit=${id}`)}
         />
       )}
 

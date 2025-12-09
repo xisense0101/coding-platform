@@ -54,6 +54,18 @@ const examSchema = z.object({
   test_code_type: z.enum(['permanent', 'rotating']).optional(),
   test_code_rotation_minutes: z.number().optional().nullable(),
   test_code_last_rotated: z.string().optional().nullable(),
+  
+  // Monitoring settings
+  strict_level: z.number().optional(),
+  max_tab_switches: z.number().optional(),
+  max_screen_lock_duration: z.number().optional(),
+  auto_terminate_on_violations: z.boolean().optional(),
+  track_tab_switches: z.boolean().optional(),
+  track_screen_locks: z.boolean().optional(),
+  detect_vm: z.boolean().optional(),
+  require_single_monitor: z.boolean().optional(),
+  allow_zoom_changes: z.boolean().optional(),
+
   sections: z.array(sectionSchema)
 })
 
@@ -162,6 +174,18 @@ export async function POST(request: NextRequest) {
         test_code_type: validatedData.test_code_type || 'permanent',
         test_code_rotation_minutes: validatedData.test_code_rotation_minutes || null,
         test_code_last_rotated: validatedData.test_code_last_rotated || null,
+        
+        // Monitoring settings
+        strict_level: validatedData.strict_level ?? 1,
+        max_tab_switches: validatedData.max_tab_switches ?? 3,
+        max_screen_lock_duration: validatedData.max_screen_lock_duration ?? 30,
+        auto_terminate_on_violations: validatedData.auto_terminate_on_violations ?? false,
+        track_tab_switches: validatedData.track_tab_switches ?? true,
+        track_screen_locks: validatedData.track_screen_locks ?? true,
+        detect_vm: validatedData.detect_vm ?? true,
+        require_single_monitor: validatedData.require_single_monitor ?? false,
+        allow_zoom_changes: validatedData.allow_zoom_changes ?? true,
+
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
