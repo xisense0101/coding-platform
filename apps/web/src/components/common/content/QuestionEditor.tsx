@@ -60,9 +60,18 @@ export function QuestionEditor({
       isHidden: true,
       weight: 1
     };
-    onUpdate({
-      testCases: [...(question.testCases || []), newTestCase]
-    });
+    const newTestCases = [...(question.testCases || []), newTestCase];
+    
+    const updates: Partial<Question> = {
+      testCases: newTestCases
+    };
+
+    // Auto-update total points for coding questions
+    if (question.type === 'coding') {
+      updates.points = newTestCases.reduce((sum, tc) => sum + (tc.weight || 0), 0);
+    }
+
+    onUpdate(updates);
   };
 
   return (
@@ -101,9 +110,10 @@ export function QuestionEditor({
                   onUpdate({ points: parseInt(e.target.value) || 0 });
                 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-16 h-8 text-center"
+                className={cn("w-16 h-8 text-center", question.type === 'coding' && "bg-gray-100 text-gray-500")}
                 placeholder="pts"
-                disabled={readOnly}
+                disabled={readOnly || question.type === 'coding'}
+                title={question.type === 'coding' ? "Points are calculated from test cases" : "Points"}
               />
               <span className="text-xs text-gray-500">pts</span>
             </div>
@@ -415,8 +425,13 @@ export function QuestionEditor({
                               value={tc.weight || 1}
                               onChange={(e) => {
                                 const newTestCases = [...(question.testCases || [])];
-                                newTestCases[tcIdx] = { ...tc, weight: parseInt(e.target.value) || 1 };
-                                onUpdate({ testCases: newTestCases });
+                                newTestCases[tcIdx] = { ...tc, weight: parseInt(e.target.value) || 0 };
+                                
+                                const updates: Partial<Question> = { testCases: newTestCases };
+                                if (question.type === 'coding') {
+                                  updates.points = newTestCases.reduce((sum, t) => sum + (t.weight || 0), 0);
+                                }
+                                onUpdate(updates);
                               }}
                               className="w-16 h-7 text-xs text-center"
                               disabled={readOnly}
@@ -429,7 +444,12 @@ export function QuestionEditor({
                             variant="ghost"
                             onClick={() => {
                               const newTestCases = (question.testCases || []).filter((_, i) => i !== tcIdx);
-                              onUpdate({ testCases: newTestCases });
+                              
+                              const updates: Partial<Question> = { testCases: newTestCases };
+                              if (question.type === 'coding') {
+                                updates.points = newTestCases.reduce((sum, t) => sum + (t.weight || 0), 0);
+                              }
+                              onUpdate(updates);
                             }}
                             className="h-7 w-7 p-0 text-red-600 hover:bg-red-50"
                           >

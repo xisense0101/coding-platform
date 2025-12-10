@@ -156,7 +156,8 @@ export function useElectronMonitoring(options: MonitoringOptions) {
     violationType: string,
     violationMessage: string,
     severity: 'low' | 'medium' | 'high' | 'critical' = 'medium',
-    additionalData: any = {}
+    additionalData: any = {},
+    skipUi: boolean = false
   ) => {
     if (!submissionId || !examId) return
 
@@ -180,7 +181,8 @@ export function useElectronMonitoring(options: MonitoringOptions) {
       const result = await response.json()
       
       if (result.success) {
-        if (onViolation) {
+        // Only trigger UI if not skipped, OR if termination is required (always show termination)
+        if (onViolation && (!skipUi || result.shouldTerminate)) {
           onViolation({
             type: violationType,
             message: violationMessage,
@@ -270,11 +272,23 @@ export function useElectronMonitoring(options: MonitoringOptions) {
       if (!processedViolationsRef.current.has(violationKey)) {
         processedViolationsRef.current.add(violationKey)
         
+        // Show immediate warning for tab switch
+        if (onViolation) {
+          onViolation({
+            type: 'excessive_tab_switching',
+            message: 'Warning: Tab Switch Detected!',
+            severity: 'medium',
+            shouldTerminate: false,
+            violationCount: currentCount
+          })
+        }
+
         logViolation(
           'excessive_tab_switching',
           'User switched away from exam window',
           'medium',
-          { message, count: currentCount }
+          { message, count: currentCount },
+          true // Skip UI since we already showed it
         )
 
         // Clear old processed violations after 10 seconds

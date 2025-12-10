@@ -52,6 +52,7 @@ export async function GET(
             teacher_id,
             organization_id,
             proctoring_enabled,
+            exam_mode,
             strict_level,
             max_tab_switches,
             max_screen_lock_duration,

@@ -55,6 +55,18 @@ export async function GET(
         test_code_type,
         test_code_rotation_minutes,
         test_code_last_rotated,
+        allowed_ip,
+        invite_token,
+        exam_mode,
+        strict_level,
+        max_tab_switches,
+        max_screen_lock_duration,
+        auto_terminate_on_violations,
+        track_tab_switches,
+        track_screen_locks,
+        detect_vm,
+        require_single_monitor,
+        allow_zoom_changes,
         created_at,
         updated_at,
         teacher:users!exams_teacher_id_fkey(full_name),
@@ -191,6 +203,13 @@ export async function PATCH(
     if (body.test_code_type !== undefined) examUpdateData.test_code_type = body.test_code_type
     if (body.test_code_rotation_minutes !== undefined) examUpdateData.test_code_rotation_minutes = body.test_code_rotation_minutes
     if (body.test_code_last_rotated !== undefined) examUpdateData.test_code_last_rotated = body.test_code_last_rotated
+
+    // Access Control
+    if (body.allowed_ip !== undefined) examUpdateData.allowed_ip = body.allowed_ip
+    if (body.invite_token !== undefined) examUpdateData.invite_token = body.invite_token
+
+    // Exam Mode
+    if (body.exam_mode !== undefined) examUpdateData.exam_mode = body.exam_mode
 
     // Monitoring settings
     if (body.strict_level !== undefined) examUpdateData.strict_level = body.strict_level

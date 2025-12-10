@@ -16,6 +16,7 @@ interface CodingEditorProps {
   readOnly?: boolean
   fontSizeClass?: string
   showHeadTail?: boolean
+  disableCopyPaste?: boolean
 }
 
 export function CodingEditor({
@@ -27,7 +28,8 @@ export function CodingEditor({
   disabled = false,
   readOnly = false,
   fontSizeClass = "text-sm",
-  showHeadTail = true
+  showHeadTail = true,
+  disableCopyPaste = false
 }: CodingEditorProps) {
   const [isHeadCollapsed, setIsHeadCollapsed] = useState(true)
   const [isTailCollapsed, setIsTailCollapsed] = useState(true)
@@ -82,6 +84,7 @@ export function CodingEditor({
           showActionButtons={false}
           theme="light"
           className="bg-white h-full"
+          disableCopyPaste={disableCopyPaste}
         />
       </div>
 

@@ -41,6 +41,13 @@ function CreateExamPageContent() {
   const [testCodeRotationMinutes, setTestCodeRotationMinutes] = useState(60)
   const [isPublished, setIsPublished] = useState(false)
   
+  // Access Control
+  const [allowedIp, setAllowedIp] = useState("")
+  const [inviteToken, setInviteToken] = useState("")
+
+  // Exam Mode
+  const [examMode, setExamMode] = useState<"browser" | "app">("browser")
+
   // Monitoring settings
   const [strictLevel, setStrictLevel] = useState(1)
   const [maxTabSwitches, setMaxTabSwitches] = useState(3)
@@ -91,9 +98,16 @@ function CreateExamPageContent() {
       setTestCodeType(exam.test_code_type || "permanent")
       setTestCodeRotationMinutes(exam.test_code_rotation_minutes || 60)
       
+      // Load access control
+      setAllowedIp(exam.allowed_ip || "")
+      setInviteToken(exam.invite_token || "")
+      
+      // Load exam mode
+      setExamMode(exam.exam_mode || "browser")
+
       // Load monitoring settings
       setStrictLevel(exam.strict_level || 1)
-      setMaxTabSwitches(exam.max_tab_switches || 3)
+      setMaxTabSwitches(exam.max_tab_switches || 7)
       setMaxScreenLockDuration(exam.max_screen_lock_duration || 30)
       setAutoTerminateOnViolations(exam.auto_terminate_on_violations || false)
       setTrackTabSwitches(exam.track_tab_switches !== false)
@@ -260,7 +274,7 @@ function CreateExamPageContent() {
       title: `New ${type.toUpperCase()} Question`,
       content: "",
       isVisible: true,
-      points: type === "coding" ? 10 : 2,
+      points: type === "coding" ? 1 : 2,
       hasChanges: true
     }
 
@@ -275,6 +289,7 @@ function CreateExamPageContent() {
     } else if (type === "coding") {
       newQuestion = {
         ...baseQuestion,
+        points: 1, // Default points for 1 test case with weight 1
         code: "// Write your code here",
         head: {},
         body_template: {},
@@ -388,6 +403,9 @@ function CreateExamPageContent() {
           test_code_type: testCodeType,
           test_code_rotation_minutes: testCodeRotationMinutes,
           test_code_last_rotated: testCode ? new Date().toISOString() : null,
+          allowed_ip: allowedIp || null,
+          invite_token: inviteToken || null,
+          exam_mode: examMode,
           strict_level: strictLevel,
           max_tab_switches: maxTabSwitches,
           max_screen_lock_duration: maxScreenLockDuration,
@@ -418,7 +436,8 @@ function CreateExamPageContent() {
                   id: tc.id,
                   input: tc.input,
                   expectedOutput: tc.expectedOutput,
-                  isHidden: tc.isHidden
+                  isHidden: tc.isHidden,
+                  weight: tc.weight || 1
                 }))
               })
             }))
@@ -463,6 +482,9 @@ function CreateExamPageContent() {
           test_code_type: testCodeType,
           test_code_rotation_minutes: testCodeRotationMinutes,
           test_code_last_rotated: testCode ? new Date().toISOString() : null,
+          allowed_ip: allowedIp || null,
+          invite_token: inviteToken || null,
+          exam_mode: examMode,
           strict_level: strictLevel,
           max_tab_switches: maxTabSwitches,
           max_screen_lock_duration: maxScreenLockDuration,
@@ -858,6 +880,51 @@ function CreateExamPageContent() {
                   )}
                 </div>
 
+                {/* Access Control Settings */}
+                <div className="space-y-3 pt-3 border-t">
+                  <Label className="text-base font-semibold">Access Control</Label>
+                  <div>
+                    <Label>Allowed IP Address (Optional)</Label>
+                    <Input
+                      type="text"
+                      value={allowedIp}
+                      onChange={(e) => setAllowedIp(e.target.value)}
+                      placeholder="e.g., 192.168.1.1"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Restrict exam access to a specific IP address (e.g., school wifi)
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Invite Token (Optional)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        value={inviteToken}
+                        onChange={(e) => setInviteToken(e.target.value)}
+                        placeholder="e.g., class-a-final"
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="icon"
+                        onClick={() => setInviteToken(Math.random().toString(36).substring(2, 10))}
+                        title="Generate Random Token"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Create a unique invite link: /invite/{inviteToken || 'token'}
+                    </p>
+                    {inviteToken && (
+                      <div className="mt-2 p-2 bg-gray-100 rounded text-xs break-all">
+                        {typeof window !== 'undefined' ? window.location.origin : ''}/invite/{inviteToken}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Monitoring & Security Settings */}
                 <div className="space-y-3 pt-3 border-t">
                   <Label className="text-base font-semibold flex items-center gap-2">
@@ -865,6 +932,38 @@ function CreateExamPageContent() {
                     Monitoring & Security
                   </Label>
                   
+                  <div>
+                    <Label>Exam Mode</Label>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => setExamMode("browser")}
+                        className={`p-3 text-sm rounded border flex flex-col items-center gap-1 ${
+                          examMode === "browser"
+                            ? "bg-blue-50 border-blue-500 text-blue-700"
+                            : "bg-white border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        <span className="font-semibold">Browser</span>
+                        <span className="text-xs text-gray-500">Standard web exam</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExamMode("app")}
+                        className={`p-3 text-sm rounded border flex flex-col items-center gap-1 ${
+                          examMode === "app"
+                            ? "bg-purple-50 border-purple-500 text-purple-700"
+                            : "bg-white border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        <span className="font-semibold">App (Secure)</span>
+                        <span className="text-xs text-gray-500">Electron app only</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {examMode === "app" && (
+                  <>
                   <div>
                     <Label>Strict Level</Label>
                     <div className="grid grid-cols-3 gap-2 mt-2">
@@ -995,6 +1094,8 @@ function CreateExamPageContent() {
                         <strong>Monitoring Active:</strong> Students will be monitored for suspicious activity in the Electron app.
                       </p>
                     </div>
+                  )}
+                  </>
                   )}
                 </div>
 

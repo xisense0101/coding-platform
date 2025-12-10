@@ -23,6 +23,14 @@ export function ViolationAlert({ violation, onDismiss, onTerminate }: ViolationA
   const [isExiting, setIsExiting] = useState(false)
   const [progressWidth, setProgressWidth] = useState(100)
 
+  const handleDismiss = () => {
+    setIsExiting(true)
+    setTimeout(() => {
+      setIsVisible(false)
+      onDismiss()
+    }, 300)
+  }
+
   useEffect(() => {
     if (violation) {
       setIsVisible(true)
@@ -34,11 +42,11 @@ export function ViolationAlert({ violation, onDismiss, onTerminate }: ViolationA
         setProgressWidth(0)
       })
       
-      // Auto-dismiss after 5 seconds if not a termination
+      // Auto-dismiss after 3 seconds if not a termination
       if (!violation.shouldTerminate) {
         const timer = setTimeout(() => {
           handleDismiss()
-        }, 5000)
+        }, 3000)
         
         return () => clearTimeout(timer)
       }
@@ -47,14 +55,6 @@ export function ViolationAlert({ violation, onDismiss, onTerminate }: ViolationA
 
   if (!violation || !isVisible) {
     return null
-  }
-
-  const handleDismiss = () => {
-    setIsExiting(true)
-    setTimeout(() => {
-      setIsVisible(false)
-      onDismiss()
-    }, 300)
   }
 
   const handleTerminate = () => {

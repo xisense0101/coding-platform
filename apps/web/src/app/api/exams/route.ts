@@ -55,6 +55,13 @@ const examSchema = z.object({
   test_code_rotation_minutes: z.number().optional().nullable(),
   test_code_last_rotated: z.string().optional().nullable(),
   
+  // Access Control
+  allowed_ip: z.string().optional().nullable(),
+  invite_token: z.string().optional().nullable(),
+  
+  // Exam Mode
+  exam_mode: z.enum(['browser', 'app']).optional(),
+  
   // Monitoring settings
   strict_level: z.number().optional(),
   max_tab_switches: z.number().optional(),
@@ -175,6 +182,13 @@ export async function POST(request: NextRequest) {
         test_code_rotation_minutes: validatedData.test_code_rotation_minutes || null,
         test_code_last_rotated: validatedData.test_code_last_rotated || null,
         
+        // Access Control
+        allowed_ip: validatedData.allowed_ip || null,
+        invite_token: validatedData.invite_token || null,
+        
+        // Exam Mode
+        exam_mode: validatedData.exam_mode || 'browser',
+
         // Monitoring settings
         strict_level: validatedData.strict_level ?? 1,
         max_tab_switches: validatedData.max_tab_switches ?? 3,

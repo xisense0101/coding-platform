@@ -37,6 +37,7 @@ interface CodingQuestionInterfaceProps {
   onBackToCurrentCode?: () => void
   showSubmitButton?: boolean
   showAttempts?: boolean
+  disableCopyPaste?: boolean
 }
 
 export function CodingQuestionInterface({
@@ -53,7 +54,8 @@ export function CodingQuestionInterface({
   viewingAttempt = null,
   onBackToCurrentCode,
   showSubmitButton = true,
-  showAttempts = false
+  showAttempts = false,
+  disableCopyPaste = false
 }: CodingQuestionInterfaceProps) {
   const [selectedLanguage, setSelectedLanguage] = useState(
     (coding.allowed_languages && coding.allowed_languages[0]) || "c"
@@ -349,6 +351,7 @@ export function CodingQuestionInterface({
             disabled={isRunning || isSubmitting || isLocked}
             readOnly={viewingAttempt !== null}
             fontSizeClass={fontSizeClass}
+            disableCopyPaste={disableCopyPaste}
           />
         </div>
       </div>
@@ -407,6 +410,10 @@ export function CodingQuestionInterface({
                   fontSizeClass
                 )}
                 readOnly={isLocked}
+                onCopy={(e) => disableCopyPaste && e.preventDefault()}
+                onPaste={(e) => disableCopyPaste && e.preventDefault()}
+                onCut={(e) => disableCopyPaste && e.preventDefault()}
+                onContextMenu={(e) => disableCopyPaste && e.preventDefault()}
               />
               <div className="flex justify-end">
                 <Button

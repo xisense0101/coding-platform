@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { ChevronLeft, ChevronRight, Play, Send, RotateCcw, Settings, Maximize2, Menu, X, Check, Info, Timer, BookOpen, Minus, Plus, Lock, ChevronDown, ChevronUp, AlertTriangle, Star } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Play, Send, RotateCcw, Settings, Maximize2, Menu, X, Check, Info, Timer, BookOpen, Minus, Plus, Lock, ChevronDown, ChevronUp, AlertTriangle, Star, Shield, RefreshCw, WifiOff, Wifi, Clock } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 
@@ -32,6 +32,15 @@ import type { Tables, TablesInsert, TablesUpdate } from "@/lib/database/types"
 
 import { logger } from '@/lib/utils/logger'
 import { useElectronMonitoring } from '@/hooks/useElectronMonitoring'
+import { useBrowserMonitoring } from '@/hooks/useBrowserMonitoring'
+
+import { WaitingRoom } from '@/components/exam/WaitingRoom'
+import { ExamInstructions } from '@/components/exam/ExamInstructions'
+import { SubmitDialog } from '@/components/exam/SubmitDialog'
+import { MCQQuestionPanel } from '@/components/exam/MCQQuestionPanel'
+import { MCQAnswerPanel } from '@/components/exam/MCQAnswerPanel'
+import { CodingQuestionPanel } from '@/components/exam/CodingQuestionPanel'
+import { LocalMcqQuestion, LocalCodingQuestion, DialogQuestionSummary, LocalQuestionBase } from '@/components/exam/types'
 
 // -----------------------------------------------------------------------------
 // Local UI types built from API shape
@@ -42,6 +51,7 @@ type ApiExam = {
   title: string
   description?: string
   slug: string
+  exam_mode?: "browser" | "app"
   instructions?: string
   start_time: string
   end_time: string
@@ -139,31 +149,6 @@ type AnswerState = {
   status: "unanswered" | "answered" | "submitted"
 }
 
-type DialogQuestionSummary = { id: string; status: "unanswered" | "answered" | "submitted" }
-
-// Keep panel components simple with local question models
-interface LocalQuestionBase {
-  id: string
-  section: string
-  questionNumber: number
-  type: "mcq" | "coding"
-  title: string
-  question: string
-  status: "unanswered" | "answered" | "submitted"
-}
-interface LocalMcqQuestion extends LocalQuestionBase {
-  type: "mcq"
-  options?: { id: string; text: string; isCorrect?: boolean }[]
-  userAnswer?: string
-}
-interface LocalCodingQuestion extends LocalQuestionBase {
-  type: "coding"
-  codeTemplate?: string
-  language?: string
-  userCode?: string
-  head?: string
-  tail?: string
-}
 
 const FONT_SIZES = ["text-xs", "text-sm", "text-base", "text-lg", "text-xl"]
 
@@ -205,6 +190,15 @@ export default function Component() {
   const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false)
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const lastViolationIdRef = useRef<string | null>(null)
+  const [isOnline, setIsOnline] = useState(true)
+  const [networkStrength, setNetworkStrength] = useState<number>(4) // 0-4 scale
+  const [networkSpeed, setNetworkSpeed] = useState<number | null>(null)
+  const [isTimeUp, setIsTimeUp] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Waiting Room State
+  const [showWaitingRoom, setShowWaitingRoom] = useState(false)
+  const [showAppRequired, setShowAppRequired] = useState(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const rightPanelRef = useRef<HTMLDivElement>(null)
@@ -242,6 +236,219 @@ export default function Component() {
     logger.log('Monitoring metrics updated:', metrics)
   }, [])
 
+  // Disable copy/paste/selection globally
+  useEffect(() => {
+    const preventDefault = (e: Event) => {
+      e.preventDefault()
+    }
+
+    // Prevent default behavior for copy, paste, cut, contextmenu
+    document.addEventListener('copy', preventDefault)
+    document.addEventListener('paste', preventDefault)
+    document.addEventListener('cut', preventDefault)
+    document.addEventListener('contextmenu', preventDefault)
+    
+    // Prevent text selection
+    const preventSelection = (e: Event) => {
+      // Allow selection in inputs and textareas and monaco editor for editing
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('.monaco-editor')) {
+        return
+      }
+      e.preventDefault()
+    }
+    
+    document.addEventListener('selectstart', preventSelection)
+    document.addEventListener('dragstart', preventDefault)
+
+    // Add user-select: none to body via style
+    const originalUserSelect = document.body.style.userSelect
+    const originalWebkitUserSelect = document.body.style.webkitUserSelect
+    
+    document.body.style.userSelect = 'none'
+    document.body.style.webkitUserSelect = 'none'
+
+    // Inject a style tag to force user-select: none globally with !important
+    const style = document.createElement('style')
+    style.id = 'disable-selection-style'
+    style.innerHTML = `
+      *, *::before, *::after {
+        user-select: none !important;
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+      }
+      /* Allow selection in editor and inputs to enable coding/typing, but copy/paste is blocked via events */
+      .monaco-editor, .monaco-editor *, input, textarea {
+        user-select: text !important;
+        -webkit-user-select: text !important;
+      }
+    `
+    document.head.appendChild(style)
+
+    return () => {
+      document.removeEventListener('copy', preventDefault)
+      document.removeEventListener('paste', preventDefault)
+      document.removeEventListener('cut', preventDefault)
+      document.removeEventListener('contextmenu', preventDefault)
+      document.removeEventListener('selectstart', preventSelection)
+      document.removeEventListener('dragstart', preventDefault)
+      
+      document.body.style.userSelect = originalUserSelect
+      document.body.style.webkitUserSelect = originalWebkitUserSelect
+      
+      const styleEl = document.getElementById('disable-selection-style')
+      if (styleEl) {
+        styleEl.remove()
+      }
+    }
+  }, [])
+
+  // Network status monitoring
+  useEffect(() => {
+    let isMounted = true
+    
+    const updateNetworkStatus = () => {
+      if (!isMounted) return
+      const online = navigator.onLine
+      
+      if (!online) {
+        setIsOnline(false)
+        setNetworkStrength(0)
+        setNetworkSpeed(0)
+        logger.warn('❌ Network disconnected (navigator)')
+      } else {
+        setIsOnline(true)
+        
+        const connection = (navigator as any).connection
+        if (connection) {
+          const downlink = connection.downlink
+          setNetworkSpeed(downlink)
+          if (downlink < 1) setNetworkStrength(1)
+          else if (downlink < 3) setNetworkStrength(2)
+          else if (downlink < 5) setNetworkStrength(3)
+          else setNetworkStrength(4)
+        } else {
+          setNetworkStrength(4)
+          setNetworkSpeed(null)
+        }
+      }
+    }
+
+    const checkConnection = async () => {
+      if (!isMounted) return
+      try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 1500)
+        
+        const res = await fetch('/api/health', { 
+          method: 'GET', 
+          cache: 'no-store',
+          signal: controller.signal
+        })
+        clearTimeout(timeoutId)
+
+        if (res.ok) {
+          setIsOnline(true)
+          const connection = (navigator as any).connection
+          if (connection) {
+            const downlink = connection.downlink
+            setNetworkSpeed(downlink)
+            if (downlink < 1) setNetworkStrength(1)
+            else if (downlink < 3) setNetworkStrength(2)
+            else if (downlink < 5) setNetworkStrength(3)
+            else setNetworkStrength(4)
+          }
+        } else {
+          throw new Error('Health check failed')
+        }
+      } catch (e) {
+        if (isMounted) {
+          setIsOnline(false)
+          setNetworkStrength(0)
+          setNetworkSpeed(0)
+        }
+      }
+    }
+
+    window.addEventListener('online', updateNetworkStatus)
+    window.addEventListener('offline', updateNetworkStatus)
+    
+    if ((navigator as any).connection) {
+      (navigator as any).connection.addEventListener('change', updateNetworkStatus)
+    }
+    
+    // Initial check
+    updateNetworkStatus()
+    checkConnection()
+    
+    // Poll every 10 seconds
+    const intervalId = setInterval(checkConnection, 5000)
+
+    return () => {
+      isMounted = false
+      window.removeEventListener('online', updateNetworkStatus)
+      window.removeEventListener('offline', updateNetworkStatus)
+      if ((navigator as any).connection) {
+        (navigator as any).connection.removeEventListener('change', updateNetworkStatus)
+      }
+      clearInterval(intervalId)
+    }
+  }, [])
+
+  // Persist/Restore session
+  useEffect(() => {
+    if (!exam) return
+
+    const sessionKey = `exam_session_${exam.id}`
+    
+    // If we have auth data, save it
+    if (studentAuthData && submissionId) {
+      const sessionData = {
+        studentAuthData,
+        submissionId,
+        timestamp: Date.now()
+      }
+      localStorage.setItem(sessionKey, JSON.stringify(sessionData))
+    } 
+    // If we don't have auth data but it exists in storage, restore it
+    else if (!studentAuthData && !submissionId) {
+      try {
+        const stored = localStorage.getItem(sessionKey)
+        if (stored) {
+          const { studentAuthData: savedAuth, submissionId: savedSubId } = JSON.parse(stored)
+          if (savedAuth && savedSubId) {
+            logger.log('🔄 Restoring session from storage')
+            setStudentAuthData(savedAuth)
+            setSubmissionId(savedSubId)
+            setShowStudentAuth(false)
+            setShowInstructions(false)
+            setIsExamStarted(true)
+            // Trigger startExam to fetch latest state from server
+            // We need to wrap this in a timeout or effect to avoid state update loops
+            // But since we set state above, we can just let the next render handle it?
+            // Actually, we need to call the API to get the latest time/answers
+            // We can do this by setting a flag or calling a function
+          }
+        }
+      } catch (e) {
+        logger.error('Error restoring session:', e)
+      }
+    }
+  }, [exam, studentAuthData, submissionId])
+
+  // Effect to trigger data fetch after restoration
+  useEffect(() => {
+    if (isExamStarted && submissionId && exam && !answers['restored']) {
+       // This is a bit hacky, but we need to re-fetch the exam state if we just restored from local storage
+       // The startExam function handles fetching existing submission state
+       // We can just call it again? Or extract the fetch logic?
+       // Let's modify startExam to be callable for restoration
+       startExam()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isExamStarted, submissionId])
+
   const electronMonitoring = useElectronMonitoring({
     submissionId,
     examId: exam?.id || null,
@@ -250,11 +457,21 @@ export default function Component() {
     onMetricsUpdate: handleMetricsUpdateCallback
   })
 
+  const browserMonitoring = useBrowserMonitoring({
+    submissionId,
+    examId: exam?.id || null,
+    studentId: studentAuthData?.userId || user?.id || null,
+    onViolation: handleViolationCallback,
+    onMetricsUpdate: handleMetricsUpdateCallback,
+    isEnabled: isExamStarted && !isExamFinished,
+    autoLogEvents: !electronMonitoring?.isElectronApp
+  })
+
   const {
     isElectronApp,
     appVersion,
     isVM,
-    metrics: monitoringMetrics,
+    metrics: electronMetrics,
     notifyExamComplete,
     closeElectronApp,
     handleZoomChange
@@ -267,6 +484,10 @@ export default function Component() {
     closeElectronApp: () => {},
     handleZoomChange: () => {}
   }
+
+  // Use browser metrics for UI display to ensure consistency between browser and app
+  // Electron metrics are still logged in the background
+  const monitoringMetrics = browserMonitoring.metrics
 
   // Fetch exam by slug
   useEffect(() => {
@@ -287,6 +508,13 @@ export default function Component() {
         const ex: ApiExam = json.exam
         if (!mounted) return
         setExam(ex)
+
+        // Check if exam has started
+        const now = new Date()
+        const startTime = new Date(ex.start_time)
+        if (now < startTime) {
+          setShowWaitingRoom(true)
+        }
 
         const built = (ex.sections || []).map((s) => ({
           id: s.id,
@@ -336,23 +564,55 @@ export default function Component() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.slug])
 
+  // Check exam mode whenever exam or isElectronApp changes
+  useEffect(() => {
+    if (!exam) return
+    
+    if (exam.exam_mode === 'app') {
+      if (isElectronApp) {
+        setShowAppRequired(false)
+      } else {
+        setShowAppRequired(true)
+      }
+    } else {
+      setShowAppRequired(false)
+    }
+  }, [exam, isElectronApp])
+
   // Timer
   useEffect(() => {
-    if (!isExamStarted || timeLeft <= 0) return
-    const t = setInterval(() => setTimeLeft((s) => s - 1), 1000)
+    if (!isExamStarted || isExamFinished) return
+    
+    const t = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(t)
+          setIsTimeUp(true)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    
     return () => clearInterval(t)
-  }, [isExamStarted, timeLeft])
+  }, [isExamStarted, isExamFinished])
 
   useEffect(() => {
-    if (timeLeft === 0 && isExamStarted && !isExamFinished) {
+    if (isTimeUp && !isExamFinished && !isSubmitting) {
       logger.log('⏱️ Time expired - auto-submitting exam')
       autoSubmitExam()
     }
-  }, [timeLeft, isExamStarted, isExamFinished])
+  }, [isTimeUp, isExamFinished, isSubmitting])
   
-  const autoSubmitExam = async () => {
+  async function autoSubmitExam() {
+    if (isSubmitting) return
+    setIsSubmitting(true)
+
     try {
-      if (!exam || !submissionId) return
+      if (!exam || !submissionId) {
+        setIsSubmitting(false)
+        return
+      }
       
       const { total, max, gradedAnswers } = computeScore()
       
@@ -384,18 +644,33 @@ export default function Component() {
         .update(finalUpdate as any)
         .eq("id", submissionId)
       
+      clearLocalSession()
       setIsExamFinished(true)
       logger.log('✅ Exam auto-submitted due to time expiry')
     } catch (error) {
       logger.error('❌ Error auto-submitting exam:', error)
+      setIsSubmitting(false)
     }
   }
+
+  function clearLocalSession(subId?: string) {
+    if (!exam) return
+    const targetSubId = subId || submissionId
+    if (!targetSubId) return
+    
+    const sessionKey = `exam_session_${exam.id}`
+    const monitoringKey = `browser_monitoring_metrics_${targetSubId}`
+    
+    localStorage.removeItem(sessionKey)
+    localStorage.removeItem(monitoringKey)
+    logger.log('🧹 Cleared local session data')
+  }
   
-  const autoSubmitExpiredExam = async (subId: string) => {
+  const autoSubmitExpiredExam = async (subId: string, answersOverride?: Record<string, AnswerState>) => {
     try {
       if (!exam) return
       
-      const { total, max, gradedAnswers } = computeScore()
+      const { total, max, gradedAnswers } = computeScore(answersOverride)
       
       // Check if any questions require manual grading
       const requiresManualGrading = Object.values(gradedAnswers).some((ans: any) => ans.requires_manual_grading)
@@ -422,6 +697,7 @@ export default function Component() {
         .update(finalUpdate as any)
         .eq("id", subId)
       
+      clearLocalSession(subId)
       logger.log('✅ Expired exam auto-submitted on re-login')
     } catch (error) {
       logger.error('❌ Error auto-submitting expired exam:', error)
@@ -446,7 +722,7 @@ export default function Component() {
   }
 
   // Start exam -> ensure submission row exists and preload answers
-  const startExam = async () => {
+  async function startExam() {
     try {
       logger.log('🚀 Start Exam clicked')
       if (!exam) {
@@ -487,6 +763,7 @@ export default function Component() {
         if (result.alreadySubmitted) {
           setIsExamFinished(true)
           setShowInstructions(false)
+          clearLocalSession()
           return
         }
         throw new Error(result.error || 'Failed to start exam')
@@ -502,7 +779,21 @@ export default function Component() {
         logger.log('📝 Exam was already submitted')
         setIsExamFinished(true)
         setShowInstructions(false)
+        clearLocalSession(result.submission.id)
         return
+      }
+
+      // Prepare restored answers if any
+      let restoredAnswers: Record<string, AnswerState> = {}
+      if (!result.isNew && result.submission.answers) {
+        const pre = result.submission.answers || {}
+        Object.keys(pre).forEach((qid) => {
+          const savedAnswer = pre[qid]
+          restoredAnswers[qid] = {
+            ...savedAnswer,
+            status: savedAnswer.status || "unanswered"
+          }
+        })
       }
 
       // Set time remaining from API (handles both new and resumed exams)
@@ -518,7 +809,9 @@ export default function Component() {
           // If not yet submitted, auto-submit now
           if (!result.submission.is_submitted) {
             logger.log('⏱️ Auto-submitting expired exam')
-            await autoSubmitExpiredExam(result.submission.id)
+            await autoSubmitExpiredExam(result.submission.id, restoredAnswers)
+          } else {
+            clearLocalSession(result.submission.id)
           }
           
           setIsExamFinished(true)
@@ -530,20 +823,9 @@ export default function Component() {
       // If existing submission, restore answers and section progress
       if (!result.isNew && result.submission.answers) {
         logger.log('📋 Restoring previous answers...')
-        const pre = result.submission.answers || {}
-        const ans: Record<string, AnswerState> = {}
+        const ans = restoredAnswers
         const submittedSections: Record<string, boolean> = {}
         const unlockedSectionsMap: Record<string, boolean> = {}
-        
-        // Restore answers with all fields
-        Object.keys(pre).forEach((qid) => {
-          const savedAnswer = pre[qid]
-          ans[qid] = {
-            userAnswer: savedAnswer.userAnswer,
-            userCode: savedAnswer.userCode,
-            status: savedAnswer.status || "unanswered"
-          }
-        })
         
         // Determine which sections have been submitted and should be unlocked
         uiSections.forEach((section, idx) => {
@@ -661,17 +943,6 @@ export default function Component() {
     updateAnswer(currentQ.id, { userAnswer: undefined, status: "unanswered" })
   }
 
-  const handleViolationDismiss = () => {
-    setCurrentViolation(null)
-    // Don't reset lastViolationIdRef to prevent same violation from showing again
-  }
-
-  const handleViolationTerminate = () => {
-    setCurrentViolation(null)
-    setSubmitDialogType("final")
-    setShowSubmitDialog(true)
-  }
-
   // Submit feedback
   const handleSubmitFeedback = async () => {
     if (!exam || !submissionId || !studentAuthData) return
@@ -731,20 +1002,21 @@ export default function Component() {
     setShowSubmitDialog(true)
   }
 
-  const computeScore = () => {
+  function computeScore(answersOverride?: Record<string, AnswerState>) {
     if (!exam) return { total: 0, max: 0, gradedAnswers: {} }
     let total = 0
     let max = 0
     const gradedAnswers: Record<string, any> = {}
+    const currentAnswers = answersOverride || answers
     
-    logger.log('🔍 computeScore - All answers:', answers)
+    logger.log('🔍 computeScore - All answers:', currentAnswers)
     
     uiSections.forEach((s) => {
       s.questions.forEach((q) => {
         const apiQ = exam.sections.find((ss) => ss.id === s.id)?.questions.find((qq) => qq.question.id === q.id)
         if (!apiQ) return
         const pts = apiQ.points || 1
-        const answer = answers[q.id]
+        const answer = currentAnswers[q.id]
         
         if (q.type === "mcq") {
           max += pts
@@ -881,6 +1153,8 @@ export default function Component() {
           .from("exam_submissions")
           .update(finalUpdate as any)
           .eq("id", submissionId)
+          
+        clearLocalSession()
       }
       setIsExamFinished(true)
       setShowSubmitDialog(false)
@@ -934,6 +1208,36 @@ export default function Component() {
     const sec = currentSection
     if (!sec) return true
     return !!sectionSubmitted[sec.id]
+  }
+
+  const handleViolationDismiss = useCallback(() => {
+    setCurrentViolation(null)
+  }, [])
+
+  const handleViolationTerminate = useCallback(() => {
+    setCurrentViolation(null)
+    autoSubmitExam()
+  }, [autoSubmitExam])
+
+  if (isTimeUp && !isExamFinished) {
+    return (
+      <div className="h-screen w-screen bg-gradient-to-br from-sky-50 to-white flex items-center justify-center p-4">
+        <Card className="max-w-md w-full border-sky-200 shadow-lg">
+          <CardContent className="p-8 text-center space-y-4">
+            <div className="mx-auto w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center animate-pulse">
+              <Clock className="h-8 w-8 text-amber-600" />
+            </div>
+            <h1 className="text-3xl font-bold text-sky-900">Time's Up!</h1>
+            <p className="text-sky-700">
+              Your exam time has expired. Submitting your answers now...
+            </p>
+            <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-4">
+              <div className="bg-blue-600 h-2.5 rounded-full w-full animate-pulse"></div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   if (isExamFinished) {
@@ -1101,6 +1405,48 @@ export default function Component() {
     )
   }
 
+  if (showAppRequired) {
+    return (
+      <div className="h-screen w-screen bg-gradient-to-br from-sky-50 to-white flex items-center justify-center p-4">
+        <Card className="max-w-md w-full border-sky-200 shadow-lg">
+          <CardContent className="p-8 text-center space-y-6">
+            <div className="mx-auto w-16 h-16 bg-sky-100 rounded-full flex items-center justify-center">
+              <Shield className="h-8 w-8 text-sky-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-sky-900">Secure Exam App Required</h1>
+            <p className="text-sky-700">
+              This exam requires the secure exam application to ensure integrity. Please open the exam in the app.
+            </p>
+            
+            <div className="space-y-3">
+              <Button 
+                className="w-full bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white shadow-md"
+                onClick={() => {
+                  window.location.href = `coding-exam://open?slug=${params.slug}`
+                }}
+              >
+                Open Exam in App
+              </Button>
+              
+              <div className="text-sm text-gray-500">
+                Don't have the app? <a href="/download" className="text-sky-600 hover:underline">Download here</a>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (showWaitingRoom) {
+    return (
+      <WaitingRoom 
+        exam={exam} 
+        onExamStart={() => setShowWaitingRoom(false)} 
+      />
+    )
+  }
+
   if (showStudentAuth && exam) {
     return (
       <StudentAuthModal
@@ -1170,13 +1516,14 @@ export default function Component() {
             </Button>
           </div>
           {/* Monitoring Status - Tab Switches Only */}
-          {isElectronApp && (
+          {(isElectronApp || exam?.exam_mode === 'browser') && (
             <MonitoringStatus
               metrics={monitoringMetrics}
               isElectronApp={isElectronApp}
               isVM={isVM}
               appVersion={appVersion}
               maxTabSwitches={exam?.max_tab_switches || 3}
+              mode={exam?.exam_mode === 'browser' ? 'browser' : 'electron'}
             />
           )}
         </div>
@@ -1184,19 +1531,35 @@ export default function Component() {
         <div className="flex items-center gap-4">
           <Button
             onClick={handleSectionSubmitClick}
-            disabled={isSectionSubmitButtonDisabled()}
-            className="bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white shadow-md transition-all duration-200 hover:shadow-lg font-semibold px-6 py-2"
+            disabled={isSectionSubmitButtonDisabled() || !isOnline}
+            className="bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white shadow-md transition-all duration-200 hover:shadow-lg font-semibold px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {getSectionSubmitButtonText()}
           </Button>
           <Button
             onClick={handleFinalSubmitClick}
-            className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-md transition-all duration-200 hover:shadow-lg font-semibold px-6 py-2"
+            disabled={!isOnline}
+            className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-md transition-all duration-200 hover:shadow-lg font-semibold px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Final Submit Exam
           </Button>
         </div>
         <div className="flex items-center gap-4">
+          {studentAuthData?.rollNumber && (
+             <div className="hidden lg:flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-lg border border-slate-200">
+                <span className="text-xs text-slate-500 font-medium uppercase">Roll:</span>
+                <span className="text-sm font-bold text-slate-700">{studentAuthData.rollNumber}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 ml-1 text-slate-400 hover:text-slate-600"
+                  onClick={() => window.location.reload()}
+                  title="Refresh Page"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                </Button>
+             </div>
+          )}
           <div className="flex items-center gap-2 bg-sky-100 px-3 py-1 rounded-lg">
             <Timer className="h-4 w-4 text-sky-600" />
             <span className={`font-mono font-semibold ${timeLeft < 600 ? "text-red-600" : "text-sky-700"}`}>
@@ -1229,10 +1592,31 @@ export default function Component() {
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          <Button variant="ghost" size="sm" className="hover:bg-sky-100 text-sky-600">
-            <Settings className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" className="hover:bg-sky-100 text-sky-600">
+          <div className="flex items-center justify-center w-10 h-8 rounded-lg bg-slate-50 border border-slate-200" title={!isOnline ? "Offline" : `Network Strength: ${networkStrength}/4${networkSpeed ? ` (${networkSpeed} Mbps)` : ''}`}>
+            {!isOnline ? (
+              <WifiOff className="h-5 w-5 text-red-500 animate-pulse" />
+            ) : (
+               <div className="relative w-5 h-4 flex items-end gap-0.5">
+                  <div className={`w-1 rounded-sm ${networkStrength >= 1 ? 'h-1 bg-green-500' : 'h-1 bg-gray-300'}`}></div>
+                  <div className={`w-1 rounded-sm ${networkStrength >= 2 ? 'h-2 bg-green-500' : 'h-2 bg-gray-300'}`}></div>
+                  <div className={`w-1 rounded-sm ${networkStrength >= 3 ? 'h-3 bg-green-500' : 'h-3 bg-gray-300'}`}></div>
+                  <div className={`w-1 rounded-sm ${networkStrength >= 4 ? 'h-4 bg-green-500' : 'h-4 bg-gray-300'}`}></div>
+               </div>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="hover:bg-sky-100 text-sky-600"
+            onClick={() => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {})
+                } else {
+                    if (document.exitFullscreen) document.exitFullscreen()
+                }
+            }}
+            title="Toggle Fullscreen"
+          >
             <Maximize2 className="h-4 w-4" />
           </Button>
         </div>
@@ -1286,6 +1670,34 @@ export default function Component() {
 
         {/* Main Content Area */}
         <div ref={containerRef} className="flex-1 flex relative overflow-hidden">
+          {!isOnline && (
+            <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-10 duration-300">
+              <div className="bg-white p-4 rounded-lg shadow-xl border border-red-200 max-w-sm flex items-start gap-4">
+                <div className="bg-red-100 p-2 rounded-full shrink-0 animate-pulse">
+                  <WifiOff className="h-5 w-5 text-red-600" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-slate-800 text-sm">Connection Lost</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    You are currently offline. Your progress is saved locally but cannot be submitted until connection is restored.
+                  </p>
+                  <div className="text-[10px] text-slate-400 pt-1 font-medium">
+                    Reconnecting...
+                  </div>
+                </div>
+                <button 
+                  onClick={() => {
+                    // Optional: Allow dismissing the popup temporarily? 
+                    // Or just keep it there as a persistent warning.
+                    // For now, let's not add a close button to ensure they see it.
+                  }}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  {/* <X className="h-4 w-4" /> */}
+                </button>
+              </div>
+            </div>
+          )}
           {currentSection && sectionSubmitted[currentSection.id] ? (
             <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-sky-50 to-white p-8">
               <div className="text-center space-y-4 max-w-md">
@@ -1560,6 +1972,7 @@ export default function Component() {
                     fontSizeClass={currentFontSizeClass}
                     isLocked={!!sectionSubmitted[currentSection?.id || ""]}
                     showSubmitButton={true}
+                    disableCopyPaste={true}
                   />
                 )}
               </div>
@@ -1606,255 +2019,4 @@ export default function Component() {
   }
 }
 
-function MCQQuestionPanel({ question, onReportProblem, fontSizeClass }: { question: LocalMcqQuestion; onReportProblem: () => void; fontSizeClass: string }) {
-  return (
-    <div className="p-6 space-y-6">
-      <div className="space-y-4">
-        {/* Removed Tabs */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-black">{question.title}</h1>
-            <Badge className="bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border-green-200 shadow-sm">
-              <Check className="h-3 w-3 mr-1" />
-            </Badge>
-          </div>
-          <Button variant="ghost" size="sm" onClick={onReportProblem} className="hover:bg-sky-100 text-sky-600 p-2" title="Report a problem">
-            <Info className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
 
-      <div className="space-y-6">
-        <Card className="border-sky-200 shadow-sm">
-          <CardContent className="p-6 bg-gradient-to-r from-sky-50 to-blue-50">
-            <RichTextPreview content={question.question} className={cn("text-lg text-black leading-relaxed", fontSizeClass)} />
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  )
-}
-
-function MCQAnswerPanel({ question, onAnswerChange, onClearSelection, fontSizeClass, isSectionSubmitted, onQuestionSubmit }: { question: LocalMcqQuestion; onAnswerChange: (answer: string) => void; onClearSelection: () => void; fontSizeClass: string; isSectionSubmitted: boolean; onQuestionSubmit: (question: LocalMcqQuestion) => void }) {
-  const isQuestionLocked = isSectionSubmitted
-  return (
-    <>
-      <div className="p-6 border-b border-sky-200 bg-gradient-to-r from-sky-50 to-white" />
-
-      <div className="flex-1 p-6 overflow-auto">
-        <RadioGroup value={question.userAnswer || ""} onValueChange={onAnswerChange} className="space-y-4" disabled={isQuestionLocked}>
-          {question.options?.map((option) => (
-            <Label 
-              key={option.id} 
-              htmlFor={option.id} 
-              className={`flex items-center space-x-3 p-4 rounded-lg border-2 border-sky-200 transition-all duration-200 ${isQuestionLocked ? "opacity-70 cursor-not-allowed" : "cursor-pointer hover:bg-sky-50 hover:border-sky-300"}`}
-            >
-              <RadioGroupItem value={option.id} id={option.id} className="text-sky-600" disabled={isQuestionLocked} />
-              <span className={cn("flex-1 font-mono text-base text-black", fontSizeClass)}>
-                {option.text}
-              </span>
-            </Label>
-          ))}
-        </RadioGroup>
-      </div>
-
-      <div className="p-6 border-t border-sky-200 bg-gradient-to-r from-sky-50 to-white">
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={onClearSelection} className="text-sky-600 hover:text-sky-700 hover:bg-sky-100" disabled={!question.userAnswer || isQuestionLocked}>
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Clear selection
-          </Button>
-          <Button onClick={() => onQuestionSubmit(question)} disabled={!question.userAnswer || isQuestionLocked} className="bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white shadow-md transition-all duration-200 hover:shadow-lg font-semibold">
-            <Send className="h-4 w-4 mr-2" />
-            Submit
-          </Button>
-        </div>
-      </div>
-    </>
-  )
-}
-
-function CodingQuestionPanel({ question, onReportProblem, fontSizeClass }: { question: LocalCodingQuestion; onReportProblem: () => void; fontSizeClass: string }) {
-  return (
-    <div className="p-6 space-y-6">
-      <div className="space-y-4">
-        {/* Removed Tabs */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-black">{question.title}</h1>
-            <Badge className="bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border-green-200 shadow-sm">
-              <Check className="h-3 w-3 mr-1" />
-            </Badge>
-          </div>
-          <Button variant="ghost" size="sm" onClick={onReportProblem} className="hover:bg-sky-100 text-sky-600 p-2" title="Report a problem">
-            <Info className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        <Card className="border-sky-200 shadow-sm">
-          <CardContent className="p-6 bg-gradient-to-r from-sky-50 to-blue-50">
-            <RichTextPreview content={question.question} className={cn("text-lg text-black leading-relaxed", fontSizeClass)} />
-          </CardContent>
-        </Card>
-        {/* Stubbed meta/help sections can be enhanced with real data later */}
-        <div className={cn("space-y-3 text-black", fontSizeClass)}>
-          <div>
-            <span className="font-semibold text-black">Expected Time Complexity:</span> —
-          </div>
-          <div>
-            <span className="font-semibold text-black">Input Format:</span>
-          </div>
-        </div>
-
-        <Card className="border-sky-200 shadow-sm">
-          <CardContent className="p-4 bg-gradient-to-r from-sky-50 to-blue-50">
-            <div className={cn("text-sm space-y-1 text-black", fontSizeClass)}>
-              <div>Provide input as required by the problem statement.</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  )
-}
-
-function ExamInstructions({ onStart }: { onStart: () => Promise<void> }) {
-  const [isStarting, setIsStarting] = useState(false)
-  
-  const handleStart = async () => {
-    try {
-      logger.log('📋 Instructions: Start button clicked')
-      setIsStarting(true)
-      await onStart()
-      logger.log('📋 Instructions: onStart completed successfully')
-      // Don't reset isStarting here - the component will unmount when exam starts
-    } catch (error) {
-      logger.error('❌ Instructions: Error during start:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      alert(`Failed to start exam: ${errorMessage}`)
-      setIsStarting(false)
-    }
-  }
-  
-  return (
-    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 to-white p-4">
-      <Card className="max-w-2xl w-full border-sky-200 shadow-lg">
-        <CardContent className="p-8">
-          <div className="text-center mb-8">
-            <BookOpen className="h-12 w-12 text-sky-600 mx-auto mb-4" />
-            <h1 className="text-3xl font-bold text-sky-900 mb-2">Programming Exam</h1>
-            <p className="text-sky-700">Please read the instructions carefully before starting</p>
-          </div>
-
-          <div className="space-y-6 text-black">
-            <div>
-              <h3 className="font-semibold text-lg mb-3 text-sky-800">Exam Structure</h3>
-              <ul className="space-y-2 text-sm">
-                <li>• Use the sidebar to navigate between sections and questions</li>
-                <li>• Your answers are automatically saved</li>
-                <li>• For coding questions, select your preferred programming language</li>
-                <li>• Submit sections when done, then final submit</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="mt-8 text-center">
-            <Button 
-              onClick={handleStart} 
-              disabled={isStarting}
-              size="lg" 
-              className="bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white font-semibold px-8 py-3 disabled:opacity-50"
-            >
-              {isStarting ? (
-                <>
-                  <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full inline-block" />
-                  Starting...
-                </>
-              ) : (
-                'Start Exam'
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-function SubmitDialog({ questions, onConfirm, onCancel, title, message, requireVerification = false }: { questions: DialogQuestionSummary[]; onConfirm: (isVerified: boolean) => void; onCancel: () => void; title: string; message: string; requireVerification?: boolean }) {
-  const answeredCount = questions.filter((q) => q.status === "answered" || q.status === "submitted").length
-  const totalQuestions = questions.length
-
-  const [verificationCode, setVerificationCode] = useState<string>("")
-  const [enteredCode, setEnteredCode] = useState<string>("")
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (requireVerification) {
-      const code = Math.floor(1000 + Math.random() * 9000).toString()
-      setVerificationCode(code)
-      setEnteredCode("")
-      setError(null)
-    }
-  }, [requireVerification])
-
-  const handleConfirmClick = () => {
-    if (requireVerification) {
-      if (enteredCode === verificationCode) onConfirm(true)
-      else setError("Incorrect code. Please try again.")
-    } else {
-      onConfirm(true)
-    }
-  }
-
-  const isConfirmButtonDisabled = requireVerification && enteredCode !== verificationCode
-
-  return (
-    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 to-white p-4">
-      <Card className="max-w-md w-full border-sky-200 shadow-lg">
-        <CardContent className="p-6">
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-bold text-black mb-2">{title}</h2>
-            <p className="text-slate-600">{message}</p>
-          </div>
-
-          <div className="space-y-3 mb-6">
-            <div className="flex justify-between text-sm"><span>Total Questions:</span><span className="font-semibold">{totalQuestions}</span></div>
-            <div className="flex justify-between text-sm"><span>Answered:</span><span className="font-semibold text-green-600">{answeredCount}</span></div>
-            <div className="flex justify-between text-sm"><span>Unanswered:</span><span className="font-semibold text-red-600">{totalQuestions - answeredCount}</span></div>
-          </div>
-
-          {requireVerification && (
-            <div className="space-y-3 mb-6">
-              <p className="text-center text-sm text-black">
-                To confirm, please enter the following code:{" "}
-                <span className="font-bold text-lg text-sky-700">{verificationCode}</span>
-              </p>
-              <Input
-                type="text"
-                placeholder="Enter code"
-                value={enteredCode}
-                onChange={(e) => {
-                  setEnteredCode(e.target.value)
-                  setError(null)
-                }}
-                className={`w-full text-center text-lg font-mono ${error ? "border-red-500" : "border-sky-200"}`}
-                maxLength={4}
-              />
-              {error && <p className="text-red-500 text-sm text-center mt-1">{error}</p>}
-            </div>
-          )}
-
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={onCancel} className="flex-1">Go Back</Button>
-            <Button onClick={handleConfirmClick} disabled={isConfirmButtonDisabled} className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white">
-              Confirm Submit
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}

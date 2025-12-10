@@ -21,15 +21,17 @@ interface MonitoringStatusProps {
   isVM: boolean
   appVersion?: string | null
   maxTabSwitches?: number
+  mode?: 'electron' | 'browser'
 }
 
 export function MonitoringStatus({
   metrics,
   isElectronApp,
   isVM,
-  maxTabSwitches = 3
+  maxTabSwitches = 3,
+  mode = 'electron'
 }: MonitoringStatusProps) {
-  if (!isElectronApp) {
+  if (mode === 'electron' && !isElectronApp) {
     return null
   }
 
@@ -39,38 +41,19 @@ export function MonitoringStatus({
 
   return (
     <div className="flex items-center gap-3">
-      {/* Tab Switches Monitor - Show In/Out separately without limit */}
-      <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border shadow-sm">
-        <Activity className={cn(
-          "h-4 w-4",
-          isOverLimit ? "text-red-600" : isWarning ? "text-orange-600" : "text-sky-600"
-        )} />
-        <span className="text-xs text-slate-600">Tab Switch</span>
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-slate-600">Out:</span>
-          <Badge 
-            variant={isOverLimit ? "destructive" : isWarning ? "secondary" : "outline"}
-            className={cn(
-              "text-xs font-semibold",
-              isOverLimit && "bg-red-600 text-white",
-              isWarning && "bg-orange-500 text-white"
-            )}
-          >
-            {metrics.tabSwitchesOut}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-slate-600">In:</span>
-          <Badge 
-            variant="outline"
-            className="text-xs font-semibold"
-          >
-            {metrics.tabSwitchesIn}
-          </Badge>
-        </div>
-        {isOverLimit && (
-          <AlertTriangle className="h-4 w-4 text-red-600 animate-pulse" />
-        )}
+      {/* Tab Switches Monitor - Simplified View */}
+      <div className="flex items-center gap-2 bg-white text-slate-700 px-3 py-1.5 rounded-md shadow-sm border border-slate-200">
+        <span className="text-sm font-medium">Window</span>
+        <span className="text-sm text-slate-400">(</span>
+        <span className="text-sm text-green-600">In: {metrics.tabSwitchesIn}</span>
+        <span className="text-sm text-slate-300">|</span>
+        <span className={cn(
+          "text-sm",
+          isOverLimit ? "text-red-600 font-bold" : isWarning ? "text-orange-500" : "text-red-500"
+        )}>
+          Out: {metrics.tabSwitchesOut}
+        </span>
+        <span className="text-sm text-slate-400">)</span>
       </div>
 
       {/* VM Detection Badge */}

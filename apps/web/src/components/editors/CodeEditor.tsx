@@ -30,6 +30,7 @@ interface CodeEditorProps {
   onRun?: () => void
   onReset?: () => void
   isRunning?: boolean
+  disableCopyPaste?: boolean
 }
 
 const defaultSupportedLanguages = [
@@ -159,7 +160,8 @@ export function CodeEditor({
   supportedLanguages = defaultSupportedLanguages.map(lang => lang.value),
   onRun,
   onReset,
-  isRunning = false
+  isRunning = false,
+  disableCopyPaste = false
 }: CodeEditorProps) {
   const editorRef = useRef<any>(null)
   const [mounted, setMounted] = useState(false)
@@ -186,8 +188,28 @@ export function CodeEditor({
       automaticLayout: true,
       suggest: {
         insertMode: 'replace'
-      }
+      },
+      contextmenu: !disableCopyPaste,
     })
+
+    if (disableCopyPaste) {
+      editor.onKeyDown((e: any) => {
+        const { keyCode, ctrlKey, metaKey } = e;
+        if ((ctrlKey || metaKey) && (keyCode === monaco.KeyCode.KeyC || keyCode === monaco.KeyCode.KeyV || keyCode === monaco.KeyCode.KeyX)) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      });
+      
+      // Disable selection context menu and copy/paste via DOM events on the container
+      const domNode = editor.getDomNode();
+      if (domNode) {
+        domNode.addEventListener('contextmenu', (e: any) => e.preventDefault());
+        domNode.addEventListener('copy', (e: any) => e.preventDefault());
+        domNode.addEventListener('paste', (e: any) => e.preventDefault());
+        domNode.addEventListener('cut', (e: any) => e.preventDefault());
+      }
+    }
 
     // Add custom keyboard shortcuts
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR, () => {

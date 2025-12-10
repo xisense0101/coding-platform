@@ -54,6 +54,8 @@ interface Exam {
     full_name: string
   }
   exam_sections: ExamSection[]
+  allowed_ip?: string
+  invite_token?: string
 }
 
 interface ExamSection {
@@ -377,36 +379,80 @@ export default function ExamDetailPage({ params }: { params: { examId: string } 
         </div>
 
         {/* Exam URL Card */}
-        <Card className="mb-8 border-blue-200 bg-gradient-to-br from-blue-50 to-white">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-blue-900">
-              <Globe className="w-5 h-5" />
-              Exam URL
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-3 p-4 bg-white border border-blue-200 rounded-lg">
-              <code className="flex-1 text-sm font-mono text-blue-700 break-all">{examUrl}</code>
-              <button
-                onClick={copyExamUrl}
-                className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex items-center gap-2 shrink-0"
-              >
-                <Copy className="w-4 h-4" />
-                {copySuccess ? 'Copied!' : 'Copy'}
-              </button>
-              <button
-                onClick={openExamUrl}
-                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shrink-0"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Open
-              </button>
-            </div>
-            <p className="text-sm text-gray-600 mt-3">
-              Share this URL with students to allow them to access the exam. {exam.is_published ? 'The exam is currently published and accessible.' : 'Publish the exam to make it accessible to students.'}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-blue-900">
+                <Globe className="w-5 h-5" />
+                Public Exam URL
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3 p-4 bg-white border border-blue-200 rounded-lg">
+                <code className="flex-1 text-sm font-mono text-blue-700 break-all">{examUrl}</code>
+                <button
+                  onClick={copyExamUrl}
+                  className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex items-center gap-2 shrink-0"
+                >
+                  <Copy className="w-4 h-4" />
+                  {copySuccess ? 'Copied!' : 'Copy'}
+                </button>
+                <button
+                  onClick={openExamUrl}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shrink-0"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Open
+                </button>
+              </div>
+              {exam.allowed_ip && (
+                <div className="mt-4 flex items-center gap-2 text-sm text-blue-800 bg-blue-100/50 p-2 rounded">
+                  <Lock className="w-4 h-4" />
+                  <span>Restricted to IP: <span className="font-mono font-bold">{exam.allowed_ip}</span></span>
+                </div>
+              )}
+              <p className="text-sm text-gray-600 mt-3">
+                Share this URL with students to allow them to access the exam. {exam.is_published ? 'The exam is currently published and accessible.' : 'Publish the exam to make it accessible to students.'}
+              </p>
+            </CardContent>
+          </Card>
+
+          {exam.invite_token && (
+            <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-purple-900">
+                  <Users className="w-5 h-5" />
+                  Invite Link
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-3 p-4 bg-white border border-purple-200 rounded-lg">
+                  <code className="flex-1 text-sm font-mono text-purple-700 break-all">
+                    {typeof window !== 'undefined' ? window.location.origin : ''}/invite/{exam.invite_token}
+                  </code>
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/invite/${exam.invite_token}`
+                      navigator.clipboard.writeText(url)
+                      alert('Invite link copied!')
+                    }}
+                    className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors flex items-center gap-2 shrink-0"
+                  >
+                    <Copy className="w-4 h-4" />
+                    Copy
+                  </button>
+                </div>
+                <div className="mt-4 flex items-center gap-2 text-sm text-purple-800 bg-purple-100/50 p-2 rounded">
+                  <Clock className="w-4 h-4" />
+                  <span>Waiting room enabled (30 min before start)</span>
+                </div>
+                <p className="text-sm text-gray-600 mt-3">
+                  Students using this link will see a countdown until the exam starts.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
         {/* Tabs Section */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
