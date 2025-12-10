@@ -25,18 +25,18 @@ export function ExamInstructions({ onStart }: { onStart: () => Promise<void> }) 
   }
   
   return (
-    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 to-white p-4">
-      <Card className="max-w-2xl w-full border-sky-200 shadow-lg">
+    <div className="h-screen flex items-center justify-center bg-gray-50 p-4">
+      <Card className="max-w-2xl w-full border-gray-200 shadow-lg bg-white">
         <CardContent className="p-8">
           <div className="text-center mb-8">
             <BookOpen className="h-12 w-12 text-sky-600 mx-auto mb-4" />
-            <h1 className="text-3xl font-bold text-sky-900 mb-2">Programming Exam</h1>
-            <p className="text-sky-700">Please read the instructions carefully before starting</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Programming Exam</h1>
+            <p className="text-gray-600">Please read the instructions carefully before starting</p>
           </div>
 
-          <div className="space-y-6 text-black">
+          <div className="space-y-6 text-gray-800">
             <div>
-              <h3 className="font-semibold text-lg mb-3 text-sky-800">Exam Structure</h3>
+              <h3 className="font-semibold text-lg mb-3 text-gray-900">Exam Structure</h3>
               <ul className="space-y-2 text-sm">
                 <li>• Use the sidebar to navigate between sections and questions</li>
                 <li>• Your answers are automatically saved</li>
@@ -51,7 +51,7 @@ export function ExamInstructions({ onStart }: { onStart: () => Promise<void> }) 
               onClick={handleStart} 
               disabled={isStarting}
               size="lg" 
-              className="bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white font-semibold px-8 py-3 disabled:opacity-50"
+              className="bg-sky-600 hover:bg-sky-700 text-white font-semibold px-8 py-3 disabled:opacity-50 shadow-md"
             >
               {isStarting ? (
                 <>

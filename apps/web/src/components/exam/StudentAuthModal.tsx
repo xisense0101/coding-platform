@@ -169,16 +169,16 @@ export default function StudentAuthModal({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-6xl">
         {/* Main Card with Two Columns */}
-        <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-xl overflow-hidden">
+        <Card className="border border-gray-200 shadow-lg bg-white overflow-hidden">
           <div className="grid grid-cols-1 lg:grid-cols-2">
             {/* Left Side - Login Form */}
             <CardContent className="p-8 md:p-12">
               <div className="mb-8">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl shadow-lg mb-4">
-                  <GraduationCap className="w-8 h-8 text-white" />
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-2xl mb-4">
+                  <GraduationCap className="w-8 h-8 text-indigo-600" />
                 </div>
                 <h2 className="text-3xl font-bold text-gray-900 mb-2">
                   Student Login
@@ -293,7 +293,7 @@ export default function StudentAuthModal({
                   {/* Password */}
                   <div className="space-y-2">
                     <Label htmlFor="password" className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                      <Lock className="w-4 h-4 text-purple-600" />
+                      <Lock className="w-4 h-4 text-indigo-600" />
                       Password
                     </Label>
                     <Input
@@ -302,7 +302,7 @@ export default function StudentAuthModal({
                       value={formData.password}
                       onChange={(e) => handleChange('password', e.target.value)}
                       className={cn(
-                        "h-10 border-gray-300 focus:border-purple-500 focus:ring-purple-500",
+                        "h-10 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500",
                         errors.password && 'border-red-500 focus:border-red-500 focus:ring-red-500'
                       )}
                     />
@@ -317,7 +317,7 @@ export default function StudentAuthModal({
                   {/* Test Code */}
                   <div className="space-y-2">
                     <Label htmlFor="testCode" className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                      <KeyRound className="w-4 h-4 text-purple-600" />
+                      <KeyRound className="w-4 h-4 text-indigo-600" />
                       Test Code
                     </Label>
                     <Input
@@ -326,7 +326,7 @@ export default function StudentAuthModal({
                       value={formData.testCode}
                       onChange={(e) => handleChange('testCode', e.target.value.toUpperCase())}
                       className={cn(
-                        "h-10 font-mono tracking-wider uppercase border-gray-300 focus:border-purple-500 focus:ring-purple-500",
+                        "h-10 font-mono tracking-wider uppercase border-gray-300 focus:border-indigo-500 focus:ring-indigo-500",
                         errors.testCode && 'border-red-500 focus:border-red-500 focus:ring-red-500'
                       )}
                     />
@@ -342,7 +342,7 @@ export default function StudentAuthModal({
                 {/* Submit Button */}
                 <Button
                   type="submit"
-                  className="w-full h-11 text-base font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="w-full h-11 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all duration-200"
                   disabled={isValidating}
                 >
                   {isValidating ? (
@@ -361,10 +361,10 @@ export default function StudentAuthModal({
             </CardContent>
 
             {/* Right Side - Exam Details */}
-            <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 p-8 md:p-12 text-white flex flex-col justify-center">
+            <div className="bg-indigo-600 p-8 md:p-12 text-white flex flex-col justify-center">
               <div className="space-y-6">
                 <div>
-                  <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full mb-4">
+                  <div className="inline-flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full mb-4">
                     <Shield className="w-4 h-4" />
                     <span className="text-sm font-medium">Secure Exam Portal</span>
                   </div>
@@ -378,7 +378,7 @@ export default function StudentAuthModal({
 
                 <div className="space-y-4 pt-6">
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
                       <Lock className="w-5 h-5" />
                     </div>
                     <div>
@@ -390,7 +390,7 @@ export default function StudentAuthModal({
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
                       <Shield className="w-5 h-5" />
                     </div>
                     <div>
@@ -402,7 +402,7 @@ export default function StudentAuthModal({
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
                       <Info className="w-5 h-5" />
                     </div>
                     <div>
