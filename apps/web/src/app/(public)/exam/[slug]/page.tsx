@@ -162,6 +162,7 @@ export default function Component() {
   const [isResizing, setIsResizing] = useState(false)
   const [isResizingVertical, setIsResizingVertical] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
   const [currentFontSizeIndex, setCurrentFontSizeIndex] = useState(2)
 
   // Exam runtime state
@@ -1573,7 +1574,6 @@ export default function Component() {
               className="hover:bg-sky-100 text-sky-600" 
               onClick={() => {
                 decreaseFontSize()
-                handleZoomChange(-10)
               }} 
               disabled={currentFontSizeIndex === 0}
             >
@@ -1585,7 +1585,6 @@ export default function Component() {
               className="hover:bg-sky-100 text-sky-600" 
               onClick={() => {
                 increaseFontSize()
-                handleZoomChange(10)
               }} 
               disabled={currentFontSizeIndex === FONT_SIZES.length - 1}
             >
@@ -1630,37 +1629,47 @@ export default function Component() {
               {uiSections.map((s, sIdx) => {
                 const locked = !unlockedSections[s.id]
                 const submitted = !!sectionSubmitted[s.id]
+                const isCollapsed = collapsedSections[s.id]
                 return (
-                  <div key={s.id} className="relative">
-                    <div className="text-xs font-semibold text-sky-800 mb-2 px-1 py-1 bg-blue-100 rounded text-center">
-                      {s.title}
+                  <div key={s.id} className="relative pb-2">
+                    <div 
+                      className="text-xs font-semibold text-sky-800 mb-2 px-1 py-1 bg-blue-100 rounded cursor-pointer hover:bg-blue-200 select-none flex items-center justify-between gap-1"
+                      onClick={() => setCollapsedSections(prev => ({ ...prev, [s.id]: !prev[s.id] }))}
+                    >
+                      <span className="truncate flex-1 text-center">{s.title}</span>
+                      {isCollapsed ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronUp className="h-3 w-3 shrink-0" />}
                     </div>
-                    {(locked || submitted) && (
-                      <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                        <div className="bg-sky-100 p-2 rounded-full flex items-center justify-center shadow-md">
-                          <Lock className="h-4 w-4 text-sky-600" />
+                    
+                    {!isCollapsed && (
+                      <>
+                        {(locked || submitted) && (
+                          <div className="absolute inset-0 top-8 flex items-center justify-center z-10 pointer-events-none">
+                            <div className="bg-sky-100 p-2 rounded-full flex items-center justify-center shadow-md">
+                              <Lock className="h-4 w-4 text-sky-600" />
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex flex-col gap-1.5 items-center">
+                          {s.questions.map((q, qIdx) => {
+                            const st = answers[q.id]?.status || "unanswered"
+                            const isActive = currentSectionIdx === sIdx && currentQuestionIdx === qIdx
+                            const color = st === "submitted" ? "bg-green-600 text-white" : st === "answered" ? "bg-sky-600 text-white" : "bg-slate-200 text-slate-700"
+                            const isDisabled = locked || submitted
+                            return (
+                              <button
+                                key={q.id}
+                                onClick={() => navigateToQuestion(sIdx, qIdx)}
+                                disabled={isDisabled}
+                                className={cn("w-10 h-7 rounded text-xs font-semibold grid place-items-center border", color, isActive && "ring-2 ring-offset-1 ring-sky-500", isDisabled && "opacity-60 cursor-not-allowed")}
+                                title={`${s.title} • Q${q.indexInSection}`}
+                              >
+                                {q.indexInSection}
+                              </button>
+                            )
+                          })}
                         </div>
-                      </div>
+                      </>
                     )}
-                    <div className="flex flex-col gap-1.5 items-center">
-                      {s.questions.map((q, qIdx) => {
-                        const st = answers[q.id]?.status || "unanswered"
-                        const isActive = currentSectionIdx === sIdx && currentQuestionIdx === qIdx
-                        const color = st === "submitted" ? "bg-green-600 text-white" : st === "answered" ? "bg-sky-600 text-white" : "bg-slate-200 text-slate-700"
-                        const isDisabled = locked || submitted
-                        return (
-                          <button
-                            key={q.id}
-                            onClick={() => navigateToQuestion(sIdx, qIdx)}
-                            disabled={isDisabled}
-                            className={cn("w-10 h-7 rounded text-xs font-semibold grid place-items-center border", color, isActive && "ring-2 ring-offset-1 ring-sky-500", isDisabled && "opacity-60 cursor-not-allowed")}
-                            title={`${s.title} • Q${q.indexInSection}`}
-                          >
-                            {q.indexInSection}
-                          </button>
-                        )
-                      })}
-                    </div>
                   </div>
                 )
               })}
