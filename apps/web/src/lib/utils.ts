@@ -315,3 +315,23 @@ export function getStatusColor(status: string): string {
       return 'text-gray-600 bg-gray-100'
   }
 }
+
+export function getRootUrl() {
+  if (typeof window === 'undefined') return ''
+  const host = window.location.hostname
+  const protocol = window.location.protocol
+  const port = window.location.port
+
+  if (host === 'localhost' || host.startsWith('127.0.0.1')) {
+    return window.location.origin
+  }
+
+  const parts = host.split('.')
+  if (parts.length > 2) {
+    const rootDomain = parts.slice(-2).join('.')
+    return `${protocol}//${rootDomain}${port ? `:${port}` : ''}`
+  }
+  
+  return window.location.origin
+}
+

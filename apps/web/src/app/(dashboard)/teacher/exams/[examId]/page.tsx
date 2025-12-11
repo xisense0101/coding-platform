@@ -35,6 +35,7 @@ import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 
 import { logger } from '@/lib/utils/logger'
+import { getRootUrl } from '@/lib/utils'
 
 interface Exam {
   id: string
@@ -138,9 +139,10 @@ export default function ExamDetailPage({ params }: { params: { examId: string } 
     }
   }
 
+
   const copyExamUrl = () => {
     if (exam?.slug) {
-      const fullUrl = `${window.location.origin}/exam/${exam.slug}`
+      const fullUrl = `${getRootUrl()}/exam/${exam.slug}`
       navigator.clipboard.writeText(fullUrl)
       setCopySuccess(true)
       setTimeout(() => setCopySuccess(false), 2000)
@@ -149,7 +151,7 @@ export default function ExamDetailPage({ params }: { params: { examId: string } 
 
   const openExamUrl = () => {
     if (exam?.slug) {
-      const fullUrl = `${window.location.origin}/exam/${exam.slug}`
+      const fullUrl = `${getRootUrl()}/exam/${exam.slug}`
       window.open(fullUrl, '_blank')
     }
   }
@@ -211,7 +213,7 @@ export default function ExamDetailPage({ params }: { params: { examId: string } 
   const isUpcoming = startDate > now
   const isActive = now >= startDate && now <= endDate
   const isEnded = now > endDate
-  const examUrl = `${window.location.origin}/exam/${exam.slug}`
+  const examUrl = `${getRootUrl()}/exam/${exam.slug}`
 
   const getStatusInfo = () => {
     if (isActive) return { label: 'Active Now', color: 'bg-green-100 text-green-700 border-green-200', icon: Activity }
@@ -428,11 +430,11 @@ export default function ExamDetailPage({ params }: { params: { examId: string } 
               <CardContent>
                 <div className="flex items-center gap-3 p-4 bg-white border border-purple-200 rounded-lg">
                   <code className="flex-1 text-sm font-mono text-purple-700 break-all">
-                    {typeof window !== 'undefined' ? window.location.origin : ''}/invite/{exam.invite_token}
+                    {getRootUrl()}/invite/{exam.invite_token}
                   </code>
                   <button
                     onClick={() => {
-                      const url = `${window.location.origin}/invite/${exam.invite_token}`
+                      const url = `${getRootUrl()}/invite/${exam.invite_token}`
                       navigator.clipboard.writeText(url)
                       alert('Invite link copied!')
                     }}
