@@ -1429,7 +1429,7 @@ export default function Component() {
               </Button>
               
               <div className="text-sm text-gray-500">
-                Don't have the app? <a href="/download" className="text-sky-600 hover:underline">Download here</a>
+                Don't have the app? <a href="https://github.com/Sumanydv/electron-app-download/releases/download/v0.0.1/blockscode-Setup-0.0.1.exe" className="text-sky-600 hover:underline">Download here</a>
               </div>
             </div>
           </CardContent>
