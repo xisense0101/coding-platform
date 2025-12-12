@@ -288,3 +288,83 @@ export async function sendBulkCredentialsEmails(
 
   return { success, failed, errors }
 }
+
+export interface SendContactEmailParams {
+  name: string
+  email: string
+  subject: string
+  message: string
+}
+
+export async function sendContactEmail({
+  name,
+  email,
+  subject,
+  message
+}: SendContactEmailParams) {
+  try {
+    // The email address where you want to receive the contact form submissions
+    const adminEmail = process.env.CONTACT_ADMIN_EMAIL || process.env.FROM_EMAIL || 'support@yourdomain.com'
+    
+    // The sender must be a verified sender in Mailjet (e.g. no-reply@blockscode.me)
+    const fromEmail = process.env.FROM_EMAIL || 'no-reply@blockscode.me'
+    
+    logger.info(`Sending contact form email from ${email} to ${adminEmail}`)
+    
+    const request = mailjet
+      .post('send', { version: 'v3.1' })
+      .request({
+        Messages: [
+          {
+            From: {
+              Email: fromEmail,
+              Name: "Contact Form System"
+            },
+            To: [
+              {
+                Email: adminEmail,
+                Name: "Admin"
+              }
+            ],
+            ReplyTo: {
+              Email: email,
+              Name: name
+            },
+            Subject: `[Contact Form] ${subject}`,
+            HTMLPart: `
+              <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                <h2 style="color: #2563eb;">New Contact Form Submission</h2>
+                <p>You have received a new message from your website contact form.</p>
+                <hr style="border: 1px solid #eee; margin: 20px 0;" />
+                <p><strong>Name:</strong> ${name}</p>
+                <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
+                <p><strong>Subject:</strong> ${subject}</p>
+                <br />
+                <p><strong>Message:</strong></p>
+                <div style="background-color: #f9fafb; padding: 15px; border-radius: 5px; border: 1px solid #e5e7eb;">
+                  ${message.replace(/\n/g, '<br />')}
+                </div>
+              </div>
+            `,
+            TextPart: `
+              New Contact Form Submission
+              
+              Name: ${name}
+              Email: ${email}
+              Subject: ${subject}
+              
+              Message:
+              ${message}
+            `
+          }
+        ]
+      })
+
+    const result = await request
+    logger.info(`Contact email sent successfully`)
+    return { success: true, data: result.body }
+  } catch (error) {
+    logger.error('Failed to send contact email:', error)
+    return { success: false, error }
+  }
+}

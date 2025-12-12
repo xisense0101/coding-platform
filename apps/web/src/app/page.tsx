@@ -210,8 +210,13 @@ function SlideOne() {
             secure, immersive learning experiences.
           </motion.p>
 
-          {/* Login Button */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}>
+          {/* Buttons */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            transition={{ delay: 0.8 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          >
             <motion.a
               href="/auth/login"
               className="inline-flex items-center gap-2 px-6 sm:px-10 py-3 sm:py-4 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all shadow-xl hover:shadow-2xl text-sm sm:text-base"
@@ -223,6 +228,19 @@ function SlideOne() {
             >
               <LogIn className="w-4 h-4 sm:w-5 sm:h-5" />
               Login to Platform
+            </motion.a>
+
+            <motion.a
+              href="/contact"
+              className="inline-flex items-center gap-2 px-6 sm:px-10 py-3 sm:py-4 bg-white text-blue-600 border-2 border-blue-600 rounded-full hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl text-sm sm:text-base"
+              whileHover={{
+                scale: 1.05,
+                boxShadow: "0 20px 60px rgba(59, 130, 246, 0.2)",
+              }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Mail className="w-4 h-4 sm:w-5 sm:h-5" />
+              Contact Us
             </motion.a>
           </motion.div>
         </motion.div>
@@ -840,7 +858,7 @@ function SlideThree() {
                 <p className="text-gray-400 text-xs">&copy; 2025 BlocksCode</p>
 
                 <motion.a
-                  href="#"
+                  href="/contact"
                   className="w-8 h-8 sm:w-9 sm:h-9 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50 transition-all shadow-sm"
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
