@@ -89,15 +89,32 @@ export async function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
   const hostname = request.headers.get('host') || ''
   
+  // Get client IP
+  const clientIp = request.ip || request.headers.get('x-forwarded-for')?.split(',')[0] || '127.0.0.1'
+  
   // Skip middleware for static files and API routes
-  if (pathname.startsWith('/_next') || pathname.startsWith('/api') || pathname.startsWith('/favicon')) {
+  if (pathname.startsWith('/_next') || pathname.startsWith('/favicon')) {
     return NextResponse.next()
   }
   
+  // For API routes, we only want to inject the client IP and skip other checks
+  if (pathname.startsWith('/api')) {
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-client-ip', clientIp)
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    })
+  }
+  
   // Create a response object that we can modify
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-client-ip', clientIp)
+
   let response = NextResponse.next({
     request: {
-      headers: request.headers,
+      headers: requestHeaders,
     },
   })
 

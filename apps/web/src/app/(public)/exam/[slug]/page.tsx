@@ -19,8 +19,10 @@ export default async function ExamPage({ params }: { params: { slug: string } })
     const forwardedFor = headersList.get('x-forwarded-for')
     const realIp = headersList.get('x-real-ip')
     const cfConnectingIp = headersList.get('cf-connecting-ip')
+    const middlewareIp = headersList.get('x-client-ip')
     
-    let clientIp = forwardedFor?.split(',')[0]?.trim() || 
+    let clientIp = middlewareIp || 
+                   forwardedFor?.split(',')[0]?.trim() || 
                    cfConnectingIp || 
                    realIp || 
                    'unknown'

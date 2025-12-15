@@ -78,11 +78,14 @@ export async function GET(
 
     // Check IP Restriction
     if (exam.allowed_ip) {
-      const forwardedFor = request.headers.get('x-forwarded-for')
-      const realIp = request.headers.get('x-real-ip')
-      const cfConnectingIp = request.headers.get('cf-connecting-ip')
+      const headersList = request.headers
+      const forwardedFor = headersList.get('x-forwarded-for')
+      const realIp = headersList.get('x-real-ip')
+      const cfConnectingIp = headersList.get('cf-connecting-ip')
+      const middlewareIp = headersList.get('x-client-ip')
       
-      let clientIp = forwardedFor?.split(',')[0]?.trim() || 
+      let clientIp = middlewareIp || 
+                     forwardedFor?.split(',')[0]?.trim() || 
                      cfConnectingIp || 
                      realIp || 
                      request.ip || 
@@ -93,10 +96,30 @@ export async function GET(
         clientIp = '127.0.0.1'
       }
 
+      // Fallback for local development if IP is unknown
+      if (clientIp === 'unknown' && process.env.NODE_ENV === 'development') {
+        clientIp = '127.0.0.1'
+      }
+
       // Split allowed IPs by comma and trim whitespace
       const allowedIps = exam.allowed_ip.split(',').map((ip: string) => ip.trim())
       
+      // DEBUG LOGS
+      console.log('--- EXAM IP VALIDATION ---')
+      console.log(`Exam Slug: ${params.slug}`)
+      console.log(`Detected Client IP: ${clientIp}`)
+      console.log(`Allowed IPs: ${JSON.stringify(allowedIps)}`)
+      console.log(`Match Found: ${allowedIps.includes(clientIp)}`)
+      console.log('--------------------------')
+
       if (clientIp && !allowedIps.includes(clientIp)) {
+        logger.warn(`IP restriction failed. Allowed: ${allowedIps.join(', ')}, Got: ${clientIp}`)
+        return NextResponse.json(
+          { error: `Access Denied: Your IP (${clientIp}) is not authorized. You must be connected to the specific exam Wifi network.` },
+          { status: 403, headers: { 'Access-Control-Allow-Origin': '*' } }
+        )
+      }
+    }
         logger.warn(`IP restriction failed. Allowed: ${allowedIps.join(', ')}, Got: ${clientIp}`)
         return NextResponse.json(
           { error: `Access Denied: Your IP (${clientIp}) is not authorized. You must be connected to the specific exam Wifi network.` },
