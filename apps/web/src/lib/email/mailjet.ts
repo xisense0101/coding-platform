@@ -296,6 +296,7 @@ export interface SendContactEmailParams {
   message: string
 }
 
+// mailjet
 export async function sendContactEmail({
   name,
   email,
