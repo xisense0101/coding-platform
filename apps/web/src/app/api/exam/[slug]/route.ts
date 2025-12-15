@@ -120,13 +120,6 @@ export async function GET(
         )
       }
     }
-        logger.warn(`IP restriction failed. Allowed: ${allowedIps.join(', ')}, Got: ${clientIp}`)
-        return NextResponse.json(
-          { error: `Access Denied: Your IP (${clientIp}) is not authorized. You must be connected to the specific exam Wifi network.` },
-          { status: 403, headers: { 'Access-Control-Allow-Origin': '*' } }
-        )
-      }
-    }
 
     // Count total questions
     const questionCount = exam.exam_sections.reduce(
