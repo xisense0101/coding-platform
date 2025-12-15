@@ -23,6 +23,7 @@ import { useTeacherCourses, useTeacherStats, useTeacherExams, useTeacherActivity
 import { useAuth } from '@/lib/auth/AuthContext'
 import { logger } from '@/lib/utils/logger'
 import { DashboardShell } from '@/components/layouts'
+import { StudentsSection } from '@/components/dashboard/teacher/StudentsSection'
 
 interface Course {
   id: string;
@@ -454,13 +455,7 @@ export default function TeacherDashboard() {
       )}
 
       {activeSection === 'students' && (
-        <div className="text-center py-20">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-            <Users className="w-8 h-8 text-gray-400" />
-          </div>
-          <h3 className="text-gray-900 text-xl mb-2">Student Management</h3>
-          <p className="text-gray-500">This section is under development.</p>
-        </div>
+        <StudentsSection />
       )}
     </DashboardShell>
   )
