@@ -36,6 +36,7 @@ export async function GET(
         is_published,
         strict_level,
         require_invite_token,
+        allowed_ip,
         exam_sections(
           id,
           exam_questions(id)
@@ -73,6 +74,35 @@ export async function GET(
         { error: 'Exam not published' },
         { status: 403 }
       )
+    }
+
+    // Check IP Restriction
+    if (exam.allowed_ip) {
+      const forwardedFor = request.headers.get('x-forwarded-for')
+      const realIp = request.headers.get('x-real-ip')
+      const cfConnectingIp = request.headers.get('cf-connecting-ip')
+      
+      let clientIp = forwardedFor?.split(',')[0]?.trim() || 
+                     cfConnectingIp || 
+                     realIp || 
+                     request.ip || 
+                     'unknown'
+      
+      // Normalize IPv6 localhost
+      if (clientIp === '::1' || clientIp === '::ffff:127.0.0.1') {
+        clientIp = '127.0.0.1'
+      }
+
+      // Split allowed IPs by comma and trim whitespace
+      const allowedIps = exam.allowed_ip.split(',').map((ip: string) => ip.trim())
+      
+      if (clientIp && !allowedIps.includes(clientIp)) {
+        logger.warn(`IP restriction failed. Allowed: ${allowedIps.join(', ')}, Got: ${clientIp}`)
+        return NextResponse.json(
+          { error: `Access Denied: Your IP (${clientIp}) is not authorized. You must be connected to the specific exam Wifi network.` },
+          { status: 403, headers: { 'Access-Control-Allow-Origin': '*' } }
+        )
+      }
     }
 
     // Count total questions

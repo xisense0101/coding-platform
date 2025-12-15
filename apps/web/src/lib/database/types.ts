@@ -641,6 +641,7 @@ export interface Database {
           allowed_users: string[]
           blocked_users: string[]
           ip_restrictions: string[]
+          allowed_ip: string | null
           security_settings: Json
           proctoring_enabled: boolean
           require_webcam: boolean
@@ -686,6 +687,7 @@ export interface Database {
           allowed_users?: string[]
           blocked_users?: string[]
           ip_restrictions?: string[]
+          allowed_ip?: string | null
           security_settings?: Json
           proctoring_enabled?: boolean
           require_webcam?: boolean
@@ -731,6 +733,7 @@ export interface Database {
           allowed_users?: string[]
           blocked_users?: string[]
           ip_restrictions?: string[]
+          allowed_ip?: string | null
           security_settings?: Json
           proctoring_enabled?: boolean
           require_webcam?: boolean

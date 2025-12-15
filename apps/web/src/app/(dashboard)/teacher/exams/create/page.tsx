@@ -889,10 +889,12 @@ function CreateExamPageContent() {
                       type="text"
                       value={allowedIp}
                       onChange={(e) => setAllowedIp(e.target.value)}
-                      placeholder="e.g., 192.168.1.1"
+                      placeholder="e.g., 192.168.1.1, 203.0.113.5"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Restrict exam access to a specific IP address (e.g., school wifi)
+                      Restrict exam access to specific Public IP addresses (comma separated).
+                      <br />
+                      Students must be connected to a network (e.g. School WiFi) with one of these IPs.
                     </p>
                   </div>
                   <div>
