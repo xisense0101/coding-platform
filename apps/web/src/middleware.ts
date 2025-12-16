@@ -32,8 +32,8 @@ setInterval(() => {
 
 // Helper function to extract subdomain from hostname
 function extractSubdomain(hostname: string): string | null {
-  // Handle localhost and IP addresses
-  if (hostname.includes('localhost') || /^\d+\.\d+\.\d+\.\d+/.test(hostname)) {
+  // Handle localhost, IP addresses, and ngrok tunnels
+  if (hostname.includes('localhost') || /^\d+\.\d+\.\d+\.\d+/.test(hostname) || hostname.includes('ngrok')) {
     return null
   }
   
@@ -141,7 +141,7 @@ export async function middleware(request: NextRequest) {
   let subdomain = extractSubdomain(hostname)
   
   // For local development: fallback to ?org= query parameter
-  if (!subdomain && (hostname.includes('localhost') || hostname.includes('127.0.0.1'))) {
+  if (!subdomain && (hostname.includes('localhost') || hostname.includes('127.0.0.1') || hostname.includes('ngrok'))) {
     subdomain = searchParams.get('org')
   }
   
