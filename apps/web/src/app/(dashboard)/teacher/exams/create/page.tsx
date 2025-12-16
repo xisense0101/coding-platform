@@ -15,7 +15,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { ArrowLeft, Save, Eye, Trash2, Settings, Plus, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
+import { ArrowLeft, Save, Eye, Trash2, Settings, Plus, ChevronDown, ChevronUp, Sparkles, Copy } from 'lucide-react'
+import { useToast } from "@/components/ui/use-toast"
 
 import { logger } from '@/lib/utils/logger'
 import { formatDateTimeLocal } from '@/lib/utils'
@@ -70,6 +71,31 @@ function CreateExamPageContent() {
   const [showPreview, setShowPreview] = useState(false)
   const [showAiModal, setShowAiModal] = useState(false)
   const [isExamInfoCollapsed, setIsExamInfoCollapsed] = useState(false)
+  const { toast } = useToast()
+
+  const handleCopyPublicIp = async () => {
+    try {
+      const response = await fetch("/api/public-ip");
+      const data = await response.json();
+      if (data.ip) {
+        await navigator.clipboard.writeText(data.ip);
+        toast({
+          title: "Public IP Copied",
+          description: `IP ${data.ip} copied to clipboard`,
+          duration: 2000,
+        });
+      } else {
+        throw new Error("No IP returned");
+      }
+    } catch (error) {
+      console.error("Failed to copy IP", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch public IP",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Load existing exam data if in edit mode
   useEffect(() => {
@@ -884,7 +910,19 @@ function CreateExamPageContent() {
                 <div className="space-y-3 pt-3 border-t">
                   <Label className="text-base font-semibold">Access Control</Label>
                   <div>
-                    <Label>Allowed IP Address (Optional)</Label>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>Allowed IP Address (Optional)</Label>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleCopyPublicIp}
+                        className="h-7 text-xs"
+                      >
+                        <Copy className="h-3 w-3 mr-1" />
+                        Copy My IP
+                      </Button>
+                    </div>
                     <Input
                       type="text"
                       value={allowedIp}
