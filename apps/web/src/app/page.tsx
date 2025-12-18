@@ -20,6 +20,8 @@ import {
   Smartphone,
   Apple,
   Chrome,
+  Info,
+  Monitor,
 } from "lucide-react"
 
 export default function App() {
@@ -211,9 +213,9 @@ function SlideOne() {
           </motion.p>
 
           {/* Buttons */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }} 
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.8 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
@@ -228,6 +230,19 @@ function SlideOne() {
             >
               <LogIn className="w-4 h-4 sm:w-5 sm:h-5" />
               Login to Platform
+            </motion.a>
+
+            <motion.a
+              href="/about"
+              className="inline-flex items-center gap-2 px-6 sm:px-10 py-3 sm:py-4 bg-white text-blue-600 border-2 border-blue-600 rounded-full hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl text-sm sm:text-base"
+              whileHover={{
+                scale: 1.05,
+                boxShadow: "0 20px 60px rgba(59, 130, 246, 0.2)",
+              }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Info className="w-4 h-4 sm:w-5 sm:h-5" />
+              About Us
             </motion.a>
 
             <motion.a
@@ -281,8 +296,8 @@ function SlideTwo() {
     },
     {
       icon: Shield,
-      title: "Secure Assessments",
-      description: "Multi-layered proctoring with AI monitoring",
+      title: "Exam Platform",
+      description: "Comprehensive exam management for teachers and institutions",
       color: "from-purple-500 to-purple-600",
     },
     {
@@ -393,9 +408,8 @@ function SlideTwo() {
         >
           <motion.button
             onClick={() => setActiveTab("educators")}
-            className={`relative px-4 sm:px-8 lg:px-10 py-2.5 sm:py-3 rounded-full transition-all overflow-hidden text-xs sm:text-sm lg:text-base ${
-              activeTab === "educators" ? "text-white" : "text-gray-600 hover:text-blue-600"
-            }`}
+            className={`relative px-4 sm:px-8 lg:px-10 py-2.5 sm:py-3 rounded-full transition-all overflow-hidden text-xs sm:text-sm lg:text-base ${activeTab === "educators" ? "text-white" : "text-gray-600 hover:text-blue-600"
+              }`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -411,9 +425,8 @@ function SlideTwo() {
 
           <motion.button
             onClick={() => setActiveTab("students")}
-            className={`relative px-4 sm:px-8 lg:px-10 py-2.5 sm:py-3 rounded-full transition-all overflow-hidden text-xs sm:text-sm lg:text-base ${
-              activeTab === "students" ? "text-white" : "text-gray-600 hover:text-blue-600"
-            }`}
+            className={`relative px-4 sm:px-8 lg:px-10 py-2.5 sm:py-3 rounded-full transition-all overflow-hidden text-xs sm:text-sm lg:text-base ${activeTab === "students" ? "text-white" : "text-gray-600 hover:text-blue-600"
+              }`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -489,9 +502,9 @@ function SlideDownload() {
       color: "from-blue-500 to-blue-600",
     },
     {
-      icon: Smartphone,
+      icon: Monitor,
       title: "Multi-Platform",
-      description: "Works seamlessly on iOS, Android, Windows, and Mac",
+      description: "Works seamlessly on Windows and Mac",
       color: "from-purple-500 to-purple-600",
     },
     {
@@ -571,8 +584,8 @@ function SlideDownload() {
             animate={isInView ? { opacity: 1, scale: 1 } : {}}
             transition={{ delay: 0.2 }}
           >
-            <Smartphone className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-            <span className="text-blue-600 text-xs sm:text-sm font-semibold">MOBILE & DESKTOP APP</span>
+            <Monitor className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+            <span className="text-blue-600 text-xs sm:text-sm font-semibold">MAC & DESKTOP APP</span>
           </motion.div>
 
           <h2 className="mb-4 sm:mb-6 text-gray-900 text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold">
@@ -580,7 +593,7 @@ function SlideDownload() {
             <span className="bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">Exam App</span>
           </h2>
           <p className="text-gray-600 text-base sm:text-lg lg:text-xl max-w-2xl mx-auto px-2">
-            Take secure, proctored exams anywhere, anytime with our powerful native application
+            Take secure, proctored exams with our powerful native application
           </p>
         </motion.div>
 
