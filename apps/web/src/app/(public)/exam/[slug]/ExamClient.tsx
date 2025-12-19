@@ -24,6 +24,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { ChevronLeft, ChevronRight, Flag, Play, Send, RotateCcw, Settings, Maximize2, Menu, X, Check, Info, Timer, BookOpen, Minus, Plus, Lock, ChevronDown, ChevronUp, AlertTriangle, Star, Shield, RefreshCw, WifiOff, Wifi, Clock } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
+import { v4 as uuidv4 } from 'uuid'
 
 // Supabase and Auth
 import createClient from "@/lib/database/client"
@@ -149,8 +150,8 @@ type AnswerState = {
   totalTestCases?: number
   totalPointsEarned?: number
   totalPossiblePoints?: number
-  status: "unanswered" | "answered" | "submitted"
   isMarkedForReview?: boolean
+  status: "unanswered" | "answered" | "submitted"
 }
 
 
@@ -200,6 +201,8 @@ export default function Component() {
   const [networkSpeed, setNetworkSpeed] = useState<number | null>(null)
   const [isTimeUp, setIsTimeUp] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // New Flow States
   const [isReviewingSection, setIsReviewingSection] = useState(false)
@@ -326,8 +329,26 @@ export default function Component() {
         setNetworkStrength(0)
         setNetworkSpeed(0)
         logger.warn('❌ Network disconnected (navigator)')
+
+        // Start connection loss timer (2 minutes = 120 seconds)
+        if (!connectionLossTimerRef.current) {
+          logger.warn('⏱️ Starting 2-minute connection loss timer')
+          connectionLossTimerRef.current = setTimeout(() => {
+            logger.error('💥 Connection lost for more than 2 minutes. Invalidating session.')
+            setLoadingError('Connection lost for more than 2 minutes. Please log in again.')
+            setIsExamStarted(false)
+            clearLocalSession()
+          }, 120000)
+        }
       } else {
         setIsOnline(true)
+
+        // Clear connection loss timer if back online
+        if (connectionLossTimerRef.current) {
+          logger.log('✅ Connection restored. Clearing timer.')
+          clearTimeout(connectionLossTimerRef.current)
+          connectionLossTimerRef.current = null
+        }
 
         const connection = (navigator as any).connection
         if (connection) {
@@ -405,6 +426,97 @@ export default function Component() {
     }
   }, [])
 
+  const connectionLossTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Initialize Session ID
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    let sid = sessionStorage.getItem('exam_session_id')
+    if (!sid) {
+      sid = uuidv4()
+      sessionStorage.setItem('exam_session_id', sid)
+    }
+    setSessionId(sid)
+  }, [])
+
+  // Session Heartbeat
+  useEffect(() => {
+    if (!isExamStarted || isExamFinished || !sessionId || !studentAuthData || !exam) {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current)
+        heartbeatIntervalRef.current = null
+      }
+      return
+    }
+
+    const sendHeartbeat = async () => {
+      try {
+        const res = await fetch(`/api/exams/${exam.id}/session/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: studentAuthData.userId,
+            sessionId: sessionId
+          })
+        })
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          if (data.code === 'CONCURRENT_SESSION') {
+            logger.error('🚫 Session conflict detected in heartbeat')
+            setLoadingError('Exam is already active on another device or browser tab')
+            setIsExamStarted(false)
+          }
+        }
+      } catch (error) {
+        logger.warn('⚠️ Heartbeat failed:', error)
+      }
+    }
+
+    // Initial heartbeat
+    sendHeartbeat()
+
+    // Interval every 20 seconds
+    heartbeatIntervalRef.current = setInterval(sendHeartbeat, 20000)
+
+    return () => {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current)
+        heartbeatIntervalRef.current = null
+      }
+    }
+  }, [isExamStarted, isExamFinished, sessionId, studentAuthData, exam])
+
+  // Release session on close
+  const releaseSession = useCallback(async () => {
+    if (!exam || !studentAuthData || !sessionId) return
+
+    try {
+      // Use navigator.sendBeacon for more reliable release on tab close
+      const blob = new Blob([JSON.stringify({
+        userId: studentAuthData.userId,
+        sessionId: sessionId
+      })], { type: 'application/json' })
+
+      navigator.sendBeacon(`/api/exams/${exam.id}/session/release`, blob)
+    } catch (error) {
+      logger.error('Error releasing session:', error)
+    }
+  }, [exam, studentAuthData, sessionId])
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      releaseSession()
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      releaseSession() // Also release on unmount
+    }
+  }, [releaseSession])
+
   // Persist/Restore session
   useEffect(() => {
     if (!exam) return
@@ -418,26 +530,21 @@ export default function Component() {
         submissionId,
         timestamp: Date.now()
       }
-      localStorage.setItem(sessionKey, JSON.stringify(sessionData))
+      sessionStorage.setItem(sessionKey, JSON.stringify(sessionData))
     }
     // If we don't have auth data but it exists in storage, restore it
     else if (!studentAuthData && !submissionId) {
       try {
-        const stored = localStorage.getItem(sessionKey)
+        const stored = sessionStorage.getItem(sessionKey)
         if (stored) {
           const { studentAuthData: savedAuth, submissionId: savedSubId } = JSON.parse(stored)
           if (savedAuth && savedSubId) {
-            logger.log('🔄 Restoring session from storage')
+            logger.log('🔄 Restoring session from sessionStorage')
             setStudentAuthData(savedAuth)
             setSubmissionId(savedSubId)
             setShowStudentAuth(false)
             setShowInstructions(false)
             setIsExamStarted(true)
-            // Trigger startExam to fetch latest state from server
-            // We need to wrap this in a timeout or effect to avoid state update loops
-            // But since we set state above, we can just let the next render handle it?
-            // Actually, we need to call the API to get the latest time/answers
-            // We can do this by setting a flag or calling a function
           }
         }
       } catch (e) {
@@ -449,10 +556,7 @@ export default function Component() {
   // Effect to trigger data fetch after restoration
   useEffect(() => {
     if (isExamStarted && submissionId && exam && !answers['restored']) {
-      // This is a bit hacky, but we need to re-fetch the exam state if we just restored from local storage
       // The startExam function handles fetching existing submission state
-      // We can just call it again? Or extract the fetch logic?
-      // Let's modify startExam to be callable for restoration
       startExam()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -670,9 +774,9 @@ export default function Component() {
     const sessionKey = `exam_session_${exam.id}`
     const monitoringKey = `browser_monitoring_metrics_${targetSubId}`
 
-    localStorage.removeItem(sessionKey)
-    localStorage.removeItem(monitoringKey)
-    logger.log('🧹 Cleared local session data')
+    sessionStorage.removeItem(sessionKey)
+    sessionStorage.removeItem(monitoringKey)
+    logger.log('Sweep: Cleared session data')
   }
 
   const autoSubmitExpiredExam = async (subId: string, answersOverride?: Record<string, AnswerState>) => {
@@ -761,7 +865,8 @@ export default function Component() {
           studentName: studentAuthData.studentName,
           studentEmail: studentAuthData.studentEmail,
           rollNumber: studentAuthData.rollNumber,
-          studentSection: studentAuthData.studentSection
+          studentSection: studentAuthData.studentSection,
+          sessionId: sessionId
         })
       })
 
@@ -769,6 +874,10 @@ export default function Component() {
 
       if (!response.ok) {
         logger.error('❌ Start exam API error:', result)
+        if (result.code === 'CONCURRENT_SESSION') {
+          setLoadingError('Exam is already active on another device or browser tab')
+          return
+        }
         if (result.alreadySubmitted) {
           setIsExamFinished(true)
           setShowInstructions(false)
@@ -846,10 +955,25 @@ export default function Component() {
           if (allQuestionsSubmitted && section.questions.length > 0) {
             submittedSections[section.id] = true
           }
+        })
 
-          // Unlock sections: first one, or any with answered/submitted questions
-          const hasProgress = section.questions.some((q) => ans[q.id]?.status !== "unanswered" && ans[q.id]?.status !== undefined)
-          if (idx === 0 || hasProgress || allQuestionsSubmitted) {
+        // Second pass: Unlock sections if previous is submitted
+        uiSections.forEach((section, idx) => {
+          if (idx === 0) {
+            unlockedSectionsMap[section.id] = true
+          } else {
+            const prevSec = uiSections[idx - 1]
+            if (submittedSections[prevSec.id]) {
+              unlockedSectionsMap[section.id] = true
+            }
+          }
+
+          // Also unlock if it has any progress
+          const hasProgress = section.questions.some((q) => {
+            const st = ans[q.id]?.status
+            return st !== "unanswered" && st !== undefined
+          })
+          if (hasProgress) {
             unlockedSectionsMap[section.id] = true
           }
         })
@@ -864,16 +988,22 @@ export default function Component() {
           currentSecIdx = i // If all submitted, stay on last
         }
 
+        const allSectionsSubmitted = uiSections.length > 0 && uiSections.every(s => submittedSections[s.id])
+
         setAnswers(ans)
         setSectionSubmitted(submittedSections)
         setUnlockedSections(unlockedSectionsMap)
         setCurrentSectionIdx(currentSecIdx)
+        if (allSectionsSubmitted) {
+          setIsExamReview(true)
+        }
 
         logger.log('✅ Restored state:', {
           answersCount: Object.keys(ans).length,
           submittedSections: Object.keys(submittedSections),
           unlockedSections: Object.keys(unlockedSectionsMap),
-          currentSectionIdx: currentSecIdx
+          currentSectionIdx: currentSecIdx,
+          isExamReview: allSectionsSubmitted
         })
       } else {
         logger.log('📝 Starting fresh exam (no previous answers)')
@@ -894,7 +1024,7 @@ export default function Component() {
     const payload: Record<string, any> = {}
     Object.keys(next).forEach((qid) => {
       const a = next[qid]
-      payload[qid] = { userAnswer: a.userAnswer, userCode: a.userCode, status: a.status }
+      payload[qid] = { userAnswer: a.userAnswer, userCode: a.userCode, status: a.status, isMarkedForReview: a.isMarkedForReview }
     })
     const updatePayload: TablesUpdate<'exam_submissions'> = {
       answers: payload as any,
@@ -918,10 +1048,6 @@ export default function Component() {
     })
   }
 
-  const toggleMarkForReview = (qid: string) => {
-    const current = answers[qid]?.isMarkedForReview || false
-    updateAnswer(qid, { isMarkedForReview: !current })
-  }
 
   // Navigation
   const navigateToQuestion = (sectionIdx: number, questionIdx: number) => {
@@ -932,6 +1058,7 @@ export default function Component() {
     if (sectionSubmitted[s.id]) return
 
     setIsReviewingSection(false)
+    setIsExamReview(false)
     setCurrentSectionIdx(sectionIdx)
     setCurrentQuestionIdx(questionIdx)
   }
@@ -1113,6 +1240,12 @@ export default function Component() {
   const confirmSubmit = async (isVerified: boolean) => {
     if (!isVerified) return
     if (!exam) return
+
+    if (submitDialogType === "final") {
+      handleFinalSubmit()
+      setShowSubmitDialog(false)
+      return
+    }
 
     const sec = currentSection
     if (!sec) return
@@ -1503,6 +1636,7 @@ export default function Component() {
               variant="ghost"
               size="sm"
               className="hover:bg-sky-100 text-sky-700"
+              disabled={isExamReview || isReviewingSection}
               onClick={() => {
                 if (!currentSection) return
                 if (currentQuestionIdx > 0) setCurrentQuestionIdx(currentQuestionIdx - 1)
@@ -1523,6 +1657,7 @@ export default function Component() {
               variant="ghost"
               size="sm"
               className="hover:bg-sky-100 text-sky-700"
+              disabled={isExamReview || isReviewingSection}
               onClick={() => {
                 if (!currentSection) return
                 if (currentQuestionIdx < currentSection.questions.length - 1) setCurrentQuestionIdx(currentQuestionIdx + 1)
@@ -1534,20 +1669,6 @@ export default function Component() {
               Next
               <ChevronRight className="h-4 w-4" />
             </Button>
-            {currentQ && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "hover:bg-sky-100 items-center gap-1.5",
-                  answers[currentQ.id]?.isMarkedForReview ? "text-amber-600 bg-amber-50" : "text-sky-600"
-                )}
-                onClick={() => toggleMarkForReview(currentQ.id)}
-              >
-                <Flag className={cn("h-4 w-4", answers[currentQ.id]?.isMarkedForReview && "fill-amber-600")} />
-                <span className="hidden sm:inline">Mark for Review</span>
-              </Button>
-            )}
           </div>
           {/* Monitoring Status - Tab Switches Only */}
           {(isElectronApp || exam?.exam_mode === 'browser') && (
@@ -1656,7 +1777,7 @@ export default function Component() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar - Sections/Questions */}
-        <div className={`${isSidebarOpen ? "w-16" : "w-0"} transition-all duration-300 border-r border-sky-200 bg-white shadow-sm overflow-hidden`}>
+        <div className={`${isSidebarOpen && !isExamReview && !isReviewingSection ? "w-16" : "w-0"} transition-all duration-300 border-r border-sky-200 bg-white shadow-sm overflow-hidden`}>
           <ScrollArea className="h-full">
             <div className="p-2 space-y-3">
               {uiSections.map((s, sIdx) => {
@@ -1750,7 +1871,13 @@ export default function Component() {
                   status: (answers[q.id]?.status as any) || "unanswered"
                 }))
               }))}
-              onFinalSubmit={handleFinalSubmit}
+              onFinalSubmit={handleFinalSubmitClick}
+              onGoToSection={(idx) => {
+                setIsExamReview(false)
+                setIsReviewingSection(false)
+                setCurrentSectionIdx(idx)
+                setCurrentQuestionIdx(0)
+              }}
             />
           ) : isReviewingSection && currentSection ? (
             <SectionReview
@@ -1766,7 +1893,10 @@ export default function Component() {
                 setIsReviewingSection(false)
                 setCurrentQuestionIdx(idx)
               }}
-              onSubmitSection={() => confirmSubmit(true)}
+              onSubmitSection={() => {
+                setSubmitDialogType("section")
+                setShowSubmitDialog(true)
+              }}
             />
           ) : currentSection && sectionSubmitted[currentSection.id] ? (
             <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-sky-50 to-white p-8">
@@ -2051,20 +2181,22 @@ export default function Component() {
         </div>
       </div>
 
-      {showSubmitDialog && (
-        <SubmitDialog
-          questions={dialogQuestions}
-          onConfirm={confirmSubmit}
-          onCancel={() => setShowSubmitDialog(false)}
-          title={submitDialogType === "section" ? `Submit Section ${currentSection?.title}?` : "Submit Exam?"}
-          message={
-            submitDialogType === "section"
-              ? `Are you sure you want to submit Section ${currentSection?.title}? Once submitted, you cannot change your answers for this section.`
-              : "Are you sure you want to submit your exam?"
-          }
-          requireVerification={true}
-        />
-      )}
+      {
+        showSubmitDialog && (
+          <SubmitDialog
+            questions={dialogQuestions}
+            onConfirm={confirmSubmit}
+            onCancel={() => setShowSubmitDialog(false)}
+            title={submitDialogType === "section" ? `Submit Section ${currentSection?.title}?` : "Submit Exam?"}
+            message={
+              submitDialogType === "section"
+                ? `Are you sure you want to submit Section ${currentSection?.title}? Once submitted, you cannot change your answers for this section.`
+                : "Are you sure you want to submit your exam?"
+            }
+            requireVerification={true}
+          />
+        )
+      }
 
       {/* Violation Alert - In-app popup instead of system alert */}
       <ViolationAlert
@@ -2072,7 +2204,7 @@ export default function Component() {
         onDismiss={handleViolationDismiss}
         onTerminate={handleViolationTerminate}
       />
-    </div>
+    </div >
   )
 
   function reportProblem() {
