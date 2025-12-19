@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { ChevronLeft, ChevronRight, Flag, Play, Send, RotateCcw, Settings, Maximize2, Menu, X, Check, Info, Timer, BookOpen, Minus, Plus, Lock, ChevronDown, ChevronUp, AlertTriangle, Star, Shield, RefreshCw, WifiOff, Wifi, Clock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Flag, Play, Send, RotateCcw, Settings, Maximize2, Menu, X, Check, Info, Timer, BookOpen, Minus, Plus, Lock, ChevronDown, ChevronUp, AlertTriangle, Star, Shield, RefreshCw, WifiOff, Wifi, Clock, Home } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { v4 as uuidv4 } from 'uuid'
@@ -37,14 +37,12 @@ import { useBrowserMonitoring } from '@/hooks/useBrowserMonitoring'
 
 import { WaitingRoom } from '@/components/exam/WaitingRoom'
 import { ExamInstructions } from '@/components/exam/ExamInstructions'
-import { SubmitDialog } from '@/components/exam/SubmitDialog'
 import { MCQQuestionPanel } from '@/components/exam/MCQQuestionPanel'
 import { MCQAnswerPanel } from '@/components/exam/MCQAnswerPanel'
 import { CodingQuestionPanel } from '@/components/exam/CodingQuestionPanel'
-import { LocalMcqQuestion, LocalCodingQuestion, DialogQuestionSummary, LocalQuestionBase } from '@/components/exam/types'
 
-import { SectionReview } from '@/components/exam/SectionReview'
 import { ExamReview } from '@/components/exam/ExamReview'
+import { DialogQuestionSummary } from '@/components/exam/types'
 
 // -----------------------------------------------------------------------------
 // Local UI types built from API shape
@@ -178,8 +176,6 @@ export default function Component() {
   const [answers, setAnswers] = useState<Record<string, AnswerState>>({})
   const [sectionSubmitted, setSectionSubmitted] = useState<Record<string, boolean>>({})
   const [unlockedSections, setUnlockedSections] = useState<Record<string, boolean>>({})
-  const [submitDialogType, setSubmitDialogType] = useState<"section" | "final">("section")
-  const [showSubmitDialog, setShowSubmitDialog] = useState(false)
   const [isExamStarted, setIsExamStarted] = useState(false)
   const [isExamFinished, setIsExamFinished] = useState(false)
   const [showInstructions, setShowInstructions] = useState(true)
@@ -204,8 +200,6 @@ export default function Component() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // New Flow States
-  const [isReviewingSection, setIsReviewingSection] = useState(false)
   const [isExamReview, setIsExamReview] = useState(false)
 
   // Waiting Room State
@@ -1057,7 +1051,6 @@ export default function Component() {
     if (!unlockedSections[s.id]) return
     if (sectionSubmitted[s.id]) return
 
-    setIsReviewingSection(false)
     setIsExamReview(false)
     setCurrentSectionIdx(sectionIdx)
     setCurrentQuestionIdx(questionIdx)
@@ -1072,9 +1065,9 @@ export default function Component() {
 
     // Check if this is the last question in the section
     if (currentSection && nextIdx >= currentSection.questions.length) {
-      // Last question - show section review instead of dialog directly
-      logger.log('📋 Last question in section - moving to section review')
-      setIsReviewingSection(true)
+      // Last question - show submit page
+      logger.log('📋 Last question in section - moving to submit page')
+      setIsExamReview(true)
     } else if (currentSection && nextIdx < currentSection.questions.length) {
       // Not the last question - navigate to next question
       setCurrentQuestionIdx(nextIdx)
@@ -1135,13 +1128,8 @@ export default function Component() {
   const decreaseFontSize = () => setCurrentFontSizeIndex((p) => Math.max(p - 1, 0))
   const currentFontSizeClass = FONT_SIZES[currentFontSizeIndex]
 
-  // Section and final submit dialogs
-  const handleSectionSubmitClick = () => {
-    setIsReviewingSection(true)
-  }
   const handleFinalSubmitClick = () => {
-    setSubmitDialogType("final")
-    setShowSubmitDialog(true)
+    handleFinalSubmit()
   }
 
   function computeScore(answersOverride?: Record<string, AnswerState>) {
@@ -1237,47 +1225,7 @@ export default function Component() {
     return { total, max, gradedAnswers }
   }
 
-  const confirmSubmit = async (isVerified: boolean) => {
-    if (!isVerified) return
-    if (!exam) return
 
-    if (submitDialogType === "final") {
-      handleFinalSubmit()
-      setShowSubmitDialog(false)
-      return
-    }
-
-    const sec = currentSection
-    if (!sec) return
-
-    // Mark section as submitted and lock its questions
-    setSectionSubmitted((prev) => ({ ...prev, [sec.id]: true }))
-    setAnswers((prev) => {
-      const next = { ...prev }
-      sec.questions.forEach((q) => {
-        const prior = next[q.id] || { status: "unanswered" }
-        next[q.id] = { ...prior, status: "submitted" }
-      })
-      void persistAnswers(next)
-      return next
-    })
-
-    // Reset review state
-    setIsReviewingSection(false)
-
-    // Unlock next section or move to final exam review
-    if (uiSections[currentSectionIdx + 1]) {
-      const nextSec = uiSections[currentSectionIdx + 1]
-      setUnlockedSections((prev) => ({ ...prev, [nextSec.id]: true }))
-      setCurrentSectionIdx(currentSectionIdx + 1)
-      setCurrentQuestionIdx(0)
-    } else {
-      // Last section submitted - show final exam review
-      setIsExamReview(true)
-    }
-
-    setShowSubmitDialog(false)
-  }
 
   const handleFinalSubmit = async () => {
     if (!exam) return
@@ -1619,9 +1567,6 @@ export default function Component() {
     return <ExamInstructions onStart={startExam} />
   }
 
-  const dialogQuestions: DialogQuestionSummary[] = submitDialogType === "section"
-    ? (currentSection?.questions || []).map((q) => ({ id: q.id, status: answers[q.id]?.status || "unanswered" }))
-    : uiSections.flatMap((s) => s.questions.map((q) => ({ id: q.id, status: answers[q.id]?.status || "unanswered" })))
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-sky-50 to-white">
@@ -1636,7 +1581,7 @@ export default function Component() {
               variant="ghost"
               size="sm"
               className="hover:bg-sky-100 text-sky-700"
-              disabled={isExamReview || isReviewingSection}
+              disabled={isExamReview}
               onClick={() => {
                 if (!currentSection) return
                 if (currentQuestionIdx > 0) setCurrentQuestionIdx(currentQuestionIdx - 1)
@@ -1657,12 +1602,12 @@ export default function Component() {
               variant="ghost"
               size="sm"
               className="hover:bg-sky-100 text-sky-700"
-              disabled={isExamReview || isReviewingSection}
+              disabled={isExamReview}
               onClick={() => {
                 if (!currentSection) return
                 if (currentQuestionIdx < currentSection.questions.length - 1) setCurrentQuestionIdx(currentQuestionIdx + 1)
                 else {
-                  setIsReviewingSection(true)
+                  setIsExamReview(true)
                 }
               }}
             >
@@ -1683,21 +1628,34 @@ export default function Component() {
           )}
         </div>
         {/* Central Submit Buttons */}
-        <div className="flex items-center gap-4">
-          <Button
-            onClick={() => setIsReviewingSection(true)}
-            disabled={isSectionSubmitButtonDisabled() || !isOnline || isExamReview}
-            className="bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white shadow-md transition-all duration-200 hover:shadow-lg font-semibold px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Review Section
-          </Button>
-          <Button
-            onClick={() => setIsExamReview(true)}
-            disabled={!isOnline}
-            className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-md transition-all duration-200 hover:shadow-lg font-semibold px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Final Submit Exam
-          </Button>
+        <div className="flex items-center gap-2">
+          {isExamReview ? (
+            /* Home Button to return to questions - only shown in Review mode */
+            <Button
+              variant="ghost"
+              className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 h-9 px-3 flex items-center gap-2"
+              onClick={() => {
+                const firstOpenIdx = uiSections.findIndex(s => !sectionSubmitted[s.id])
+                if (firstOpenIdx !== -1) {
+                  setCurrentSectionIdx(firstOpenIdx)
+                  setCurrentQuestionIdx(0)
+                }
+                setIsExamReview(false)
+              }}
+            >
+              <Home className="h-5 w-5" />
+              <span className="text-sm font-semibold">Back to Questions</span>
+            </Button>
+          ) : (
+            /* Submit Button - only shown when taking the exam */
+            <Button
+              onClick={() => setIsExamReview(true)}
+              disabled={!isOnline}
+              className="bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-md transition-all duration-200 hover:shadow-lg font-semibold px-6 py-2 h-9 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Submit
+            </Button>
+          )}
         </div>
         <div className="flex items-center gap-4">
           {studentAuthData?.rollNumber && (
@@ -1777,7 +1735,7 @@ export default function Component() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar - Sections/Questions */}
-        <div className={`${isSidebarOpen && !isExamReview && !isReviewingSection ? "w-16" : "w-0"} transition-all duration-300 border-r border-sky-200 bg-white shadow-sm overflow-hidden`}>
+        <div className={`${isSidebarOpen && !isExamReview ? "w-16" : "w-0"} transition-all duration-300 border-r border-sky-200 bg-white shadow-sm overflow-hidden`}>
           <ScrollArea className="h-full">
             <div className="p-2 space-y-3">
               {uiSections.map((s, sIdx) => {
@@ -1868,36 +1826,50 @@ export default function Component() {
                 title: s.title,
                 questions: s.questions.map(q => ({
                   id: q.id,
+                  title: q.title,
                   status: (answers[q.id]?.status as any) || "unanswered"
                 }))
               }))}
               onFinalSubmit={handleFinalSubmitClick}
-              onGoToSection={(idx) => {
+              sectionSubmitted={sectionSubmitted}
+              onSectionSubmit={(sectionId) => {
+                // Find all questions in this section
+                const section = uiSections.find(s => s.id === sectionId)
+                if (!section) return
+
+                setSectionSubmitted(prev => ({
+                  ...prev,
+                  [sectionId]: true
+                }))
+
+                // Mark all questions in this section as "submitted" and persist
+                setAnswers((prev) => {
+                  const next = { ...prev }
+                  section.questions.forEach((q) => {
+                    const prior = next[q.id] || { status: "unanswered" }
+                    next[q.id] = { ...prior, status: "submitted" }
+                  })
+                  void persistAnswers(next)
+                  return next
+                })
+
+                // Standard unlocking logic for next section if applicable
+                const sIdx = uiSections.findIndex(s => s.id === sectionId)
+                if (sIdx !== -1 && sIdx < uiSections.length - 1) {
+                  const nextSectionId = uiSections[sIdx + 1].id
+                  setUnlockedSections(prev => ({
+                    ...prev,
+                    [nextSectionId]: true
+                  }))
+                }
+              }}
+              onGoToSection={(idx, qIdx) => {
                 setIsExamReview(false)
-                setIsReviewingSection(false)
                 setCurrentSectionIdx(idx)
-                setCurrentQuestionIdx(0)
+                setCurrentQuestionIdx(qIdx || 0)
               }}
             />
-          ) : isReviewingSection && currentSection ? (
-            <SectionReview
-              sectionTitle={currentSection.title}
-              questions={currentSection.questions.map(q => ({
-                id: q.id,
-                title: q.title,
-                status: (answers[q.id]?.status as any) || "unanswered",
-                isMarkedForReview: !!answers[q.id]?.isMarkedForReview,
-                questionNumber: q.indexInSection
-              }))}
-              onBackToQuestion={(idx) => {
-                setIsReviewingSection(false)
-                setCurrentQuestionIdx(idx)
-              }}
-              onSubmitSection={() => {
-                setSubmitDialogType("section")
-                setShowSubmitDialog(true)
-              }}
-            />
+
           ) : currentSection && sectionSubmitted[currentSection.id] ? (
             <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-sky-50 to-white p-8">
               <div className="text-center space-y-4 max-w-md">
@@ -2181,22 +2153,7 @@ export default function Component() {
         </div>
       </div>
 
-      {
-        showSubmitDialog && (
-          <SubmitDialog
-            questions={dialogQuestions}
-            onConfirm={confirmSubmit}
-            onCancel={() => setShowSubmitDialog(false)}
-            title={submitDialogType === "section" ? `Submit Section ${currentSection?.title}?` : "Submit Exam?"}
-            message={
-              submitDialogType === "section"
-                ? `Are you sure you want to submit Section ${currentSection?.title}? Once submitted, you cannot change your answers for this section.`
-                : "Are you sure you want to submit your exam?"
-            }
-            requireVerification={true}
-          />
-        )
-      }
+
 
       {/* Violation Alert - In-app popup instead of system alert */}
       <ViolationAlert
