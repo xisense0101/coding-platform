@@ -181,7 +181,6 @@ function TheFounders() {
     const leaders = [
         {
             name: "Pawan Jung Bista",
-            role: "CEO",
             image: "/professional-nepali-male-ceo-portrait.jpg",
             description:
                 "Pawan experienced modern, hands-on education while studying in India and returned to Nepal determined to bring the same transformative learning approach to his homeland.",
@@ -193,7 +192,6 @@ function TheFounders() {
         },
         {
             name: "Suman Yadav",
-            role: "Founder",
             image: "/professional-nepali-male-founder-portrait-tech.jpg",
             description:
                 "Suman founded Blockscode with a clear mission: to give Nepalese students the practical skills and opportunities they need to compete globally.",
@@ -251,9 +249,6 @@ function TheFounders() {
                                         />
                                     </motion.div>
                                     <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">{leader.name}</h3>
-                                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium mb-4">
-                                        {leader.role}
-                                    </span>
                                     <p className="text-gray-600 mb-6 leading-relaxed">{leader.description}</p>
                                     <ul className="space-y-3 w-full">
                                         {leader.highlights.map((highlight, i) => (
