@@ -202,13 +202,6 @@ export function QuestionEditor({
             </div>
           )}
 
-          {/* Essay/Reading Question - Just Content (already rendered above) */}
-          {(question.type === 'essay' || question.type === 'reading') && (
-            <div className="text-xs text-gray-500 italic">
-              {question.type === 'essay' ? 'Students will write an essay response.' : 'Students will read this content.'}
-            </div>
-          )}
-
           {/* Coding Question */}
           {question.type === 'coding' && (
             <div className="space-y-6">

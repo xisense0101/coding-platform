@@ -11,7 +11,7 @@ interface ContentEditorProps {
   activeSection: Section | undefined;
   onUpdateSection: (updates: Partial<Section>) => void;
   onDeleteSection: () => void;
-  onAddQuestion: (type: 'mcq' | 'coding' | 'essay') => void;
+  onAddQuestion: (type: 'mcq' | 'coding' | 'essay' | 'reading') => void;
   onUpdateQuestion: (questionId: number, updates: Partial<Question>) => void;
   onDeleteQuestion: (questionId: number) => void;
   expandedQuestionId: number | null;
@@ -122,6 +122,14 @@ export function ContentEditor({
                 >
                   <Code2 className="w-3 h-3 mr-2" />
                   Coding Challenge
+                </Button>
+                <Button
+                  onClick={() => onAddQuestion('essay')}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  size="sm"
+                >
+                  <BookOpen className="w-3 h-3 mr-2" />
+                  Essay
                 </Button>
               </div>
             </div>
